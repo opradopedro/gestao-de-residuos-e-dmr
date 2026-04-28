@@ -1,7 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export type Unidade = { id: string; nome: string; criado_em: string };
-export type TipoResiduo = { id: string; nome: string; tratamento_padrao: string };
+export type TipoResiduo = { id: string; nome: string; tratamento_padrao: string; codigo?: string | null };
+export type Tratamento = { id: string; nome: string; codigo: string | null };
 export type Coleta = {
   id: string;
   unidade_id: string;
@@ -49,12 +50,13 @@ export async function listTiposResiduo(): Promise<TipoResiduo[]> {
   return data ?? [];
 }
 
-export async function upsertTipoResiduo(input: { id?: string; nome: string; tratamento_padrao: string }) {
+export async function upsertTipoResiduo(input: { id?: string; nome: string; tratamento_padrao: string; codigo?: string | null }) {
+  const payload = { nome: input.nome, tratamento_padrao: input.tratamento_padrao, codigo: input.codigo ?? null };
   if (input.id) {
-    const { error } = await supabase.from("tipos_residuo").update({ nome: input.nome, tratamento_padrao: input.tratamento_padrao }).eq("id", input.id);
+    const { error } = await supabase.from("tipos_residuo").update(payload).eq("id", input.id);
     if (error) throw error;
   } else {
-    const { error } = await supabase.from("tipos_residuo").insert({ nome: input.nome, tratamento_padrao: input.tratamento_padrao });
+    const { error } = await supabase.from("tipos_residuo").insert(payload);
     if (error) throw error;
   }
 }
@@ -62,6 +64,52 @@ export async function upsertTipoResiduo(input: { id?: string; nome: string; trat
 export async function deleteTipoResiduo(id: string) {
   const { error } = await supabase.from("tipos_residuo").delete().eq("id", id);
   if (error) throw error;
+}
+
+export async function bulkInsertTiposResiduo(rows: { nome: string; codigo?: string | null; tratamento_padrao?: string | null }[]) {
+  const existentes = await listTiposResiduo();
+  const existSet = new Set(existentes.map((t) => t.nome.toLowerCase()));
+  const payload = rows
+    .filter((r) => r.nome?.trim() && !existSet.has(r.nome.trim().toLowerCase()))
+    .map((r) => ({ nome: r.nome.trim(), codigo: r.codigo?.trim() || null, tratamento_padrao: (r.tratamento_padrao?.trim() || "Reciclagem") }));
+  if (payload.length === 0) return 0;
+  const { error } = await supabase.from("tipos_residuo").insert(payload);
+  if (error) throw error;
+  return payload.length;
+}
+
+export async function listTratamentos(): Promise<Tratamento[]> {
+  const { data, error } = await supabase.from("tratamentos").select("*").order("nome");
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function upsertTratamento(input: { id?: string; nome: string; codigo?: string | null }) {
+  const payload = { nome: input.nome, codigo: input.codigo ?? null };
+  if (input.id) {
+    const { error } = await supabase.from("tratamentos").update(payload).eq("id", input.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("tratamentos").insert(payload);
+    if (error) throw error;
+  }
+}
+
+export async function deleteTratamento(id: string) {
+  const { error } = await supabase.from("tratamentos").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function bulkInsertTratamentos(rows: { nome: string; codigo?: string | null }[]) {
+  const existentes = await listTratamentos();
+  const existSet = new Set(existentes.map((t) => t.nome.toLowerCase()));
+  const payload = rows
+    .filter((r) => r.nome?.trim() && !existSet.has(r.nome.trim().toLowerCase()))
+    .map((r) => ({ nome: r.nome.trim(), codigo: r.codigo?.trim() || null }));
+  if (payload.length === 0) return 0;
+  const { error } = await supabase.from("tratamentos").insert(payload);
+  if (error) throw error;
+  return payload.length;
 }
 
 export type ColetaInput = {
