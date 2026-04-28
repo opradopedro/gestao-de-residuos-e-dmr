@@ -1,68 +1,95 @@
+## Contexto
 
-# Plano — SaaS de Gestão e Conferência de DMR
+A aplicação já tem toda a estrutura funcional pedida (sidebar, dashboard, coletas, pendências, DMR, consolidação, cadastros). Este plano foca em **alinhar o design e a experiência operacional** ao briefing: paleta branco/azul/verde, filtro global de período, dashboard de risco dedicado e refinamentos de usabilidade.
 
-Sistema multiunidade para registrar coletas de resíduos, identificar pendências (sem MTR / peso estimado), consolidar por trimestre e conferir contra a DMR via upload de Excel. Sem login nesta versão; validações apenas sinalizam (não bloqueiam).
+## 1. Nova paleta (src/styles.css)
 
-## Entidades (Lovable Cloud / Postgres)
+Trocar o tema atual (verde dominante) pela paleta solicitada:
 
-- `unidades` (id, nome, criado_em)
-- `tipos_residuo` (id, nome, tratamento_padrao) — populada com lista inicial sugerida
-- `coletas` (id, unidade_id, data, transportador, destinador, mtr, peso_estimado bool, observacoes, criado_em)
-- `coleta_itens` (id, coleta_id, tipo_residuo_id, peso_kg, tratamento)
-- `dmr_uploads` (id, unidade_id, trimestre, arquivo_nome, mapeamento_jsonb, criado_em)
-- `dmr_linhas` (id, upload_id, residuo, destinador, peso_kg, mtr, data)
+- **Fundo:** branco puro / cinza muito claro
+- **Primary (ações, links, botões):** azul (`oklch(0.55 0.18 255)`)
+- **Success (indicadores positivos, "tudo certo"):** verde (`oklch(0.62 0.17 150)`)
+- **Warning (peso estimado, risco médio):** amarelo âmbar (`oklch(0.80 0.16 80)`)
+- **Destructive (sem MTR, fora da DMR, risco alto):** vermelho (`oklch(0.58 0.22 25)`)
+- **Sidebar:** branco com borda sutil; item ativo em azul claro
+- Bordas mais suaves, cards com sombra leve em vez de só borda
 
-Separação por unidade aplicada em todas as queries (filtro `unidade_id`). Sem RLS pois não há login agora — preparado para adicionar depois.
+## 2. Filtro global de período (src/components/AppShell.tsx + novo hook)
 
-Lista inicial de resíduos (exemplos, editáveis): Papel/Papelão→Reciclagem, Plástico→Reciclagem, Vidro→Reciclagem, Metal→Reciclagem, Orgânico→Compostagem, Rejeito→Aterro Sanitário, Resíduo de Saúde Infectante→Incineração, Perfurocortantes→Incineração, Químico→Tratamento Químico, Eletroeletrônico→Logística Reversa, Lâmpadas→Descontaminação, Óleo Usado→Rerrefino.
+Hoje o trimestre é "atual" fixo. Adicionar:
 
-## Telas e fluxos
+- Novo hook `use-periodo.ts` (ano + trimestre persistido em localStorage)
+- Seletor de período no **header da área principal** (ao lado do nome da unidade no mobile, e como barra superior fixa no desktop) — opções: 1º/2º/3º/4º trimestre + ano
+- Substituir `currentQuarter()` por `usePeriodoAtivo()` em: `index.tsx`, `pendencias.tsx`, `consolidacao.tsx`, `dmr.tsx`, novo `risco.tsx`
+- O período escolhido vira o filtro padrão de **todas** as telas (mantém a coerência multi-unidade já existente)
+
+## 3. Dashboard principal (`/`) — refinamento
+
+- KPIs reorganizados em destaque: total de resíduos, coletas sem MTR, peso estimado, **volume fora da DMR** (calcular comparando com último upload DMR do trimestre, se houver — caso contrário mostrar "—")
+- Banner de alerta no topo quando houver risco alto (cor vermelha) ou médio (amarela)
+- Gráfico de top resíduos com cores azul/verde da nova paleta
+- Atalhos rápidos: "Nova coleta", "Resolver pendências", "Conferir DMR"
+
+## 4. Nova tela: Dashboard de Risco (`/risco`)
+
+Nova rota `src/routes/risco.tsx` com:
+
+- **Score de risco** calculado por regra simples no trimestre selecionado:
+  - Alto: >5 coletas sem MTR **ou** >1 t fora da DMR
+  - Médio: 1-5 coletas sem MTR **ou** peso estimado >10% do total
+  - Baixo: caso contrário
+- Cartão grande no topo com badge colorido (vermelho/amarelo/verde) + frase resumo: *"3 coletas sem MTR · 1.2 toneladas fora da DMR"*
+- Lista de fatores de risco detalhados (cada item com link para a tela de origem):
+  - "Coletas sem MTR" → /pendencias
+  - "Peso estimado não confirmado" → /pendencias
+  - "Divergências DMR" → /dmr
+  - "MTRs duplicados em 90 dias" (regra já existente)
+- Item adicionado no menu lateral entre "Pendências" e "Consolidação"
+
+## 5. Tela de Pendências — ações rápidas
+
+- Adicionar **botão "Adicionar MTR"** inline em cada linha sem MTR (abre modal pequeno com input + salvar) em vez de só "Corrigir"
+- Adicionar **botão "Confirmar peso"** inline para itens com peso estimado (desmarca a flag `peso_estimado`)
+- Mantém o link "Editar coleta completa" para casos complexos
+
+## 6. Tela de DMR — investigação
+
+- Tornar cada linha de divergência **clicável** (abre `Sheet` lateral) listando:
+  - Coletas internas que compõem aquele resíduo/destinador no trimestre (com link "Editar")
+  - Linhas da DMR que entraram no agrupamento
+- Indicador visual mais forte: chips coloridos (verde "OK", amarelo "Divergência leve", vermelho "Divergência grave > 50 kg ou >10%")
+
+## 7. Cadastro de coleta — refinamento
+
+- Layout mais compacto, agrupando: Data + Unidade + Transportador + Destinador + MTR no topo
+- Bloco "Resíduos" com botão "+ Adicionar resíduo" mais visível (azul)
+- Auto-sugestão de tratamento já existe — destacar visualmente quando aplicada
+- Checkbox de "peso estimado" com ícone de aviso amarelo
+
+## 8. Sidebar — pequenos ajustes
+
+- Branco com item ativo em azul claro (alinhado à nova paleta)
+- Badge numérico vermelho ao lado de "Pendências" e "Risco" quando houver itens críticos
+
+## Arquivos afetados
 
 ```text
-Sidebar
-├─ Seletor de Unidade (global, persiste em localStorage)
-├─ Dashboard
-├─ Coletas
-│   ├─ Lista
-│   └─ Nova / Editar
-├─ Pendências
-├─ Consolidação trimestral
-├─ DMR (upload e conferência)
-└─ Cadastros (Unidades, Tipos de Resíduo)
+EDIT  src/styles.css                 (nova paleta)
+EDIT  src/components/AppShell.tsx    (período global no header, badges no menu)
+NEW   src/hooks/use-periodo.ts       (ano+trimestre global)
+EDIT  src/routes/index.tsx           (KPIs, banner, atalhos, usar período global)
+EDIT  src/routes/pendencias.tsx      (ações inline, usar período global)
+EDIT  src/routes/dmr.tsx             (Sheet de investigação, chips)
+EDIT  src/routes/consolidacao.tsx    (usar período global)
+EDIT  src/components/ColetaForm.tsx  (layout compacto)
+NEW   src/routes/risco.tsx           (dashboard de risco)
+EDIT  src/lib/data.ts                (helper para volume fora da DMR + atualização rápida MTR/peso)
 ```
 
-### 1. Dashboard (por unidade)
-Cards: total de coletas no trimestre atual, peso total, nº pendências sem MTR, peso estimado pendente, “X toneladas fora do sistema oficial”. Gráfico de pesos por tipo de resíduo e por destinador.
+## Fora do escopo
 
-### 2. Coletas
-- **Lista**: filtros por trimestre, destinador, status (OK / sem MTR / estimado / alerta peso).
-- **Nova coleta**: data padrão = hoje, unidade = unidade ativa, transportador, destinador, MTR (opcional), checkbox peso estimado, observações livre. Adiciona N itens (tipo de resíduo → tratamento auto-sugerido e editável, peso obrigatório). Permite atualizar MTR depois pela edição.
-- Sinalizadores visuais (badges) quando peso > 50.000 kg/item ou MTR repetido em coletas diferentes nos últimos 90 dias. Nunca bloqueia salvar.
+- Autenticação / RBAC (mantido para fase futura conforme combinado)
+- Mudança de schema do banco (a base atual já suporta tudo)
+- Notificações push / e-mails
 
-### 3. Pendências
-Duas abas: **Sem MTR** e **Peso estimado**. Mostra contagem, peso total e botão para abrir/corrigir a coleta. Banner de impacto agregado.
-
-### 4. Consolidação trimestral
-Agrupamento automático em trimestres calendário (Jan-Mar, Abr-Jun, Jul-Set, Out-Dez). Tabelas pivot por tipo de resíduo × destinador com soma de pesos. Botão **Exportar XLSX** gera uma planilha por trimestre (já filtrada pela unidade ativa) usando openpyxl no servidor.
-
-### 5. Módulo DMR
-- Upload de `.xlsx` para a unidade + trimestre selecionados.
-- Preview das primeiras linhas e **tela de mapeamento manual**: o usuário associa cada coluna do Excel aos campos do sistema (Resíduo, Destinador, Peso, MTR, Data). Mapeamento salvo no upload.
-- Conferência: agrupa DMR e dados internos por (tipo de resíduo, destinador) e mostra tabela comparativa com colunas Interno / DMR / Divergência (kg e %).
-- Para cada divergência, painel de **causas sugeridas**: lista coletas sem MTR e coletas com peso estimado do mesmo grupo no trimestre, com link para correção.
-
-### 6. Cadastros
-CRUD simples de Unidades e de Tipos de Resíduo (com tratamento padrão).
-
-## Detalhes técnicos
-
-- TanStack Start + Tailwind + shadcn/ui (já no projeto).
-- Lovable Cloud para banco; migrações criando todas as tabelas e seed dos tipos de resíduo.
-- Server functions (`createServerFn`) para: criar/atualizar coleta, listar por unidade, calcular pendências/totais, gerar XLSX (openpyxl não está disponível em Worker — usar `exceljs` no servidor ou `xlsx` puro JS para leitura/escrita), processar upload da DMR (parse com `xlsx`), salvar mapeamento e rodar comparação.
-- TanStack Query para cache; loaders chamando `ensureQueryData`.
-- Rotas separadas por seção (`/`, `/coletas`, `/coletas/nova`, `/coletas/$id`, `/pendencias`, `/consolidacao`, `/dmr`, `/cadastros/unidades`, `/cadastros/residuos`).
-- Validação com Zod nos forms e nas server functions.
-- Estrutura preparada para adicionar autenticação e auditoria depois (campos `criado_em` já presentes; fácil acrescentar `criado_por` e tabela `audit_log`).
-
-## Fora de escopo nesta versão
-Login/usuários, RLS por usuário, auditoria detalhada, notificações, integração direta com SINIR.
+Após sua aprovação, implemento em uma única sequência e mostro o resultado.
