@@ -149,12 +149,12 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting }: Props) 
               <CardContent className="p-4 grid gap-3 md:grid-cols-12">
                 <div className="md:col-span-4">
                   <Label className="text-xs">Tipo de resíduo</Label>
-                  <Select value={it.tipo_residuo_id ?? undefined} onValueChange={(v) => selecionarTipo(i, v)}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>
-                      {tipos.map((t) => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Autocomplete
+                    value={it.tipo_residuo_nome}
+                    onChange={(v) => selecionarTipoPorNome(i, v)}
+                    options={tipoOptions}
+                    placeholder="Digite para buscar..."
+                  />
                 </div>
                 <div className="md:col-span-3">
                   <Label className="text-xs">Peso (kg)</Label>
@@ -167,7 +167,12 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting }: Props) 
                 </div>
                 <div className="md:col-span-4">
                   <Label className="text-xs">Tratamento</Label>
-                  <Input value={it.tratamento} onChange={(e) => updateItem(i, { tratamento: e.target.value })} placeholder="Ex.: Reciclagem" />
+                  <Autocomplete
+                    value={it.tratamento}
+                    onChange={(v) => updateItem(i, { tratamento: v })}
+                    options={tratamentoOptions}
+                    placeholder="Ex.: Reciclagem"
+                  />
                 </div>
                 <div className="md:col-span-1 flex items-end justify-end">
                   <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(i)} disabled={itens.length === 1}>
