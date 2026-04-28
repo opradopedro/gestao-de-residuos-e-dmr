@@ -10,7 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PendenciasRouteImport } from './routes/pendencias'
+import { Route as DmrRouteImport } from './routes/dmr'
 import { Route as ConsolidacaoRouteImport } from './routes/consolidacao'
+import { Route as CadastrosRouteImport } from './routes/cadastros'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ColetasIndexRouteImport } from './routes/coletas.index'
 import { Route as ColetasNovaRouteImport } from './routes/coletas.nova'
@@ -21,9 +23,19 @@ const PendenciasRoute = PendenciasRouteImport.update({
   path: '/pendencias',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DmrRoute = DmrRouteImport.update({
+  id: '/dmr',
+  path: '/dmr',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ConsolidacaoRoute = ConsolidacaoRouteImport.update({
   id: '/consolidacao',
   path: '/consolidacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CadastrosRoute = CadastrosRouteImport.update({
+  id: '/cadastros',
+  path: '/cadastros',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -49,7 +61,9 @@ const ColetasIdRoute = ColetasIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/cadastros': typeof CadastrosRoute
   '/consolidacao': typeof ConsolidacaoRoute
+  '/dmr': typeof DmrRoute
   '/pendencias': typeof PendenciasRoute
   '/coletas/$id': typeof ColetasIdRoute
   '/coletas/nova': typeof ColetasNovaRoute
@@ -57,7 +71,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cadastros': typeof CadastrosRoute
   '/consolidacao': typeof ConsolidacaoRoute
+  '/dmr': typeof DmrRoute
   '/pendencias': typeof PendenciasRoute
   '/coletas/$id': typeof ColetasIdRoute
   '/coletas/nova': typeof ColetasNovaRoute
@@ -66,7 +82,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/cadastros': typeof CadastrosRoute
   '/consolidacao': typeof ConsolidacaoRoute
+  '/dmr': typeof DmrRoute
   '/pendencias': typeof PendenciasRoute
   '/coletas/$id': typeof ColetasIdRoute
   '/coletas/nova': typeof ColetasNovaRoute
@@ -76,7 +94,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/cadastros'
     | '/consolidacao'
+    | '/dmr'
     | '/pendencias'
     | '/coletas/$id'
     | '/coletas/nova'
@@ -84,7 +104,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/cadastros'
     | '/consolidacao'
+    | '/dmr'
     | '/pendencias'
     | '/coletas/$id'
     | '/coletas/nova'
@@ -92,7 +114,9 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/cadastros'
     | '/consolidacao'
+    | '/dmr'
     | '/pendencias'
     | '/coletas/$id'
     | '/coletas/nova'
@@ -101,7 +125,9 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CadastrosRoute: typeof CadastrosRoute
   ConsolidacaoRoute: typeof ConsolidacaoRoute
+  DmrRoute: typeof DmrRoute
   PendenciasRoute: typeof PendenciasRoute
   ColetasIdRoute: typeof ColetasIdRoute
   ColetasNovaRoute: typeof ColetasNovaRoute
@@ -117,11 +143,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PendenciasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dmr': {
+      id: '/dmr'
+      path: '/dmr'
+      fullPath: '/dmr'
+      preLoaderRoute: typeof DmrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/consolidacao': {
       id: '/consolidacao'
       path: '/consolidacao'
       fullPath: '/consolidacao'
       preLoaderRoute: typeof ConsolidacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cadastros': {
+      id: '/cadastros'
+      path: '/cadastros'
+      fullPath: '/cadastros'
+      preLoaderRoute: typeof CadastrosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -157,7 +197,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CadastrosRoute: CadastrosRoute,
   ConsolidacaoRoute: ConsolidacaoRoute,
+  DmrRoute: DmrRoute,
   PendenciasRoute: PendenciasRoute,
   ColetasIdRoute: ColetasIdRoute,
   ColetasNovaRoute: ColetasNovaRoute,
