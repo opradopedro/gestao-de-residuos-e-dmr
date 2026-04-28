@@ -161,6 +161,11 @@ export async function updateColetaMtr(id: string, mtr: string | null) {
   if (error) throw error;
 }
 
+export async function confirmarPesoColeta(id: string) {
+  const { error } = await supabase.from("coletas").update({ peso_estimado: false }).eq("id", id);
+  if (error) throw error;
+}
+
 // Helpers para análises
 export function totalPesoColeta(c: ColetaComItens): number {
   return (c.itens ?? []).reduce((s, it) => s + Number(it.peso_kg || 0), 0);
