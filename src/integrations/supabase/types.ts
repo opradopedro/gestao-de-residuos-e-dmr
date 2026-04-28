@@ -14,7 +14,216 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      coleta_itens: {
+        Row: {
+          coleta_id: string
+          criado_em: string
+          id: string
+          peso_kg: number
+          tipo_residuo_id: string | null
+          tipo_residuo_nome: string
+          tratamento: string
+        }
+        Insert: {
+          coleta_id: string
+          criado_em?: string
+          id?: string
+          peso_kg: number
+          tipo_residuo_id?: string | null
+          tipo_residuo_nome: string
+          tratamento: string
+        }
+        Update: {
+          coleta_id?: string
+          criado_em?: string
+          id?: string
+          peso_kg?: number
+          tipo_residuo_id?: string | null
+          tipo_residuo_nome?: string
+          tratamento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coleta_itens_coleta_id_fkey"
+            columns: ["coleta_id"]
+            isOneToOne: false
+            referencedRelation: "coletas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coleta_itens_tipo_residuo_id_fkey"
+            columns: ["tipo_residuo_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_residuo"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coletas: {
+        Row: {
+          atualizado_em: string
+          criado_em: string
+          data: string
+          destinador: string | null
+          id: string
+          mtr: string | null
+          observacoes: string | null
+          peso_estimado: boolean
+          transportador: string | null
+          unidade_id: string
+        }
+        Insert: {
+          atualizado_em?: string
+          criado_em?: string
+          data?: string
+          destinador?: string | null
+          id?: string
+          mtr?: string | null
+          observacoes?: string | null
+          peso_estimado?: boolean
+          transportador?: string | null
+          unidade_id: string
+        }
+        Update: {
+          atualizado_em?: string
+          criado_em?: string
+          data?: string
+          destinador?: string | null
+          id?: string
+          mtr?: string | null
+          observacoes?: string | null
+          peso_estimado?: boolean
+          transportador?: string | null
+          unidade_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coletas_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dmr_linhas: {
+        Row: {
+          criado_em: string
+          data: string | null
+          destinador: string | null
+          id: string
+          mtr: string | null
+          peso_kg: number | null
+          residuo: string | null
+          upload_id: string
+        }
+        Insert: {
+          criado_em?: string
+          data?: string | null
+          destinador?: string | null
+          id?: string
+          mtr?: string | null
+          peso_kg?: number | null
+          residuo?: string | null
+          upload_id: string
+        }
+        Update: {
+          criado_em?: string
+          data?: string | null
+          destinador?: string | null
+          id?: string
+          mtr?: string | null
+          peso_kg?: number | null
+          residuo?: string | null
+          upload_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dmr_linhas_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "dmr_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dmr_uploads: {
+        Row: {
+          ano: number
+          arquivo_nome: string
+          criado_em: string
+          id: string
+          mapeamento: Json
+          trimestre: number
+          unidade_id: string
+        }
+        Insert: {
+          ano: number
+          arquivo_nome: string
+          criado_em?: string
+          id?: string
+          mapeamento?: Json
+          trimestre: number
+          unidade_id: string
+        }
+        Update: {
+          ano?: number
+          arquivo_nome?: string
+          criado_em?: string
+          id?: string
+          mapeamento?: Json
+          trimestre?: number
+          unidade_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dmr_uploads_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tipos_residuo: {
+        Row: {
+          criado_em: string
+          id: string
+          nome: string
+          tratamento_padrao: string
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          nome: string
+          tratamento_padrao: string
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          nome?: string
+          tratamento_padrao?: string
+        }
+        Relationships: []
+      }
+      unidades: {
+        Row: {
+          criado_em: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          nome: string
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
