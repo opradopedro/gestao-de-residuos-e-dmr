@@ -9,11 +9,23 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PendenciasRouteImport } from './routes/pendencias'
+import { Route as ConsolidacaoRouteImport } from './routes/consolidacao'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ColetasIndexRouteImport } from './routes/coletas.index'
 import { Route as ColetasNovaRouteImport } from './routes/coletas.nova'
 import { Route as ColetasIdRouteImport } from './routes/coletas.$id'
 
+const PendenciasRoute = PendenciasRouteImport.update({
+  id: '/pendencias',
+  path: '/pendencias',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConsolidacaoRoute = ConsolidacaoRouteImport.update({
+  id: '/consolidacao',
+  path: '/consolidacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -37,12 +49,16 @@ const ColetasIdRoute = ColetasIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/consolidacao': typeof ConsolidacaoRoute
+  '/pendencias': typeof PendenciasRoute
   '/coletas/$id': typeof ColetasIdRoute
   '/coletas/nova': typeof ColetasNovaRoute
   '/coletas/': typeof ColetasIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/consolidacao': typeof ConsolidacaoRoute
+  '/pendencias': typeof PendenciasRoute
   '/coletas/$id': typeof ColetasIdRoute
   '/coletas/nova': typeof ColetasNovaRoute
   '/coletas': typeof ColetasIndexRoute
@@ -50,20 +66,43 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/consolidacao': typeof ConsolidacaoRoute
+  '/pendencias': typeof PendenciasRoute
   '/coletas/$id': typeof ColetasIdRoute
   '/coletas/nova': typeof ColetasNovaRoute
   '/coletas/': typeof ColetasIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/coletas/$id' | '/coletas/nova' | '/coletas/'
+  fullPaths:
+    | '/'
+    | '/consolidacao'
+    | '/pendencias'
+    | '/coletas/$id'
+    | '/coletas/nova'
+    | '/coletas/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/coletas/$id' | '/coletas/nova' | '/coletas'
-  id: '__root__' | '/' | '/coletas/$id' | '/coletas/nova' | '/coletas/'
+  to:
+    | '/'
+    | '/consolidacao'
+    | '/pendencias'
+    | '/coletas/$id'
+    | '/coletas/nova'
+    | '/coletas'
+  id:
+    | '__root__'
+    | '/'
+    | '/consolidacao'
+    | '/pendencias'
+    | '/coletas/$id'
+    | '/coletas/nova'
+    | '/coletas/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ConsolidacaoRoute: typeof ConsolidacaoRoute
+  PendenciasRoute: typeof PendenciasRoute
   ColetasIdRoute: typeof ColetasIdRoute
   ColetasNovaRoute: typeof ColetasNovaRoute
   ColetasIndexRoute: typeof ColetasIndexRoute
@@ -71,6 +110,20 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/pendencias': {
+      id: '/pendencias'
+      path: '/pendencias'
+      fullPath: '/pendencias'
+      preLoaderRoute: typeof PendenciasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/consolidacao': {
+      id: '/consolidacao'
+      path: '/consolidacao'
+      fullPath: '/consolidacao'
+      preLoaderRoute: typeof ConsolidacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -104,6 +157,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ConsolidacaoRoute: ConsolidacaoRoute,
+  PendenciasRoute: PendenciasRoute,
   ColetasIdRoute: ColetasIdRoute,
   ColetasNovaRoute: ColetasNovaRoute,
   ColetasIndexRoute: ColetasIndexRoute,
