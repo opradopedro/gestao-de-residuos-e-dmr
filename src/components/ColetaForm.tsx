@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { listTiposResiduo, ColetaInput, ALERTA_PESO_KG } from "@/lib/data";
+import { listTiposResiduo, listTratamentos, ColetaInput, ALERTA_PESO_KG } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Trash2, Plus, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { Autocomplete } from "@/components/Autocomplete";
 
 type ItemForm = { tipo_residuo_id: string | null; tipo_residuo_nome: string; peso_kg: number | ""; tratamento: string };
 
@@ -23,6 +23,20 @@ type Props = {
 export function ColetaForm({ unidadeId, initial, onSubmit, submitting }: Props) {
   const today = new Date().toISOString().slice(0, 10);
   const { data: tipos = [] } = useQuery({ queryKey: ["tipos_residuo"], queryFn: listTiposResiduo });
+  const { data: tratamentos = [] } = useQuery({ queryKey: ["tratamentos"], queryFn: listTratamentos });
+
+  const tipoOptions = useMemo(() => tipos.map((t) => ({
+    value: t.nome,
+    label: t.nome,
+    sublabel: t.codigo || t.tratamento_padrao,
+    searchTokens: [t.codigo ?? "", t.tratamento_padrao],
+  })), [tipos]);
+  const tratamentoOptions = useMemo(() => tratamentos.map((t) => ({
+    value: t.nome,
+    label: t.nome,
+    sublabel: t.codigo,
+    searchTokens: [t.codigo ?? ""],
+  })), [tratamentos]);
 
   const [data, setData] = useState(initial?.data ?? today);
   const [transportador, setTransportador] = useState(initial?.transportador ?? "");
@@ -44,6 +58,14 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting }: Props) 
     const t = tipos.find((x) => x.id === tipoId);
     if (!t) return;
     updateItem(i, { tipo_residuo_id: t.id, tipo_residuo_nome: t.nome, tratamento: itens[i].tratamento || t.tratamento_padrao });
+  }
+  function selecionarTipoPorNome(i: number, nome: string) {
+    const t = tipos.find((x) => x.nome.toLowerCase() === nome.toLowerCase());
+    updateItem(i, {
+      tipo_residuo_id: t?.id ?? null,
+      tipo_residuo_nome: nome,
+      tratamento: itens[i].tratamento || (t?.tratamento_padrao ?? ""),
+    });
   }
   function addItem() {
     setItens((p) => [...p, { tipo_residuo_id: null, tipo_residuo_nome: "", peso_kg: "", tratamento: "" }]);
