@@ -187,22 +187,46 @@ export type Database = {
       }
       tipos_residuo: {
         Row: {
+          codigo: string | null
           criado_em: string
           id: string
           nome: string
           tratamento_padrao: string
         }
         Insert: {
+          codigo?: string | null
           criado_em?: string
           id?: string
           nome: string
           tratamento_padrao: string
         }
         Update: {
+          codigo?: string | null
           criado_em?: string
           id?: string
           nome?: string
           tratamento_padrao?: string
+        }
+        Relationships: []
+      }
+      tratamentos: {
+        Row: {
+          codigo: string | null
+          criado_em: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          codigo?: string | null
+          criado_em?: string
+          id?: string
+          nome: string
+        }
+        Update: {
+          codigo?: string | null
+          criado_em?: string
+          id?: string
+          nome?: string
         }
         Relationships: []
       }
