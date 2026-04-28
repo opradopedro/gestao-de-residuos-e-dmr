@@ -1,19 +1,22 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
-import { listColetasByUnidade } from "@/lib/data";
+import { usePeriodoAtivo, setPeriodoAtivo } from "@/hooks/use-periodo";
+import { listColetasByUnidade, totalPesoColeta } from "@/lib/data";
 import { listDmrUploads, getDmrLinhas, createDmrUpload, deleteDmrUpload, DmrMapeamento } from "@/lib/dmr";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Upload, Trash2, AlertTriangle } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Upload, Trash2, AlertTriangle, FileSpreadsheet, ChevronRight } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { quarterOf, currentQuarter } from "@/lib/quarter";
-import { formatKg } from "@/lib/format";
+import { quarterOf } from "@/lib/quarter";
+import { formatKg, formatDate } from "@/lib/format";
 
 export const Route = createFileRoute("/dmr")({
   head: () => ({ meta: [{ title: "DMR — Conferência" }] }),
@@ -31,10 +34,8 @@ const FIELDS: { key: keyof DmrMapeamento; label: string }[] = [
 
 function DmrPage() {
   const unidade = useUnidadeAtiva();
+  const periodo = usePeriodoAtivo();
   const qc = useQueryClient();
-  const cur = currentQuarter();
-  const [ano, setAno] = useState(cur.ano);
-  const [tri, setTri] = useState<number>(cur.trimestre);
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [map, setMap] = useState<DmrMapeamento>({});
   const fileRef = useRef<HTMLInputElement>(null);
@@ -52,7 +53,7 @@ function DmrPage() {
         mtr: map.mtr ? String(r[map.mtr] ?? "") : undefined,
         data: map.data ? String(r[map.data] ?? "") : undefined,
       }));
-      return createDmrUpload({ unidade_id: unidade, ano, trimestre: tri, arquivo_nome: parsed.fileName, mapeamento: map, linhas });
+      return createDmrUpload({ unidade_id: unidade, ano: periodo.ano, trimestre: periodo.trimestre, arquivo_nome: parsed.fileName, mapeamento: map, linhas });
     },
     onSuccess: (id) => {
       toast.success("DMR importada");
@@ -72,7 +73,6 @@ function DmrPage() {
       const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
       const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
       setParsed({ headers, rows, fileName: f.name });
-      // auto-mapping por nome
       const auto: DmrMapeamento = {};
       for (const h of headers) {
         const l = h.toLowerCase();
@@ -91,34 +91,36 @@ function DmrPage() {
 
   return (
     <div className="p-6 max-w-7xl space-y-6">
-      <PageHeader title="DMR — Conferência" description="Compare a DMR oficial com os dados internos." />
+      <PageHeader title="DMR — Conferência" description={`Compare a DMR oficial com os dados internos · ${periodo.label}`} />
 
       <Card>
         <CardContent className="p-6 space-y-4">
           <div className="flex flex-wrap gap-3 items-end">
-            <div><Label className="text-xs">Ano</Label><Input value={ano} onChange={(e) => setAno(Number(e.target.value) || cur.ano)} /></div>
             <div>
-              <Label className="text-xs">Trimestre</Label>
-              <Select value={String(tri)} onValueChange={(v) => setTri(Number(v))}>
-                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1º (Jan-Mar)</SelectItem>
-                  <SelectItem value="2">2º (Abr-Jun)</SelectItem>
-                  <SelectItem value="3">3º (Jul-Set)</SelectItem>
-                  <SelectItem value="4">4º (Out-Dez)</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label className="text-xs">Trimestre alvo</Label>
+              <div className="flex gap-2 mt-1">
+                <Select value={String(periodo.trimestre)} onValueChange={(v) => setPeriodoAtivo({ ano: periodo.ano, trimestre: Number(v) as 1 | 2 | 3 | 4 })}>
+                  <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1º (Jan-Mar)</SelectItem>
+                    <SelectItem value="2">2º (Abr-Jun)</SelectItem>
+                    <SelectItem value="3">3º (Jul-Set)</SelectItem>
+                    <SelectItem value="4">4º (Out-Dez)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input className="w-24" type="number" value={periodo.ano} onChange={(e) => setPeriodoAtivo({ ano: Number(e.target.value) || periodo.ano, trimestre: periodo.trimestre })} />
+              </div>
             </div>
             <div>
-              <Label className="text-xs">Arquivo Excel</Label>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} className="block text-sm" />
+              <Label className="text-xs">Arquivo Excel da DMR</Label>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} className="block text-sm mt-1" />
             </div>
           </div>
 
           {parsed && (
-            <div className="space-y-3">
-              <div className="text-sm text-muted-foreground">{parsed.rows.length} linhas detectadas em <b>{parsed.fileName}</b>. Mapeie as colunas:</div>
-              <div className="grid gap-3 md:grid-cols-5">
+            <div className="space-y-3 border-t pt-4">
+              <div className="text-sm text-muted-foreground">{parsed.rows.length} linhas detectadas em <b>{parsed.fileName}</b>. Confirme o mapeamento das colunas:</div>
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-5">
                 {FIELDS.map((f) => (
                   <div key={f.key}>
                     <Label className="text-xs">{f.label}</Label>
@@ -142,17 +144,17 @@ function DmrPage() {
 
       <Card>
         <CardContent className="p-6">
-          <h3 className="font-medium mb-3">Uploads desta unidade</h3>
+          <h3 className="font-medium mb-3 flex items-center gap-2"><FileSpreadsheet className="size-4" /> Uploads desta unidade</h3>
           {uploads.length === 0 ? <div className="text-sm text-muted-foreground">Nenhum upload ainda.</div> : (
             <div className="space-y-2">
               {uploads.map((u) => (
-                <div key={u.id} className="flex items-center justify-between border rounded-md p-3">
+                <div key={u.id} className={`flex items-center justify-between border rounded-md p-3 ${selectedUpload === u.id ? "border-primary bg-primary/5" : ""}`}>
                   <div className="text-sm">
                     <div className="font-medium">{u.arquivo_nome}</div>
                     <div className="text-muted-foreground text-xs">{u.ano} · {u.trimestre}º trimestre</div>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setSelectedUpload(u.id)}>Conferir</Button>
+                    <Button size="sm" variant={selectedUpload === u.id ? "default" : "outline"} onClick={() => setSelectedUpload(u.id)}>Conferir</Button>
                     <Button size="sm" variant="ghost" onClick={() => { if (confirm("Excluir upload?")) deleteDmrUpload(u.id).then(() => qc.invalidateQueries({ queryKey: ["dmr_uploads"] })); }}>
                       <Trash2 className="size-4 text-destructive" />
                     </Button>
@@ -169,18 +171,27 @@ function DmrPage() {
   );
 }
 
-function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={"flex h-9 w-32 rounded-md border border-input bg-background px-3 py-1 text-sm " + (props.className ?? "")} />;
-}
+type Grupo = {
+  key: string;
+  residuo: string;
+  destinador: string;
+  internoKg: number;
+  dmrKg: number;
+  diff: number;
+  matches: any[];
+  causasSemMtr: any[];
+  causasEstimado: any[];
+  dmrLinhas: any[];
+};
 
 function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId: string }) {
   const { data: upload } = useQuery({ queryKey: ["dmr_uploads", unidadeId], queryFn: () => listDmrUploads(unidadeId), select: (l) => l.find((u) => u.id === uploadId) });
   const { data: linhas = [] } = useQuery({ queryKey: ["dmr_linhas", uploadId], queryFn: () => getDmrLinhas(uploadId) });
   const { data: coletas = [] } = useQuery({ queryKey: ["coletas", unidadeId], queryFn: () => listColetasByUnidade(unidadeId) });
+  const [detail, setDetail] = useState<Grupo | null>(null);
 
-  const grupos = useMemo(() => {
+  const grupos: Grupo[] = useMemo(() => {
     if (!upload) return [];
-    // Filtra coletas no trimestre do upload
     const coletasTri = coletas.filter((c) => {
       const q = quarterOf(c.data);
       return q.ano === upload.ano && q.trimestre === upload.trimestre;
@@ -188,20 +199,23 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
 
     const norm = (s?: string | null) => (s ?? "").trim().toLowerCase();
     const interno = new Map<string, number>();
-    const internoColetas = new Map<string, typeof coletasTri>();
+    const internoColetas = new Map<string, any[]>();
     for (const c of coletasTri) {
       const dest = norm(c.destinador) || "(sem destinador)";
       for (const it of c.itens ?? []) {
         const k = `${norm(it.tipo_residuo_nome)}||${dest}`;
         interno.set(k, (interno.get(k) ?? 0) + Number(it.peso_kg));
         if (!internoColetas.has(k)) internoColetas.set(k, []);
-        internoColetas.get(k)!.push(c);
+        if (!internoColetas.get(k)!.includes(c)) internoColetas.get(k)!.push(c);
       }
     }
     const dmr = new Map<string, number>();
+    const dmrLinhasMap = new Map<string, any[]>();
     for (const l of linhas) {
       const k = `${norm(l.residuo)}||${norm(l.destinador) || "(sem destinador)"}`;
       dmr.set(k, (dmr.get(k) ?? 0) + Number(l.peso_kg ?? 0));
+      if (!dmrLinhasMap.has(k)) dmrLinhasMap.set(k, []);
+      dmrLinhasMap.get(k)!.push(l);
     }
     const keys = new Set([...interno.keys(), ...dmr.keys()]);
     return Array.from(keys).map((k) => {
@@ -210,57 +224,137 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
       const dmrKg = dmr.get(k) ?? 0;
       const diff = dmrKg - internoKg;
       const matches = internoColetas.get(k) ?? [];
-      const causasSemMtr = matches.filter((c) => !c.mtr);
-      const causasEstimado = matches.filter((c) => c.peso_estimado);
-      return { key: k, residuo, destinador, internoKg, dmrKg, diff, causasSemMtr, causasEstimado };
+      return {
+        key: k, residuo, destinador, internoKg, dmrKg, diff, matches,
+        causasSemMtr: matches.filter((c) => !c.mtr),
+        causasEstimado: matches.filter((c) => c.peso_estimado),
+        dmrLinhas: dmrLinhasMap.get(k) ?? [],
+      };
     }).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
   }, [upload, linhas, coletas]);
 
   if (!upload) return null;
 
   return (
-    <Card>
-      <CardContent className="p-0">
-        <div className="p-4 border-b border-border">
-          <h3 className="font-medium">Conferência: {upload.arquivo_nome}</h3>
-          <div className="text-xs text-muted-foreground">{upload.ano} · {upload.trimestre}º trimestre</div>
-        </div>
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-muted-foreground">
-            <tr>
-              <th className="text-left p-3">Resíduo</th>
-              <th className="text-left p-3">Destinador</th>
-              <th className="text-right p-3">Interno</th>
-              <th className="text-right p-3">DMR</th>
-              <th className="text-right p-3">Divergência</th>
-              <th className="text-left p-3">Causas sugeridas</th>
-            </tr>
-          </thead>
-          <tbody>
-            {grupos.length === 0 ? <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Sem dados.</td></tr> : grupos.map((g) => {
-              const pct = g.internoKg > 0 ? (g.diff / g.internoKg) * 100 : 0;
-              const grave = Math.abs(g.diff) > 10; // > 10 kg
-              return (
-                <tr key={g.key} className="border-t border-border align-top">
-                  <td className="p-3">{g.residuo}</td>
-                  <td className="p-3">{g.destinador}</td>
-                  <td className="p-3 text-right tabular-nums">{formatKg(g.internoKg)}</td>
-                  <td className="p-3 text-right tabular-nums">{formatKg(g.dmrKg)}</td>
-                  <td className={"p-3 text-right tabular-nums " + (grave ? "text-destructive font-medium" : "")}>
-                    {g.diff > 0 ? "+" : ""}{formatKg(g.diff)}
-                    {g.internoKg > 0 && <div className="text-xs text-muted-foreground">{pct > 0 ? "+" : ""}{pct.toFixed(1)}%</div>}
-                  </td>
-                  <td className="p-3 text-xs space-y-1">
-                    {g.causasSemMtr.length > 0 && <div className="flex items-center gap-1 text-warning"><AlertTriangle className="size-3" /> {g.causasSemMtr.length} coleta(s) sem MTR</div>}
-                    {g.causasEstimado.length > 0 && <div className="flex items-center gap-1 text-warning"><AlertTriangle className="size-3" /> {g.causasEstimado.length} com peso estimado</div>}
-                    {g.causasSemMtr.length === 0 && g.causasEstimado.length === 0 && grave && <span className="text-muted-foreground">Verificar manualmente</span>}
-                  </td>
+    <>
+      <Card>
+        <CardContent className="p-0">
+          <div className="p-4 border-b border-border">
+            <h3 className="font-medium">Conferência: {upload.arquivo_nome}</h3>
+            <div className="text-xs text-muted-foreground">{upload.ano} · {upload.trimestre}º trimestre — clique numa linha para investigar</div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-muted-foreground">
+                <tr>
+                  <th className="text-left p-3">Status</th>
+                  <th className="text-left p-3">Resíduo</th>
+                  <th className="text-left p-3">Destinador</th>
+                  <th className="text-right p-3">Interno</th>
+                  <th className="text-right p-3">DMR</th>
+                  <th className="text-right p-3">Divergência</th>
+                  <th></th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </CardContent>
-    </Card>
+              </thead>
+              <tbody>
+                {grupos.length === 0 ? <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Sem dados.</td></tr> : grupos.map((g) => {
+                  const pct = g.internoKg > 0 ? (g.diff / g.internoKg) * 100 : (g.dmrKg > 0 ? 100 : 0);
+                  const abs = Math.abs(g.diff);
+                  const grave = abs > 50 || Math.abs(pct) > 10;
+                  const leve = !grave && abs > 1;
+                  const status = grave ? { label: "Grave", cls: "bg-destructive/15 text-destructive border-destructive/30" }
+                    : leve ? { label: "Leve", cls: "bg-warning/15 text-warning-foreground border-warning/40" }
+                    : { label: "OK", cls: "bg-success/15 text-success border-success/30" };
+                  return (
+                    <tr key={g.key} className="border-t border-border align-top hover:bg-muted/30 cursor-pointer" onClick={() => setDetail(g)}>
+                      <td className="p-3"><span className={`text-[10px] font-semibold uppercase rounded-full px-2 py-1 border ${status.cls}`}>{status.label}</span></td>
+                      <td className="p-3">{g.residuo}</td>
+                      <td className="p-3">{g.destinador}</td>
+                      <td className="p-3 text-right tabular-nums">{formatKg(g.internoKg)}</td>
+                      <td className="p-3 text-right tabular-nums">{formatKg(g.dmrKg)}</td>
+                      <td className={"p-3 text-right tabular-nums " + (grave ? "text-destructive font-medium" : leve ? "text-warning-foreground" : "")}>
+                        {g.diff > 0 ? "+" : ""}{formatKg(g.diff)}
+                        {(g.internoKg > 0 || g.dmrKg > 0) && <div className="text-xs text-muted-foreground">{pct > 0 ? "+" : ""}{pct.toFixed(1)}%</div>}
+                      </td>
+                      <td className="p-3 text-muted-foreground"><ChevronRight className="size-4" /></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Sheet open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <SheetContent className="sm:max-w-xl overflow-y-auto">
+          {detail && (
+            <>
+              <SheetHeader>
+                <SheetTitle>{detail.residuo} · {detail.destinador}</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4 space-y-4 text-sm">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-md border p-3">
+                    <div className="text-xs text-muted-foreground">Interno</div>
+                    <div className="font-semibold">{formatKg(detail.internoKg)}</div>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <div className="text-xs text-muted-foreground">DMR</div>
+                    <div className="font-semibold">{formatKg(detail.dmrKg)}</div>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <div className="text-xs text-muted-foreground">Diferença</div>
+                    <div className={`font-semibold ${Math.abs(detail.diff) > 50 ? "text-destructive" : ""}`}>{detail.diff > 0 ? "+" : ""}{formatKg(detail.diff)}</div>
+                  </div>
+                </div>
+
+                {(detail.causasSemMtr.length > 0 || detail.causasEstimado.length > 0) && (
+                  <div className="rounded-md border border-warning/40 bg-warning/10 p-3">
+                    <div className="font-medium flex items-center gap-2"><AlertTriangle className="size-4 text-warning-foreground" /> Causas sugeridas</div>
+                    <ul className="mt-1 text-sm list-disc pl-5">
+                      {detail.causasSemMtr.length > 0 && <li>{detail.causasSemMtr.length} coleta(s) sem MTR — provavelmente não foram à DMR.</li>}
+                      {detail.causasEstimado.length > 0 && <li>{detail.causasEstimado.length} coleta(s) com peso estimado.</li>}
+                    </ul>
+                  </div>
+                )}
+
+                <div>
+                  <div className="font-medium mb-2">Coletas internas ({detail.matches.length})</div>
+                  {detail.matches.length === 0 ? <div className="text-muted-foreground text-xs">Nada no sistema interno.</div> : (
+                    <div className="space-y-2">
+                      {detail.matches.map((c) => (
+                        <div key={c.id} className="border rounded-md p-2 flex items-center justify-between">
+                          <div>
+                            <div className="text-xs">{formatDate(c.data)} · MTR {c.mtr || <span className="text-destructive">—</span>}</div>
+                            <div className="text-xs text-muted-foreground">{formatKg(totalPesoColeta(c))} {c.peso_estimado && <span className="text-warning-foreground">(estimado)</span>}</div>
+                          </div>
+                          <Button asChild size="sm" variant="ghost"><Link to="/coletas/$id" params={{ id: c.id }}>Editar</Link></Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <div className="font-medium mb-2">Linhas da DMR ({detail.dmrLinhas.length})</div>
+                  {detail.dmrLinhas.length === 0 ? <div className="text-muted-foreground text-xs">Sem linhas correspondentes na DMR.</div> : (
+                    <div className="space-y-1 text-xs">
+                      {detail.dmrLinhas.slice(0, 20).map((l, i) => (
+                        <div key={i} className="border rounded-md p-2 flex justify-between">
+                          <span>MTR {l.mtr || "—"} · {l.data || ""}</span>
+                          <span className="tabular-nums">{formatKg(Number(l.peso_kg ?? 0))}</span>
+                        </div>
+                      ))}
+                      {detail.dmrLinhas.length > 20 && <div className="text-muted-foreground">+ {detail.dmrLinhas.length - 20} mais...</div>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }

@@ -97,9 +97,12 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting }: Props) 
             <Label>Destinador</Label>
             <Input value={destinador ?? ""} onChange={(e) => setDestinador(e.target.value)} />
           </div>
-          <div className="md:col-span-2 flex items-center gap-2">
+          <div className="md:col-span-2 flex items-center gap-2 rounded-md bg-warning/10 border border-warning/30 p-3">
             <Checkbox id="pe" checked={pesoEstimado} onCheckedChange={(v) => setPesoEstimado(!!v)} />
-            <Label htmlFor="pe" className="cursor-pointer">Peso estimado (revisar antes de reportar na DMR)</Label>
+            <Label htmlFor="pe" className="cursor-pointer flex items-center gap-2">
+              <AlertTriangle className="size-4 text-warning-foreground" />
+              Peso estimado (revisar antes de reportar na DMR)
+            </Label>
           </div>
           <div className="md:col-span-2">
             <Label>Observações</Label>
