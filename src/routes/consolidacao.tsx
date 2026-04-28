@@ -1,14 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
-import { listColetasByUnidade, totalPesoColeta, listUnidades } from "@/lib/data";
+import { usePeriodoAtivo } from "@/hooks/use-periodo";
+import { listColetasByUnidade, listUnidades } from "@/lib/data";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download } from "lucide-react";
-import { useMemo, useState } from "react";
-import { quarterOf, currentQuarter } from "@/lib/quarter";
+import { useMemo } from "react";
+import { quarterOf } from "@/lib/quarter";
 import { formatKg } from "@/lib/format";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
