@@ -10,33 +10,63 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ColetasIndexRouteImport } from './routes/coletas.index'
+import { Route as ColetasNovaRouteImport } from './routes/coletas.nova'
+import { Route as ColetasIdRouteImport } from './routes/coletas.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ColetasIndexRoute = ColetasIndexRouteImport.update({
+  id: '/coletas/',
+  path: '/coletas/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ColetasNovaRoute = ColetasNovaRouteImport.update({
+  id: '/coletas/nova',
+  path: '/coletas/nova',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ColetasIdRoute = ColetasIdRouteImport.update({
+  id: '/coletas/$id',
+  path: '/coletas/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/coletas/$id': typeof ColetasIdRoute
+  '/coletas/nova': typeof ColetasNovaRoute
+  '/coletas/': typeof ColetasIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/coletas/$id': typeof ColetasIdRoute
+  '/coletas/nova': typeof ColetasNovaRoute
+  '/coletas': typeof ColetasIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/coletas/$id': typeof ColetasIdRoute
+  '/coletas/nova': typeof ColetasNovaRoute
+  '/coletas/': typeof ColetasIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/coletas/$id' | '/coletas/nova' | '/coletas/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/coletas/$id' | '/coletas/nova' | '/coletas'
+  id: '__root__' | '/' | '/coletas/$id' | '/coletas/nova' | '/coletas/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ColetasIdRoute: typeof ColetasIdRoute
+  ColetasNovaRoute: typeof ColetasNovaRoute
+  ColetasIndexRoute: typeof ColetasIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +78,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/coletas/': {
+      id: '/coletas/'
+      path: '/coletas'
+      fullPath: '/coletas/'
+      preLoaderRoute: typeof ColetasIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coletas/nova': {
+      id: '/coletas/nova'
+      path: '/coletas/nova'
+      fullPath: '/coletas/nova'
+      preLoaderRoute: typeof ColetasNovaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coletas/$id': {
+      id: '/coletas/$id'
+      path: '/coletas/$id'
+      fullPath: '/coletas/$id'
+      preLoaderRoute: typeof ColetasIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ColetasIdRoute: ColetasIdRoute,
+  ColetasNovaRoute: ColetasNovaRoute,
+  ColetasIndexRoute: ColetasIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
