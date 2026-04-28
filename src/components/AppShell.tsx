@@ -8,14 +8,15 @@ import { useUnidadeAtiva, setUnidadeAtiva } from "@/hooks/use-unidade";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 
-const NAV = [
+type NavItem = { to: string; label: string; icon: any; exact?: boolean };
+const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/coletas", label: "Coletas", icon: ClipboardList },
   { to: "/pendencias", label: "Pendências", icon: AlertTriangle },
   { to: "/consolidacao", label: "Consolidação", icon: BarChart3 },
   { to: "/dmr", label: "DMR", icon: FileSpreadsheet },
   { to: "/cadastros", label: "Cadastros", icon: Settings },
-] as const;
+];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
