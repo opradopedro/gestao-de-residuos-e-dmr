@@ -20,8 +20,7 @@ export const Route = createFileRoute("/consolidacao")({
 
 function Consolidacao() {
   const unidade = useUnidadeAtiva();
-  const cur = currentQuarter();
-  const [tri, setTri] = useState<string>(cur.key);
+  const periodo = usePeriodoAtivo();
   const { data: coletas = [] } = useQuery({
     queryKey: ["coletas", unidade],
     queryFn: () => listColetasByUnidade(unidade!),
@@ -30,20 +29,9 @@ function Consolidacao() {
   const { data: unidades = [] } = useQuery({ queryKey: ["unidades"], queryFn: listUnidades });
   const nomeUnidade = unidades.find((u) => u.id === unidade)?.nome ?? "Unidade";
 
-  const trimestres = useMemo(() => {
-    const set = new Map<string, string>();
-    set.set(cur.key, cur.label);
-    for (const c of coletas) {
-      const q = quarterOf(c.data);
-      set.set(q.key, q.label);
-    }
-    return Array.from(set.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [coletas]);
-
-  const noTri = useMemo(() => coletas.filter((c) => quarterOf(c.data).key === tri), [coletas, tri]);
+  const noTri = useMemo(() => coletas.filter((c) => quarterOf(c.data).key === periodo.key), [coletas, periodo.key]);
 
   const pivot = useMemo(() => {
-    // (residuo, destinador) -> kg
     const map = new Map<string, { residuo: string; destinador: string; kg: number }>();
     for (const c of noTri) {
       const dest = c.destinador || "(sem destinador)";
@@ -82,8 +70,7 @@ function Consolidacao() {
       )
     );
     XLSX.utils.book_append_sheet(wb, detalhe, "Detalhe");
-    const triLabel = trimestres.find(([k]) => k === tri)?.[1] ?? tri;
-    XLSX.writeFile(wb, `DMR_${nomeUnidade}_${triLabel.replace(/\s+/g, "_")}.xlsx`);
+    XLSX.writeFile(wb, `DMR_${nomeUnidade}_${periodo.label.replace(/\s+/g, "_")}.xlsx`);
     toast.success("Planilha gerada");
   }
 
@@ -93,16 +80,8 @@ function Consolidacao() {
     <div className="p-6 max-w-7xl">
       <PageHeader
         title="Consolidação trimestral"
-        description="Agrupamento por tipo de resíduo e destinador, separado por unidade."
-        actions={
-          <div className="flex gap-2">
-            <Select value={tri} onValueChange={setTri}>
-              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-              <SelectContent>{trimestres.map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}</SelectContent>
-            </Select>
-            <Button onClick={exportar}><Download className="size-4 mr-1" /> Exportar XLSX</Button>
-          </div>
-        }
+        description={`Agrupamento por tipo de resíduo e destinador · ${periodo.label}`}
+        actions={<Button onClick={exportar}><Download className="size-4 mr-1" /> Exportar XLSX</Button>}
       />
       <Card>
         <CardContent className="p-0">
