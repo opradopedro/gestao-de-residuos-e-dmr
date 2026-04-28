@@ -67,7 +67,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             return (
               <Link
                 key={item.to}
-                to={item.to}
+                to={item.to as any}
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/60"
@@ -106,7 +106,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {NAV.map((item) => {
               const active = item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to);
               return (
-                <Link key={item.to} to={item.to} className={cn("text-xs px-3 py-2 rounded-md whitespace-nowrap", active ? "bg-accent text-accent-foreground" : "text-muted-foreground")}>
+                <Link key={item.to} to={item.to as any} className={cn("text-xs px-3 py-2 rounded-md whitespace-nowrap", active ? "bg-accent text-accent-foreground" : "text-muted-foreground")}>
                   {item.label}
                 </Link>
               );
