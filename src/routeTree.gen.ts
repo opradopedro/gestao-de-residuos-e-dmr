@@ -9,38 +9,161 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PendenciasRouteImport } from './routes/pendencias'
+import { Route as DmrRouteImport } from './routes/dmr'
+import { Route as ConsolidacaoRouteImport } from './routes/consolidacao'
+import { Route as CadastrosRouteImport } from './routes/cadastros'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ColetasIndexRouteImport } from './routes/coletas.index'
+import { Route as ColetasNovaRouteImport } from './routes/coletas.nova'
+import { Route as ColetasIdRouteImport } from './routes/coletas.$id'
 
+const PendenciasRoute = PendenciasRouteImport.update({
+  id: '/pendencias',
+  path: '/pendencias',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DmrRoute = DmrRouteImport.update({
+  id: '/dmr',
+  path: '/dmr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConsolidacaoRoute = ConsolidacaoRouteImport.update({
+  id: '/consolidacao',
+  path: '/consolidacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CadastrosRoute = CadastrosRouteImport.update({
+  id: '/cadastros',
+  path: '/cadastros',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ColetasIndexRoute = ColetasIndexRouteImport.update({
+  id: '/coletas/',
+  path: '/coletas/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ColetasNovaRoute = ColetasNovaRouteImport.update({
+  id: '/coletas/nova',
+  path: '/coletas/nova',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ColetasIdRoute = ColetasIdRouteImport.update({
+  id: '/coletas/$id',
+  path: '/coletas/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/cadastros': typeof CadastrosRoute
+  '/consolidacao': typeof ConsolidacaoRoute
+  '/dmr': typeof DmrRoute
+  '/pendencias': typeof PendenciasRoute
+  '/coletas/$id': typeof ColetasIdRoute
+  '/coletas/nova': typeof ColetasNovaRoute
+  '/coletas/': typeof ColetasIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cadastros': typeof CadastrosRoute
+  '/consolidacao': typeof ConsolidacaoRoute
+  '/dmr': typeof DmrRoute
+  '/pendencias': typeof PendenciasRoute
+  '/coletas/$id': typeof ColetasIdRoute
+  '/coletas/nova': typeof ColetasNovaRoute
+  '/coletas': typeof ColetasIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/cadastros': typeof CadastrosRoute
+  '/consolidacao': typeof ConsolidacaoRoute
+  '/dmr': typeof DmrRoute
+  '/pendencias': typeof PendenciasRoute
+  '/coletas/$id': typeof ColetasIdRoute
+  '/coletas/nova': typeof ColetasNovaRoute
+  '/coletas/': typeof ColetasIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/cadastros'
+    | '/consolidacao'
+    | '/dmr'
+    | '/pendencias'
+    | '/coletas/$id'
+    | '/coletas/nova'
+    | '/coletas/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/cadastros'
+    | '/consolidacao'
+    | '/dmr'
+    | '/pendencias'
+    | '/coletas/$id'
+    | '/coletas/nova'
+    | '/coletas'
+  id:
+    | '__root__'
+    | '/'
+    | '/cadastros'
+    | '/consolidacao'
+    | '/dmr'
+    | '/pendencias'
+    | '/coletas/$id'
+    | '/coletas/nova'
+    | '/coletas/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CadastrosRoute: typeof CadastrosRoute
+  ConsolidacaoRoute: typeof ConsolidacaoRoute
+  DmrRoute: typeof DmrRoute
+  PendenciasRoute: typeof PendenciasRoute
+  ColetasIdRoute: typeof ColetasIdRoute
+  ColetasNovaRoute: typeof ColetasNovaRoute
+  ColetasIndexRoute: typeof ColetasIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/pendencias': {
+      id: '/pendencias'
+      path: '/pendencias'
+      fullPath: '/pendencias'
+      preLoaderRoute: typeof PendenciasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dmr': {
+      id: '/dmr'
+      path: '/dmr'
+      fullPath: '/dmr'
+      preLoaderRoute: typeof DmrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/consolidacao': {
+      id: '/consolidacao'
+      path: '/consolidacao'
+      fullPath: '/consolidacao'
+      preLoaderRoute: typeof ConsolidacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cadastros': {
+      id: '/cadastros'
+      path: '/cadastros'
+      fullPath: '/cadastros'
+      preLoaderRoute: typeof CadastrosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,21 +171,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/coletas/': {
+      id: '/coletas/'
+      path: '/coletas'
+      fullPath: '/coletas/'
+      preLoaderRoute: typeof ColetasIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coletas/nova': {
+      id: '/coletas/nova'
+      path: '/coletas/nova'
+      fullPath: '/coletas/nova'
+      preLoaderRoute: typeof ColetasNovaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coletas/$id': {
+      id: '/coletas/$id'
+      path: '/coletas/$id'
+      fullPath: '/coletas/$id'
+      preLoaderRoute: typeof ColetasIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CadastrosRoute: CadastrosRoute,
+  ConsolidacaoRoute: ConsolidacaoRoute,
+  DmrRoute: DmrRoute,
+  PendenciasRoute: PendenciasRoute,
+  ColetasIdRoute: ColetasIdRoute,
+  ColetasNovaRoute: ColetasNovaRoute,
+  ColetasIndexRoute: ColetasIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
