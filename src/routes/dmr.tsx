@@ -155,7 +155,27 @@ function DmrPage() {
 
           {parsed && (
             <div className="space-y-3 border-t pt-4">
-              <div className="text-sm text-muted-foreground">{parsed.rows.length} linhas detectadas em <b>{parsed.fileName}</b>. Confirme o mapeamento das colunas:</div>
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <Label className="text-xs">Linha do cabeçalho</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={Math.max(1, allRows.length)}
+                    value={linhaInicial}
+                    onChange={(e) => {
+                      const n = Math.max(1, Number(e.target.value) || 1);
+                      setLinhaInicial(n);
+                      if (parsed) applyLinhaInicial(allRows, n, parsed.fileName);
+                    }}
+                    className="w-28 mt-1"
+                  />
+                </div>
+                <div className="text-sm text-muted-foreground pb-2">
+                  {parsed.rows.length} linhas de dados após o cabeçalho · <b>{parsed.fileName}</b>
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground">Confirme o mapeamento das colunas:</div>
               <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs">
                 ⚠ Os pesos da DMR são interpretados em <b>toneladas</b>. Ex: o valor <code>10</code> será tratado como 10 toneladas (10.000 kg).
               </div>
