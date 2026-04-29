@@ -138,7 +138,8 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
     if (itens.length === 0) { toast.error("Adicione ao menos um item"); return null; }
     for (const [i, it] of itens.entries()) {
       if (!it.tipo_residuo_nome) { toast.error(`Item ${i + 1}: selecione o tipo de resíduo`); return null; }
-      if (!it.peso_kg || Number(it.peso_kg) <= 0) { toast.error(`Item ${i + 1}: informe o peso`); return null; }
+      // Peso pode ficar vazio (será 0 → entra em pendência "Sem peso"), mas se preenchido deve ser positivo
+      if (it.peso_kg !== "" && Number(it.peso_kg) < 0) { toast.error(`Item ${i + 1}: peso inválido`); return null; }
       if (!it.tratamento) { toast.error(`Item ${i + 1}: informe o tratamento`); return null; }
     }
     return {
