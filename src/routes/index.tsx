@@ -80,10 +80,6 @@ function Dashboard() {
   const nivelRisco = stats.semMtr > 5 || (stats.foraDmr ?? 0) > 1000 ? "alto"
     : stats.semMtr > 0 || stats.estimadoCount > 0 || stats.semMtrOperacao > 0 ? "medio" : "ok";
 
-  if (!unidade) return <NoUnidade />;
-
-  const nivelRisco = stats.semMtr > 5 || (stats.foraDmr ?? 0) > 1000 ? "alto"
-    : stats.semMtr > 0 || stats.estimadoCount > 0 ? "medio" : "ok";
 
   return (
     <div className="p-6 max-w-7xl space-y-6">
