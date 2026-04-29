@@ -217,6 +217,7 @@ function ColetasList() {
           </div>
         </CardContent>
       </Card>
+      <ColetaImportWizard open={importOpen} onOpenChange={setImportOpen} unidadeAtiva={unidade} />
     </div>
   );
 }
