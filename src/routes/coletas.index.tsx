@@ -101,15 +101,6 @@ function ColetasList() {
     return sorted;
   }, [coletas, filtro, busca, dups, residuoSel, destinadorSel, transportadorSel, sortKey, sortDir]);
 
-  const mutImport = useMutation({
-    mutationFn: bulkInsertColetas,
-    onSuccess: (n) => {
-      toast.success(`${n} coleta(s) importada(s)`);
-      qc.invalidateQueries({ queryKey: ["coletas"] });
-      if (fileRef.current) fileRef.current.value = "";
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
 
   function toggleSort(k: SortKey) {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
