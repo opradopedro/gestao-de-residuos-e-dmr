@@ -45,10 +45,12 @@ function RiscoPage() {
     const noTri = coletas.filter((c) => c.data >= periodo.start && c.data <= periodo.end);
     const semMtrErro = noTri.filter(isPendenciaSemMtr);
     const semMtrOp = noTri.filter(isSemMtrOperacao);
+    const semMtrTotal = semMtrErro.length + semMtrOp.length;
     const estimadoComPeso = noTri.filter((c) => c.peso_estimado && totalPesoColeta(c) > 0);
     const estimadoSemPeso = noTri.filter(isPendenciaPesoEstimadoSemPeso);
     const totalKg = noTri.reduce((s, c) => s + totalPesoColeta(c), 0);
     const pesoSemMtr = semMtrErro.reduce((s, c) => s + totalPesoColeta(c), 0);
+    const pesoSemMtrOp = semMtrOp.reduce((s, c) => s + totalPesoColeta(c), 0);
     const pesoEstimado = estimadoComPeso.reduce((s, c) => s + totalPesoColeta(c), 0);
     const dups = findMtrDuplicates(noTri);
     const dupColetas = noTri.filter((c) => c.mtr && dups.has(c.mtr));
@@ -60,15 +62,17 @@ function RiscoPage() {
       foraDmr = Math.max(0, totalKg - totalDmr);
     }
 
-    // Nível de risco — não considera DMR manual.
+    // Total de fatores de risco = total de coletas sem MTR (erro + operação).
+    const fatoresRisco = semMtrTotal;
+
     let nivel: "alto" | "medio" | "baixo" = "baixo";
     if (semMtrErro.length > 5 || foraDmr > 1000 || estimadoSemPeso.length > 0) nivel = "alto";
-    else if (semMtrErro.length > 0 || dupUnicos > 0 || (totalKg > 0 && pesoEstimado / totalKg > 0.1)) nivel = "medio";
+    else if (semMtrTotal > 0 || dupUnicos > 0 || (totalKg > 0 && pesoEstimado / totalKg > 0.1)) nivel = "medio";
 
     return {
-      nivel, semMtrErro, semMtrOp, estimadoComPeso, estimadoSemPeso,
-      pesoSemMtr, pesoEstimado, totalKg, foraDmr, dupColetas, dupUnicos,
-      totalColetas: noTri.length, temUpload: !!upload,
+      nivel, semMtrErro, semMtrOp, semMtrTotal, estimadoComPeso, estimadoSemPeso,
+      pesoSemMtr, pesoSemMtrOp, pesoEstimado, totalKg, foraDmr, dupColetas, dupUnicos,
+      totalColetas: noTri.length, temUpload: !!upload, fatoresRisco,
     };
   }, [coletas, periodo, upload, linhasDmr]);
 
@@ -81,13 +85,6 @@ function RiscoPage() {
     : { bg: "bg-success/10", border: "border-success/40", text: "text-success", icon: ShieldCheck, label: "Risco baixo" };
   const Icon = tone.icon;
 
-  const frases: string[] = [];
-  if (analise.semMtrErro.length > 0) frases.push(`${analise.semMtrErro.length} sem MTR`);
-  if (analise.estimadoSemPeso.length > 0) frases.push(`${analise.estimadoSemPeso.length} estimado sem peso`);
-  if (analise.foraDmr > 0) frases.push(`${formatTon(analise.foraDmr)} fora da DMR`);
-  if (analise.dupUnicos > 0) frases.push(`${analise.dupUnicos} MTR(s) duplicado(s)`);
-  if (frases.length === 0) frases.push("Nenhum fator de risco identificado");
-
   return (
     <div className="p-6 max-w-6xl space-y-6">
       <PageHeader title="Dashboard de Risco" description={`Avaliação consolidada para ${periodo.label}.`} />
@@ -99,9 +96,14 @@ function RiscoPage() {
           </div>
           <div className="flex-1">
             <div className={`text-xs font-semibold uppercase tracking-wider ${tone.text}`}>{tone.label}</div>
-            <div className="text-2xl font-semibold mt-1">{frases.join(" · ")}</div>
+            <div className="text-2xl font-semibold mt-1">
+              {analise.fatoresRisco} fator{analise.fatoresRisco === 1 ? "" : "es"} de risco identificado{analise.fatoresRisco === 1 ? "" : "s"}
+            </div>
             <div className="text-sm text-muted-foreground mt-2">
               {analise.totalColetas} coleta(s) registrada(s) totalizando {formatTon(analise.totalKg)} no período.
+              {analise.semMtrTotal > 0 && (
+                <> · <span className="text-destructive font-medium">{analise.semMtrErro.length} sem MTR (erro)</span> + <span className="text-warning-foreground font-medium">{analise.semMtrOp.length} sem MTR (operação manual)</span></>
+              )}
             </div>
           </div>
         </CardContent>
