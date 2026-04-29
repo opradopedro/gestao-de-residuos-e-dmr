@@ -38,7 +38,7 @@ function ColetasList() {
   const [transportadorSel, setTransportadorSel] = useState<string[]>([]);
   const [sortKey, setSortKey] = useState<SortKey>("data");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: coletas = [], isLoading } = useQuery({
     queryKey: ["coletas", unidade],
