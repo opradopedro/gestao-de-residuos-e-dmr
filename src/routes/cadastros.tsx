@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Trash2, Plus, Upload, Pencil } from "lucide-react";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { parseCsv } from "@/lib/csv";
 
@@ -390,27 +390,19 @@ function TransportadorEditDialog({ transportador, onClose }: { transportador: Tr
 function DestinadoresTab() {
   const qc = useQueryClient();
   const { data: lista = [] } = useQuery({ queryKey: ["destinadores"], queryFn: listDestinadores });
-  const [nome, setNome] = useState("");
-  const [cnpj, setCnpj] = useState("");
+  const [add, setAdd] = useState(false);
   const [edit, setEdit] = useState<Destinador | null>(null);
-  const mutAdd = useMutation({
-    mutationFn: () => createDestinador({ nome: nome.trim(), cnpj: cnpj.trim() || null }),
-    onSuccess: () => { setNome(""); setCnpj(""); qc.invalidateQueries({ queryKey: ["destinadores"] }); toast.success("Adicionado"); },
-    onError: (e: any) => toast.error(e.message),
-  });
   const mutDel = useMutation({
     mutationFn: (id: string) => deleteDestinador(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["destinadores"] }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["destinadores"] }); toast.success("Removido"); },
     onError: (e: any) => toast.error(e.message),
   });
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
-        <form className="grid gap-2 md:grid-cols-3" onSubmit={(e) => { e.preventDefault(); if (nome.trim()) mutAdd.mutate(); }}>
-          <div><Label className="text-xs">Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-          <div><Label className="text-xs">CNPJ (opcional)</Label><Input value={cnpj} onChange={(e) => setCnpj(e.target.value)} /></div>
-          <Button type="submit" className="self-end" disabled={!nome.trim()}><Plus className="size-4 mr-1" />Adicionar</Button>
-        </form>
+        <div className="flex justify-end">
+          <Button onClick={() => setAdd(true)}><Plus className="size-4 mr-1" />Adicionar destinador</Button>
+        </div>
         <div className="border rounded-md divide-y">
           {lista.length === 0 ? <div className="p-4 text-sm text-muted-foreground">Nenhum destinador.</div> : lista.map((d) => (
             <div key={d.id} className="flex items-center justify-between p-3">
@@ -425,96 +417,203 @@ function DestinadoresTab() {
             </div>
           ))}
         </div>
-        <DestinadorEditDialog destinador={edit} onClose={() => setEdit(null)} />
+        {add && <DestinadorFullDialog mode="create" onClose={() => setAdd(false)} />}
+        {edit && <DestinadorFullDialog mode="edit" destinador={edit} onClose={() => setEdit(null)} />}
       </CardContent>
     </Card>
   );
 }
 
-function DestinadorEditDialog({ destinador, onClose }: { destinador: Destinador | null; onClose: () => void }) {
+function DestinadorFullDialog({ mode, destinador, onClose }: { mode: "create" | "edit"; destinador?: Destinador; onClose: () => void }) {
   const qc = useQueryClient();
-  const [nome, setNome] = useState("");
-  const [cnpj, setCnpj] = useState("");
+  const [nome, setNome] = useState(destinador?.nome ?? "");
+  const [cnpj, setCnpj] = useState(destinador?.cnpj ?? "");
+  const [busca, setBusca] = useState("");
+  // Map tipo_residuo_id -> { selected, tratamento }
   const [vinculos, setVinculos] = useState<Record<string, { selected: boolean; tratamento: string }>>({});
+  const [quickResiduo, setQuickResiduo] = useState<string | null>(null);
+  const [ready, setReady] = useState(mode === "create");
 
   const { data: tipos = [] } = useQuery({ queryKey: ["tipos_residuo"], queryFn: listTiposResiduo });
-  const { data: vinculosAtuais = [] } = useQuery({
-    queryKey: ["destinador_residuos", destinador?.id],
+  const { data: vinculosAtuais = [], isLoading: loadingVinc } = useQuery({
+    queryKey: ["destinador_residuos", destinador?.id ?? "novo"],
     queryFn: () => listDestinadorResiduos(destinador!.id),
-    enabled: !!destinador,
+    enabled: mode === "edit" && !!destinador,
   });
 
+  // Carregar vínculos só uma vez quando dados chegarem (modo edit), ou inicializar todos não-selecionados (modo create).
   useEffect(() => {
-    setNome(destinador?.nome ?? "");
-    setCnpj(destinador?.cnpj ?? "");
-  }, [destinador]);
-
-  useEffect(() => {
-    if (!destinador) return;
-    const map: Record<string, { selected: boolean; tratamento: string }> = {};
-    for (const t of tipos) {
-      const ex = vinculosAtuais.find((v) => v.tipo_residuo_id === t.id);
-      map[t.id] = { selected: !!ex, tratamento: ex?.tratamento ?? t.tratamento_padrao };
+    if (mode === "create") {
+      const map: Record<string, { selected: boolean; tratamento: string }> = {};
+      for (const t of tipos) map[t.id] = { selected: false, tratamento: t.tratamento_padrao };
+      setVinculos(map);
+      setReady(true);
+      return;
     }
-    setVinculos(map);
-  }, [destinador, tipos, vinculosAtuais]);
+    if (mode === "edit" && tipos.length > 0 && !loadingVinc) {
+      const map: Record<string, { selected: boolean; tratamento: string }> = {};
+      for (const t of tipos) {
+        const ex = vinculosAtuais.find((v) => v.tipo_residuo_id === t.id);
+        map[t.id] = { selected: !!ex, tratamento: ex?.tratamento ?? t.tratamento_padrao };
+      }
+      setVinculos(map);
+      setReady(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, tipos.length, loadingVinc, vinculosAtuais.length]);
+
+  const filtrados = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    if (!q) return tipos;
+    return tipos.filter((t) => t.nome.toLowerCase().includes(q) || (t.codigo ?? "").toLowerCase().includes(q));
+  }, [tipos, busca]);
+
+  const matchExato = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    return q ? tipos.some((t) => t.nome.toLowerCase() === q) : true;
+  }, [tipos, busca]);
 
   const mut = useMutation({
     mutationFn: async () => {
-      await updateDestinador(destinador!.id, { nome: nome.trim(), cnpj: cnpj.trim() || null });
+      let id = destinador?.id;
+      if (mode === "create") {
+        const d = await createDestinador({ nome: nome.trim(), cnpj: cnpj.trim() || null });
+        id = d.id;
+      } else {
+        await updateDestinador(destinador!.id, { nome: nome.trim(), cnpj: cnpj.trim() || null });
+      }
       const sel = Object.entries(vinculos)
         .filter(([, v]) => v.selected)
         .map(([tipo_residuo_id, v]) => ({ tipo_residuo_id, tratamento: v.tratamento.trim() || "Reciclagem" }));
-      await setDestinadorResiduos(destinador!.id, sel);
+      await setDestinadorResiduos(id!, sel);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["destinadores"] });
       qc.invalidateQueries({ queryKey: ["destinador_residuos"] });
-      toast.success("Atualizado"); onClose();
+      toast.success(mode === "create" ? "Destinador criado" : "Atualizado");
+      onClose();
     },
     onError: (e: any) => toast.error(e.message),
   });
 
+  const totalSelecionados = Object.values(vinculos).filter((v) => v.selected).length;
+
   return (
-    <Dialog open={!!destinador} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Editar destinador</DialogTitle></DialogHeader>
-        <div className="grid gap-3 md:grid-cols-2">
-          <div><Label className="text-xs">Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-          <div><Label className="text-xs">CNPJ</Label><Input value={cnpj} onChange={(e) => setCnpj(e.target.value)} /></div>
-        </div>
-        <div>
-          <Label className="text-xs">Resíduos vinculados e tratamento</Label>
-          <div className="border rounded-md max-h-72 overflow-y-auto divide-y mt-1">
-            {tipos.length === 0 ? (
-              <div className="p-3 text-sm text-muted-foreground">Cadastre tipos de resíduo primeiro.</div>
-            ) : tipos.map((t) => {
-              const v = vinculos[t.id] ?? { selected: false, tratamento: t.tratamento_padrao };
-              return (
-                <div key={t.id} className="flex items-center gap-3 p-2">
-                  <Checkbox
-                    checked={v.selected}
-                    onCheckedChange={(c) => setVinculos((p) => ({ ...p, [t.id]: { ...v, selected: !!c } }))}
-                  />
-                  <div className="flex-1 min-w-0 text-sm">
-                    <div className="truncate font-medium">{t.nome}</div>
-                    {t.codigo && <div className="text-xs text-muted-foreground">{t.codigo}</div>}
-                  </div>
-                  <Input
-                    className="h-8 w-40"
-                    placeholder="Tratamento"
-                    value={v.tratamento}
-                    disabled={!v.selected}
-                    onChange={(e) => setVinculos((p) => ({ ...p, [t.id]: { ...v, tratamento: e.target.value } }))}
-                  />
-                </div>
-              );
-            })}
+    <>
+      <Dialog open onOpenChange={(o) => !o && onClose()}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{mode === "create" ? "Novo destinador" : "Editar destinador"}</DialogTitle></DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div><Label className="text-xs">Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
+            <div><Label className="text-xs">CNPJ</Label><Input value={cnpj} onChange={(e) => setCnpj(e.target.value)} placeholder="00.000.000/0000-00" /></div>
           </div>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <Label className="text-xs">Resíduos aceitos por este destinador</Label>
+              <span className="text-xs text-muted-foreground">{totalSelecionados} selecionado(s)</span>
+            </div>
+            <Input
+              placeholder="Buscar resíduo..."
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="mb-2"
+            />
+            <div className="border rounded-md max-h-72 overflow-y-auto divide-y">
+              {!ready ? (
+                <div className="p-3 text-sm text-muted-foreground">Carregando...</div>
+              ) : tipos.length === 0 ? (
+                <div className="p-3 text-sm text-muted-foreground">Cadastre tipos de resíduo primeiro.</div>
+              ) : (
+                <>
+                  {filtrados.map((t) => {
+                    const v = vinculos[t.id] ?? { selected: false, tratamento: t.tratamento_padrao };
+                    return (
+                      <div key={t.id} className="flex items-center gap-3 p-2">
+                        <Checkbox
+                          checked={v.selected}
+                          onCheckedChange={(c) => setVinculos((p) => ({ ...p, [t.id]: { ...v, selected: !!c } }))}
+                        />
+                        <div className="flex-1 min-w-0 text-sm">
+                          <div className="truncate font-medium">{t.nome}</div>
+                          {t.codigo && <div className="text-xs text-muted-foreground">{t.codigo}</div>}
+                        </div>
+                        <Input
+                          className="h-8 w-40"
+                          placeholder="Tratamento"
+                          value={v.tratamento}
+                          disabled={!v.selected}
+                          onChange={(e) => setVinculos((p) => ({ ...p, [t.id]: { ...v, tratamento: e.target.value } }))}
+                        />
+                      </div>
+                    );
+                  })}
+                  {busca.trim() && !matchExato && (
+                    <button
+                      type="button"
+                      onClick={() => setQuickResiduo(busca.trim())}
+                      className="w-full text-left p-2 text-sm text-primary hover:bg-accent/50"
+                    >
+                      <Plus className="size-3.5 inline mr-1" />Adicionar "{busca.trim()}"
+                    </button>
+                  )}
+                  {filtrados.length === 0 && !busca.trim() && (
+                    <div className="p-3 text-xs text-muted-foreground">Nenhum resíduo cadastrado.</div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button disabled={!nome.trim() || mut.isPending || !ready} onClick={() => mut.mutate()}>
+              {mut.isPending ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {quickResiduo !== null && (
+        <QuickResiduoInlineDialog
+          defaultName={quickResiduo}
+          onClose={() => setQuickResiduo(null)}
+          onCreated={(t) => {
+            // Insere já selecionado
+            setVinculos((p) => ({ ...p, [t.id]: { selected: true, tratamento: t.tratamento_padrao } }));
+            setBusca("");
+            setQuickResiduo(null);
+            qc.invalidateQueries({ queryKey: ["tipos_residuo"] });
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function QuickResiduoInlineDialog({ defaultName, onClose, onCreated }: { defaultName: string; onClose: () => void; onCreated: (t: TipoResiduo) => void }) {
+  const [nome, setNome] = useState(defaultName);
+  const [codigo, setCodigo] = useState("");
+  const [trat, setTrat] = useState("Reciclagem");
+  const [saving, setSaving] = useState(false);
+  async function salvar() {
+    if (!nome.trim() || !trat.trim()) { toast.error("Preencha nome e tratamento"); return; }
+    setSaving(true);
+    try {
+      const t = await upsertTipoResiduo({ nome: nome.trim(), tratamento_padrao: trat.trim(), codigo: codigo.trim() || null });
+      onCreated(t);
+    } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
+  }
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>Novo resíduo</DialogTitle></DialogHeader>
+        <div className="grid gap-3">
+          <div><Label className="text-xs">Nome</Label><Input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} /></div>
+          <div><Label className="text-xs">Código IBAMA (opcional)</Label><Input value={codigo} onChange={(e) => setCodigo(e.target.value)} /></div>
+          <div><Label className="text-xs">Tratamento padrão</Label><Input value={trat} onChange={(e) => setTrat(e.target.value)} /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button disabled={!nome.trim() || mut.isPending} onClick={() => mut.mutate()}>Salvar</Button>
+          <Button onClick={salvar} disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

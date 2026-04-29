@@ -305,7 +305,7 @@ function ColetasList() {
                         <td className="p-3 text-right tabular-nums">{formatKg(peso)}</td>
                         <td className="p-3 space-x-1">
                           {!c.mtr && !c.dmr_manual && <Badge variant="outline" className="border-warning/50 text-warning"><FileWarning className="size-3 mr-1" />Sem MTR</Badge>}
-                          {c.dmr_manual && <Badge variant="outline" className="border-primary/40 text-primary">DMR manual</Badge>}
+                          {c.dmr_manual && <Badge className="bg-destructive text-destructive-foreground hover:bg-destructive/90">INCLUIR NA DMR</Badge>}
                           {c.peso_estimado && <Badge variant="outline" className="border-warning/50 text-warning"><Scale className="size-3 mr-1" />Estimado</Badge>}
                           {itemAlerta && <Badge variant="outline" className="border-destructive/50 text-destructive"><AlertTriangle className="size-3 mr-1" />Peso alto</Badge>}
                           {mtrDup && <Badge variant="outline" className="border-destructive/50 text-destructive">MTR repetido</Badge>}
