@@ -27,9 +27,7 @@ type Parsed = { headers: string[]; rows: Record<string, any>[]; fileName: string
 const FIELDS: { key: keyof DmrMapeamento; label: string }[] = [
   { key: "residuo", label: "Resíduo" },
   { key: "destinador", label: "Destinador" },
-  { key: "peso_kg", label: "Peso (kg)" },
-  { key: "mtr", label: "MTR" },
-  { key: "data", label: "Data" },
+  { key: "peso_kg", label: "Peso (toneladas)" },
 ];
 
 function DmrPage() {
