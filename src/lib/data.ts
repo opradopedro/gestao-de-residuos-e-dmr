@@ -298,3 +298,32 @@ export function findMtrDuplicates(coletas: ColetaComItens[]): Set<string> {
   });
   return dup;
 }
+
+// Item 8: contar metade das ocorrências de MTRs duplicados (excessos),
+// pois 1 MTR repetido N vezes representa N-1 problemas reais.
+export function countMtrDuplicatesExcess(coletas: ColetaComItens[]): number {
+  const counts = new Map<string, number>();
+  for (const c of coletas) {
+    if (!c.mtr) continue;
+    counts.set(c.mtr, (counts.get(c.mtr) ?? 0) + 1);
+  }
+  let n = 0;
+  counts.forEach((v) => { if (v > 1) n += v - 1; });
+  return n;
+}
+
+// Item 5: Sem MTR Tipo 1 (pendência real) = sem MTR e NÃO marcado como dmr_manual.
+export function isPendenciaSemMtr(c: ColetaComItens): boolean {
+  return !c.mtr && !c.dmr_manual;
+}
+
+// Importação em massa de coletas (item 11): cada grupo já vem agrupado.
+export async function bulkInsertColetas(grupos: ColetaInput[]): Promise<number> {
+  let n = 0;
+  for (const g of grupos) {
+    await createColeta(g);
+    n++;
+  }
+  return n;
+}
+
