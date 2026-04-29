@@ -344,7 +344,7 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
                     <div className="space-y-1 text-xs">
                       {detail.dmrLinhas.slice(0, 20).map((l, i) => (
                         <div key={i} className="border rounded-md p-2 flex justify-between">
-                          <span>MTR {l.mtr || "—"} · {l.data || ""}</span>
+                          <span>{l.residuo || "—"} · {l.destinador || "—"}</span>
                           <span className="tabular-nums">{formatKg(Number(l.peso_kg ?? 0))}</span>
                         </div>
                       ))}
