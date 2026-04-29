@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Recycle, LayoutDashboard, ClipboardList, AlertTriangle, BarChart3, FileSpreadsheet, Settings, Plus, ShieldAlert, Calendar } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { listUnidades, listColetasByUnidade, totalPesoColeta, isPendenciaSemMtr, isPendenciaSemPeso, isPendenciaPesoEstimadoSemPeso, findMtrDuplicates } from "@/lib/data";
+import { listUnidades, listColetasByUnidade, totalPesoColeta, isPendenciaSemMtr, isPendenciaSemPeso, findMtrDuplicates } from "@/lib/data";
 import { useUnidadeAtiva, setUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo, setPeriodoAtivo } from "@/hooks/use-periodo";
 import { useEffect, useMemo } from "react";
