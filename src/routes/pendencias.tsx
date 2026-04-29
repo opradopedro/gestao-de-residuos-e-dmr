@@ -4,7 +4,7 @@ import { useUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo } from "@/hooks/use-periodo";
 import {
   listColetasByUnidade, totalPesoColeta, updateColetaMtr,
-  isPendenciaSemMtr, isPendenciaSemPeso, isPendenciaPesoEstimadoSemPeso, findMtrDuplicates,
+  isPendenciaSemMtr, isPendenciaSemPeso, findMtrDuplicates,
 } from "@/lib/data";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatDate, formatKg, formatTon } from "@/lib/format";
 import { useMemo, useState } from "react";
-import { FileWarning, Scale, CheckCircle2, ScaleIcon, Copy } from "lucide-react";
+import { FileWarning, CheckCircle2, ScaleIcon, Copy } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/pendencias")({
@@ -31,14 +31,13 @@ function Pendencias() {
     enabled: !!unidade,
   });
 
-  const { semMtr, semPeso, estimadoSemPeso, dupColetas, dupUnicos, pesoSemMtr } = useMemo(() => {
+  const { semMtr, semPeso, dupColetas, dupUnicos, pesoSemMtr } = useMemo(() => {
     const noTri = coletas.filter((c) => c.data >= periodo.start && c.data <= periodo.end);
     const dups = findMtrDuplicates(noTri);
     const semMtr = noTri.filter(isPendenciaSemMtr);
     return {
       semMtr,
       semPeso: noTri.filter(isPendenciaSemPeso),
-      estimadoSemPeso: noTri.filter(isPendenciaPesoEstimadoSemPeso),
       dupColetas: noTri.filter((c) => c.mtr && dups.has(c.mtr)),
       dupUnicos: dups.size,
       pesoSemMtr: semMtr.reduce((s, c) => s + totalPesoColeta(c), 0),
@@ -51,10 +50,9 @@ function Pendencias() {
     <div className="p-6 max-w-7xl">
       <PageHeader title="Pendências" description={`Coletas que precisam de ajuste antes da DMR · ${periodo.label}`} />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+      <div className="grid gap-3 sm:grid-cols-3 mb-6">
         <SummaryCard tone="destructive" icon={FileWarning} label="Sem MTR (erro)" count={semMtr.length} extra={formatTon(pesoSemMtr) + " sem rastreio"} />
         <SummaryCard tone="warning" icon={ScaleIcon} label="Sem peso" count={semPeso.length} extra="Peso não informado" />
-        <SummaryCard tone="warning" icon={Scale} label="Peso estimado sem peso" count={estimadoSemPeso.length} extra="Estimado mas vazio" />
         <SummaryCard tone="destructive" icon={Copy} label="MTR duplicado" count={dupUnicos} extra={`${dupColetas.length} coletas envolvidas`} />
       </div>
 
@@ -62,33 +60,13 @@ function Pendencias() {
         <TabsList>
           <TabsTrigger value="mtr">Sem MTR ({semMtr.length})</TabsTrigger>
           <TabsTrigger value="sem_peso">Sem peso ({semPeso.length})</TabsTrigger>
-          <TabsTrigger value="est_sem_peso">Estimado sem peso ({estimadoSemPeso.length})</TabsTrigger>
           <TabsTrigger value="dup">MTR duplicado ({dupUnicos})</TabsTrigger>
         </TabsList>
         <TabsContent value="mtr"><PendenciaTable rows={semMtr} tipo="mtr" /></TabsContent>
         <TabsContent value="sem_peso"><PendenciaTable rows={semPeso} tipo="sem_peso" /></TabsContent>
-        <TabsContent value="est_sem_peso"><PendenciaTable rows={estimadoSemPeso} tipo="est_sem_peso" /></TabsContent>
         <TabsContent value="dup"><PendenciaTable rows={dupColetas} tipo="dup" /></TabsContent>
       </Tabs>
     </div>
-  );
-}
-
-function SummaryCard({ tone, icon: Icon, label, count, extra }: { tone: "destructive" | "warning"; icon: any; label: string; count: number; extra: string }) {
-  const cls = tone === "destructive"
-    ? "border-destructive/40 bg-destructive/5 text-destructive"
-    : "border-warning/50 bg-warning/10 text-warning-foreground";
-  return (
-    <Card className={cls.split(" ").slice(0, 2).join(" ")}>
-      <CardContent className="p-4 flex items-start gap-3">
-        <Icon className={`size-6 ${cls.split(" ")[2]}`} />
-        <div className="min-w-0">
-          <div className="text-xs text-muted-foreground">{label}</div>
-          <div className="text-2xl font-semibold">{count}</div>
-          <div className="text-xs text-muted-foreground truncate">{extra}</div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
