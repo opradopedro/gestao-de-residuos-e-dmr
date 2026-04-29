@@ -338,12 +338,12 @@ export function isSemMtrOperacao(c: ColetaComItens): boolean {
   return !c.mtr && !!c.dmr_manual;
 }
 
-// Coleta sem peso (total = 0) e sem flag de estimado.
+// Coleta sem peso (qualquer): total = 0, independentemente de peso_estimado.
 export function isPendenciaSemPeso(c: ColetaComItens): boolean {
-  return totalPesoColeta(c) === 0 && !c.peso_estimado;
+  return totalPesoColeta(c) === 0;
 }
 
-// Peso estimado mas sem valor de peso informado.
+// Mantido para compatibilidade — agora redundante com isPendenciaSemPeso.
 export function isPendenciaPesoEstimadoSemPeso(c: ColetaComItens): boolean {
   return totalPesoColeta(c) === 0 && !!c.peso_estimado;
 }
