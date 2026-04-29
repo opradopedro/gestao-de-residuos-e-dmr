@@ -61,14 +61,16 @@ export async function listTiposResiduo(): Promise<TipoResiduo[]> {
   return data ?? [];
 }
 
-export async function upsertTipoResiduo(input: { id?: string; nome: string; tratamento_padrao: string; codigo?: string | null }) {
+export async function upsertTipoResiduo(input: { id?: string; nome: string; tratamento_padrao: string; codigo?: string | null }): Promise<TipoResiduo> {
   const payload = { nome: input.nome, tratamento_padrao: input.tratamento_padrao, codigo: input.codigo ?? null };
   if (input.id) {
-    const { error } = await supabase.from("tipos_residuo").update(payload).eq("id", input.id);
+    const { data, error } = await supabase.from("tipos_residuo").update(payload).eq("id", input.id).select().single();
     if (error) throw error;
+    return data as any;
   } else {
-    const { error } = await supabase.from("tipos_residuo").insert(payload);
+    const { data, error } = await supabase.from("tipos_residuo").insert(payload).select().single();
     if (error) throw error;
+    return data as any;
   }
 }
 
@@ -95,14 +97,16 @@ export async function listTratamentos(): Promise<Tratamento[]> {
   return data ?? [];
 }
 
-export async function upsertTratamento(input: { id?: string; nome: string; codigo?: string | null }) {
+export async function upsertTratamento(input: { id?: string; nome: string; codigo?: string | null }): Promise<Tratamento> {
   const payload = { nome: input.nome, codigo: input.codigo ?? null };
   if (input.id) {
-    const { error } = await supabase.from("tratamentos").update(payload).eq("id", input.id);
+    const { data, error } = await supabase.from("tratamentos").update(payload).eq("id", input.id).select().single();
     if (error) throw error;
+    return data as any;
   } else {
-    const { error } = await supabase.from("tratamentos").insert(payload);
+    const { data, error } = await supabase.from("tratamentos").insert(payload).select().single();
     if (error) throw error;
+    return data as any;
   }
 }
 

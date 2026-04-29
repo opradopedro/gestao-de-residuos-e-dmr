@@ -1,95 +1,89 @@
-## Contexto
+# Correções no fluxo de coleta — vínculos, autocomplete e modais
 
-A aplicação já tem toda a estrutura funcional pedida (sidebar, dashboard, coletas, pendências, DMR, consolidação, cadastros). Este plano foca em **alinhar o design e a experiência operacional** ao briefing: paleta branco/azul/verde, filtro global de período, dashboard de risco dedicado e refinamentos de usabilidade.
+Foco: corrigir o filtro de resíduos por destinador, permitir criação inline de resíduos/tratamentos via modal a partir do autocomplete, validar vínculos com botão de "Adicionar vínculo", e atualizar tratamento ao trocar resíduo. Sem alterar o schema do banco.
 
-## 1. Nova paleta (src/styles.css)
+## 1. Bug — filtro de resíduos por destinador (`ColetaForm.tsx`)
 
-Trocar o tema atual (verde dominante) pela paleta solicitada:
+Atualmente o `tipoOptions` ignora completamente os vínculos: mostra todos os tipos mesmo quando o destinador tem vínculos. Além disso, a mensagem "sem resíduos vinculados" só some quando `vinculosDest.length > 0`, mas isso depende da query estar resolvida.
 
-- **Fundo:** branco puro / cinza muito claro
-- **Primary (ações, links, botões):** azul (`oklch(0.55 0.18 255)`)
-- **Success (indicadores positivos, "tudo certo"):** verde (`oklch(0.62 0.17 150)`)
-- **Warning (peso estimado, risco médio):** amarelo âmbar (`oklch(0.80 0.16 80)`)
-- **Destructive (sem MTR, fora da DMR, risco alto):** vermelho (`oklch(0.58 0.22 25)`)
-- **Sidebar:** branco com borda sutil; item ativo em azul claro
-- Bordas mais suaves, cards com sombra leve em vez de só borda
+Correção:
+- `tipoOptions` passa a depender de `destinadorId` + `vinculosDest`:
+  - Se `destinadorId` definido **e** `vinculosDest.length > 0`: filtrar `tipos` para apenas os `tipo_residuo_id` presentes em `vinculosDest`.
+  - Caso contrário: retornar todos os tipos.
+- Mensagem "Destinador sem resíduos vinculados — todos serão exibidos" só renderiza quando `destinadorId && !isLoadingVinculos && vinculosDest.length === 0`. Adicionar `isLoading` da query (`useQuery` retorna `isLoading`/`isFetching`) para não piscar a mensagem antes da resposta.
+- Garantir reatividade ao trocar destinador: ao mudar `destinadorId` para um diferente, limpar/manter itens (não limpar — só refiltra opções e exibe aviso por linha quando `tipo_residuo_id` atual não estiver no novo conjunto, lógica `naoVinculado` já existe).
 
-## 2. Filtro global de período (src/components/AppShell.tsx + novo hook)
+## 2/3/4. Autocomplete "Adicionar novo" para resíduo e tratamento + modais
 
-Hoje o trimestre é "atual" fixo. Adicionar:
+Hoje o `Autocomplete` dos itens (resíduo e tratamento) não passa `onCreate`. Criar dois novos modais e ligar os callbacks.
 
-- Novo hook `use-periodo.ts` (ano + trimestre persistido em localStorage)
-- Seletor de período no **header da área principal** (ao lado do nome da unidade no mobile, e como barra superior fixa no desktop) — opções: 1º/2º/3º/4º trimestre + ano
-- Substituir `currentQuarter()` por `usePeriodoAtivo()` em: `index.tsx`, `pendencias.tsx`, `consolidacao.tsx`, `dmr.tsx`, novo `risco.tsx`
-- O período escolhido vira o filtro padrão de **todas** as telas (mantém a coerência multi-unidade já existente)
+Novos componentes:
 
-## 3. Dashboard principal (`/`) — refinamento
+**`src/components/QuickResiduoDialog.tsx`** — modal para criar `tipos_residuo`:
+- Campos: Nome (pré-preenchido), Código IBAMA (texto livre, ex: `01 01 19`), Tratamento padrão (Autocomplete sobre `listTratamentos`).
+- Lista de destinadores existentes (checkbox múltiplo) usando `listDestinadores`.
+- Ao salvar:
+  1. `upsertTipoResiduo({ nome, codigo, tratamento_padrao })` — alterar `upsertTipoResiduo` para retornar o registro inserido (ajuste em `src/lib/data.ts` para usar `.select().single()` no insert e devolver o id/objeto).
+  2. Para cada destinador marcado: `addDestinadorResiduo(destinador_id, tipo_id, tratamento_padrao)`.
+  3. Invalidar `["tipos_residuo"]` e `["destinador_residuos"]`.
+  4. `onCreated(tipo)` para o form preencher a linha que disparou a criação.
 
-- KPIs reorganizados em destaque: total de resíduos, coletas sem MTR, peso estimado, **volume fora da DMR** (calcular comparando com último upload DMR do trimestre, se houver — caso contrário mostrar "—")
-- Banner de alerta no topo quando houver risco alto (cor vermelha) ou médio (amarela)
-- Gráfico de top resíduos com cores azul/verde da nova paleta
-- Atalhos rápidos: "Nova coleta", "Resolver pendências", "Conferir DMR"
+**`src/components/QuickTratamentoDialog.tsx`** — modal para criar `tratamentos`:
+- Campo: Nome (pré-preenchido). Código opcional.
+- Salvar via `upsertTratamento` (também ajustado para retornar o registro inserido).
+- Invalidar `["tratamentos"]` e `onCreated(nome)`.
 
-## 4. Nova tela: Dashboard de Risco (`/risco`)
+Em `ColetaForm.tsx`:
+- Adicionar estado `residuoDialog` com `{ open, defaultName, lineIndex }` e `tratDialog` com `{ open, defaultName, lineIndex }`.
+- Passar `onCreate={(name) => setResiduoDialog({ open: true, defaultName: name, lineIndex: i })}` no Autocomplete de resíduo.
+- Idem para tratamento.
+- `onCreated` do `QuickResiduoDialog`: chama `selecionarTipoPorNome(lineIndex, tipo.nome)` com o novo tipo (forçando o id via patch direto: `updateItem(lineIndex, { tipo_residuo_id: tipo.id, tipo_residuo_nome: tipo.nome, tratamento: tipo.tratamento_padrao })`).
+- `onCreated` do `QuickTratamentoDialog`: `updateItem(lineIndex, { tratamento: nome })`.
 
-Nova rota `src/routes/risco.tsx` com:
+## 5. Validação destinador × resíduo + botão "Adicionar vínculo"
 
-- **Score de risco** calculado por regra simples no trimestre selecionado:
-  - Alto: >5 coletas sem MTR **ou** >1 t fora da DMR
-  - Médio: 1-5 coletas sem MTR **ou** peso estimado >10% do total
-  - Baixo: caso contrário
-- Cartão grande no topo com badge colorido (vermelho/amarelo/verde) + frase resumo: *"3 coletas sem MTR · 1.2 toneladas fora da DMR"*
-- Lista de fatores de risco detalhados (cada item com link para a tela de origem):
-  - "Coletas sem MTR" → /pendencias
-  - "Peso estimado não confirmado" → /pendencias
-  - "Divergências DMR" → /dmr
-  - "MTRs duplicados em 90 dias" (regra já existente)
-- Item adicionado no menu lateral entre "Pendências" e "Consolidação"
+Hoje existe a marcação `naoVinculado` por linha (apenas texto). Acrescentar:
 
-## 5. Tela de Pendências — ações rápidas
+- Acima da seção "Itens da coleta", se `destinadorId && vinculosDest.length > 0` e existir alguma linha com `tipo_residuo_id` válido fora do `validIds`, renderizar um alerta (warning):
+  > "Destinador {destinadorNome} não está vinculado a: {lista de nomes de resíduos}"
+  > Botão **"Adicionar vínculo"**.
+- Ao clicar: para cada item não-vinculado com `tipo_residuo_id` e `tratamento`, executar `addDestinadorResiduo(destinadorId, tipo_id, tratamento)` em paralelo, depois `qc.invalidateQueries(["destinador_residuos", destinadorId])`. O alerta some sozinho quando os vínculos chegarem.
+- Manter a marcação inline por linha (já existente) como reforço visual, mas remover quando o vínculo passar a existir.
 
-- Adicionar **botão "Adicionar MTR"** inline em cada linha sem MTR (abre modal pequeno com input + salvar) em vez de só "Corrigir"
-- Adicionar **botão "Confirmar peso"** inline para itens com peso estimado (desmarca a flag `peso_estimado`)
-- Mantém o link "Editar coleta completa" para casos complexos
+Remover a auto-criação silenciosa de vínculos no `ensureVinculo` (substituída pela ação explícita do usuário, evitando criar vínculos sem confirmação).
 
-## 6. Tela de DMR — investigação
+## 6. Atualização automática do tratamento ao trocar resíduo
 
-- Tornar cada linha de divergência **clicável** (abre `Sheet` lateral) listando:
-  - Coletas internas que compõem aquele resíduo/destinador no trimestre (com link "Editar")
-  - Linhas da DMR que entraram no agrupamento
-- Indicador visual mais forte: chips coloridos (verde "OK", amarelo "Divergência leve", vermelho "Divergência grave > 50 kg ou >10%")
+Em `selecionarTipoPorNome` o tratamento só é setado quando o campo está vazio (`tratamento || ...`). Mudar para sempre sobrescrever **na linha atual** quando o usuário escolhe um resíduo da lista (opt presente), priorizando:
 
-## 7. Cadastro de coleta — refinamento
+1. Vínculo `vinculosDest` para `(destinadorId, tipo.id)` se existir.
+2. `tipo.tratamento_padrao`.
 
-- Layout mais compacto, agrupando: Data + Unidade + Transportador + Destinador + MTR no topo
-- Bloco "Resíduos" com botão "+ Adicionar resíduo" mais visível (azul)
-- Auto-sugestão de tratamento já existe — destacar visualmente quando aplicada
-- Checkbox de "peso estimado" com ícone de aviso amarelo
+Para distinguir "escolheu da lista" vs "está apenas digitando", o `Autocomplete` já invoca `onChange(value, option)` com `option` definido na seleção. Ajustar `selecionarTipoPorNome` para receber também o `option` (assinatura `(i, value, option?)`) e só sobrescrever o tratamento quando `option` estiver presente. Quando o usuário só digita texto livre, manter o tratamento atual.
 
-## 8. Sidebar — pequenos ajustes
+Exceção atendida: o `setItens` faz `map` retornando o item alterado apenas no índice `i` — outras linhas ficam intactas.
 
-- Branco com item ativo em azul claro (alinhado à nova paleta)
-- Badge numérico vermelho ao lado de "Pendências" e "Risco" quando houver itens críticos
+## 7. UX dos modais
 
-## Arquivos afetados
+`src/components/ui/dialog.tsx` já usa `w-[min(90vw,72rem)] max-h-[90vh] overflow-y-auto`. Ajustar para preferir não ter scroll quando couber:
+- Trocar `overflow-y-auto` por `overflow-y-auto` apenas quando necessário — manter `max-h-[90vh]` e adicionar `h-auto` (já é o default). Sem mudança estrutural; verificar que `QuickEntityDialog` não usa `max-w-lg` rígido (atual usa `max-w-lg` que conflita com 90vw — remover/relaxar para `sm:max-w-2xl` para destinador com lista de vínculos).
+- Garantir que os novos modais (`QuickResiduoDialog`, `QuickTratamentoDialog`) não apliquem `max-w` muito restrito.
 
-```text
-EDIT  src/styles.css                 (nova paleta)
-EDIT  src/components/AppShell.tsx    (período global no header, badges no menu)
-NEW   src/hooks/use-periodo.ts       (ano+trimestre global)
-EDIT  src/routes/index.tsx           (KPIs, banner, atalhos, usar período global)
-EDIT  src/routes/pendencias.tsx      (ações inline, usar período global)
-EDIT  src/routes/dmr.tsx             (Sheet de investigação, chips)
-EDIT  src/routes/consolidacao.tsx    (usar período global)
-EDIT  src/components/ColetaForm.tsx  (layout compacto)
-NEW   src/routes/risco.tsx           (dashboard de risco)
-EDIT  src/lib/data.ts                (helper para volume fora da DMR + atualização rápida MTR/peso)
-```
+## Detalhes técnicos
 
-## Fora do escopo
+**Mudanças em `src/lib/data.ts`:**
+- `upsertTipoResiduo` retorna `TipoResiduo` (insert com `.select().single()`); update mantém retorno do registro atualizado.
+- `upsertTratamento` retorna `Tratamento` analogamente.
+- (Opcional) helper `linkResiduoToDestinadores(tipo_id, destinador_ids[], tratamento)` que itera `addDestinadorResiduo`.
 
-- Autenticação / RBAC (mantido para fase futura conforme combinado)
-- Mudança de schema do banco (a base atual já suporta tudo)
-- Notificações push / e-mails
+**Arquivos novos:**
+- `src/components/QuickResiduoDialog.tsx`
+- `src/components/QuickTratamentoDialog.tsx`
 
-Após sua aprovação, implemento em uma única sequência e mostro o resultado.
+**Arquivos editados:**
+- `src/components/ColetaForm.tsx` — filtro de tipos por vínculos, alerta agregado com botão, autocomplete `onCreate` em resíduo/tratamento, override de tratamento ao escolher resíduo, remover auto-vinculação silenciosa.
+- `src/lib/data.ts` — retornos dos upserts.
+- `src/components/QuickEntityDialog.tsx` — relaxar `max-w-lg` (cap 90vw já vem do Dialog).
+- `src/routes/cadastros.tsx` — se chamadas existentes a `upsertTipoResiduo`/`upsertTratamento` ignoram retorno, nenhuma mudança necessária; verificar para não quebrar.
+
+**Não alterado:** schema do banco, lógica de DMR, importação em massa, indicadores de risco.
