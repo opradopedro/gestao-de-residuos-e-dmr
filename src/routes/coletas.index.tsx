@@ -30,7 +30,7 @@ type SortDir = "asc" | "desc";
 
 function ColetasList() {
   const unidade = useUnidadeAtiva();
-  const qc = useQueryClient();
+  
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<"todas" | "sem_mtr" | "estimado" | "alerta" | "manual">("todas");
   const [residuoSel, setResiduoSel] = useState<string[]>([]);
