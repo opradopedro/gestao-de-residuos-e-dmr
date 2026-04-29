@@ -9,11 +9,22 @@ export type Coleta = {
   data: string;
   transportador: string | null;
   destinador: string | null;
+  transportador_id: string | null;
+  destinador_id: string | null;
   mtr: string | null;
   peso_estimado: boolean;
+  dmr_manual: boolean;
   observacoes: string | null;
   criado_em: string;
   atualizado_em: string;
+};
+export type Transportador = { id: string; nome: string; cnpj: string | null };
+export type Destinador = { id: string; nome: string; cnpj: string | null };
+export type DestinadorResiduo = {
+  id: string;
+  destinador_id: string;
+  tipo_residuo_id: string;
+  tratamento: string;
 };
 export type ColetaItem = {
   id: string;
