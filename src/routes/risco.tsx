@@ -40,13 +40,16 @@ function RiscoPage() {
 
   const analise = useMemo(() => {
     const noTri = coletas.filter((c) => c.data >= periodo.start && c.data <= periodo.end);
-    const semMtr = noTri.filter((c) => !c.mtr);
+    const semMtr = noTri.filter(isPendenciaSemMtr); // erro: esquecimento
+    const semMtrOperacao = noTri.filter(isSemMtrOperacao); // DMR manual: risco, não pendência
     const estimado = noTri.filter((c) => c.peso_estimado);
     const totalKg = noTri.reduce((s, c) => s + totalPesoColeta(c), 0);
     const pesoSemMtr = semMtr.reduce((s, c) => s + totalPesoColeta(c), 0);
+    const pesoSemMtrOperacao = semMtrOperacao.reduce((s, c) => s + totalPesoColeta(c), 0);
     const pesoEstimado = estimado.reduce((s, c) => s + totalPesoColeta(c), 0);
-    const dup = findMtrDuplicates(noTri);
-    const dupColetas = noTri.filter((c) => c.mtr && dup.has(c.mtr));
+    const dupUnique = countMtrDuplicatesUnique(noTri);
+    const dupSet = findMtrDuplicates(noTri);
+    const dupColetas = noTri.filter((c) => c.mtr && dupSet.has(c.mtr));
 
     let foraDmr = 0;
     if (upload) {
@@ -57,10 +60,11 @@ function RiscoPage() {
     const pctEstimado = totalKg > 0 ? pesoEstimado / totalKg : 0;
     let nivel: "alto" | "medio" | "baixo" = "baixo";
     if (semMtr.length > 5 || foraDmr > 1000) nivel = "alto";
-    else if (semMtr.length > 0 || pctEstimado > 0.1 || dupColetas.length > 0) nivel = "medio";
+    else if (semMtr.length > 0 || pctEstimado > 0.1 || dupUnique > 0 || semMtrOperacao.length > 0) nivel = "medio";
 
     return {
-      nivel, semMtr, estimado, pesoSemMtr, pesoEstimado, totalKg, foraDmr, dupColetas, totalColetas: noTri.length, temUpload: !!upload,
+      nivel, semMtr, semMtrOperacao, estimado, pesoSemMtr, pesoSemMtrOperacao, pesoEstimado, totalKg,
+      foraDmr, dupColetas, dupUnique, totalColetas: noTri.length, temUpload: !!upload,
     };
   }, [coletas, periodo, upload, linhasDmr]);
 
