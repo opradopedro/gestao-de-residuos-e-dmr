@@ -312,9 +312,29 @@ export function countMtrDuplicatesExcess(coletas: ColetaComItens[]): number {
   return n;
 }
 
-// Item 5: Sem MTR Tipo 1 (pendência real) = sem MTR e NÃO marcado como dmr_manual.
+// Sem MTR por esquecimento (pendência + risco) — sem MTR e NÃO marcado como dmr_manual.
 export function isPendenciaSemMtr(c: ColetaComItens): boolean {
   return !c.mtr && !c.dmr_manual;
+}
+
+// Sem MTR por operação (DMR manual) — NÃO é pendência, mas é risco.
+export function isSemMtrOperacao(c: ColetaComItens): boolean {
+  return !!c.dmr_manual;
+}
+
+// Sem peso — coleta salva sem itens ou com peso total zero. É pendência.
+export function isPendenciaSemPeso(c: ColetaComItens): boolean {
+  return totalPesoColeta(c) <= 0;
+}
+
+// Peso estimado pendente — flag ativa E ainda sem peso lançado.
+export function isPendenciaEstimadoSemPeso(c: ColetaComItens): boolean {
+  return !!c.peso_estimado && totalPesoColeta(c) <= 0;
+}
+
+// Quantidade de MTRs únicos duplicados (não soma todas as ocorrências).
+export function countMtrDuplicatesUnique(coletas: ColetaComItens[]): number {
+  return findMtrDuplicates(coletas).size;
 }
 
 // Importação em massa de coletas (item 11): cada grupo já vem agrupado.
