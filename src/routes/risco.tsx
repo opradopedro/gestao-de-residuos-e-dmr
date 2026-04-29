@@ -2,12 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo } from "@/hooks/use-periodo";
-import { listColetasByUnidade, totalPesoColeta, findMtrDuplicates } from "@/lib/data";
+import { listColetasByUnidade, totalPesoColeta, findMtrDuplicates, isPendenciaSemMtr, isSemMtrOperacao, countMtrDuplicatesUnique } from "@/lib/data";
 import { listDmrUploads, getDmrLinhas } from "@/lib/dmr";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ShieldAlert, ShieldCheck, ShieldQuestion, ArrowRight, AlertTriangle, FileWarning, Scale, FileSpreadsheet } from "lucide-react";
+import { ShieldAlert, ShieldCheck, ShieldQuestion, ArrowRight, AlertTriangle, FileWarning, Scale, FileSpreadsheet, ClipboardEdit } from "lucide-react";
 import { useMemo } from "react";
 import { formatTon, formatKg } from "@/lib/format";
 
