@@ -70,7 +70,25 @@ function Pendencias() {
   );
 }
 
-function PendenciaTable({ rows, tipo }: { rows: any[]; tipo: "mtr" | "sem_peso" | "est_sem_peso" | "dup" }) {
+function SummaryCard({ tone, icon: Icon, label, count, extra }: { tone: "destructive" | "warning"; icon: any; label: string; count: number; extra: string }) {
+  const cls = tone === "destructive"
+    ? "border-destructive/40 bg-destructive/5 text-destructive"
+    : "border-warning/50 bg-warning/10 text-warning-foreground";
+  return (
+    <Card className={cls.split(" ").slice(0, 2).join(" ")}>
+      <CardContent className="p-4 flex items-start gap-3">
+        <Icon className={`size-6 ${cls.split(" ")[2]}`} />
+        <div className="min-w-0">
+          <div className="text-xs text-muted-foreground">{label}</div>
+          <div className="text-2xl font-semibold">{count}</div>
+          <div className="text-xs text-muted-foreground truncate">{extra}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PendenciaTable({ rows, tipo }: { rows: any[]; tipo: "mtr" | "sem_peso" | "dup" }) {
   const qc = useQueryClient();
   const [mtrDialog, setMtrDialog] = useState<{ id: string; mtr: string } | null>(null);
 
