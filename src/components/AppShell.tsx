@@ -110,13 +110,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </div>
-        <nav className="flex-1 p-3 space-y-0.5 mt-2">
+          <Button asChild className="w-full mt-2" size="sm">
+            <Link to="/coletas/nova"><Plus className="size-4 mr-1" /> Nova coleta</Link>
+          </Button>
+        </div>
+        <nav className="flex-1 p-3 space-y-0.5">
           {NAV.map((item) => {
             const active = item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to);
             const Icon = item.icon;
             const badgeVal = item.badge === "pendencias" && badges.pendencias > 0 ? String(badges.pendencias)
               : item.badge === "risco" && badges.risco === "alto" ? "!" : null;
-            const badgeTone = item.badge === "risco" && badges.risco === "alto" ? "bg-destructive" : "bg-warning text-warning-foreground";
             return (
               <Link
                 key={item.to}
@@ -129,7 +132,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Icon className="size-4" />
                 <span className="flex-1">{item.label}</span>
                 {badgeVal && (
-                  <span className={cn("text-[10px] font-semibold rounded-full px-1.5 py-0.5 min-w-5 text-center", badgeTone, item.badge === "pendencias" ? "bg-warning text-warning-foreground" : "bg-destructive text-destructive-foreground")}>
+                  <span className={cn("text-[10px] font-semibold rounded-full px-1.5 py-0.5 min-w-5 text-center",
+                    item.badge === "pendencias" ? "bg-warning text-warning-foreground" : "bg-destructive text-destructive-foreground")}>
                     {badgeVal}
                   </span>
                 )}
@@ -137,11 +141,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="p-3 border-t border-sidebar-border">
-          <Button asChild className="w-full" size="sm">
-            <Link to="/coletas/nova"><Plus className="size-4 mr-1" /> Nova coleta</Link>
-          </Button>
-        </div>
       </aside>
       <main className="flex-1 min-w-0">
         {/* Mobile header */}
