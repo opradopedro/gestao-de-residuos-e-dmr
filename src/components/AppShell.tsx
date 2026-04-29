@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Recycle, LayoutDashboard, ClipboardList, AlertTriangle, BarChart3, FileSpreadsheet, Settings, Plus, ShieldAlert, Calendar } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { listUnidades, listColetasByUnidade, totalPesoColeta, isPendenciaSemMtr, isPendenciaSemPeso, isPendenciaEstimadoSemPeso, countMtrDuplicatesUnique, isSemMtrOperacao } from "@/lib/data";
+import { listUnidades, listColetasByUnidade, totalPesoColeta, isPendenciaSemMtr, countMtrDuplicatesExcess } from "@/lib/data";
 import { useUnidadeAtiva, setUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo, setPeriodoAtivo } from "@/hooks/use-periodo";
 import { useEffect, useMemo } from "react";
@@ -52,16 +52,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const badges = useMemo(() => {
     const noTri = coletas.filter((c) => c.data >= periodo.start && c.data <= periodo.end);
     const semMtr = noTri.filter(isPendenciaSemMtr).length;
-    const estimadoPend = noTri.filter(isPendenciaEstimadoSemPeso).length;
-    const semPeso = noTri.filter(isPendenciaSemPeso).length;
-    const dupUnique = countMtrDuplicatesUnique(noTri);
-    const semMtrOperacao = noTri.filter(isSemMtrOperacao).length;
+    const estimado = noTri.filter((c) => c.peso_estimado).length;
+    const dupExcess = countMtrDuplicatesExcess(noTri);
+    const dmrManualCount = noTri.filter((c) => c.dmr_manual).length;
     const pesoSemMtr = noTri.filter(isPendenciaSemMtr).reduce((s, c) => s + totalPesoColeta(c), 0);
-    const pendencias = semMtr + estimadoPend + semPeso + dupUnique;
-    const temRisco = semMtr > 0 || semMtrOperacao > 0 || dupUnique > 0 || estimadoPend > 0;
     return {
-      pendencias,
-      risco: semMtr > 5 || pesoSemMtr > 1000 ? "alto" : temRisco ? "medio" : "ok",
+      pendencias: semMtr + estimado + dupExcess,
+      risco: semMtr > 5 || pesoSemMtr > 1000 || dmrManualCount > 0 ? "alto" : (semMtr + estimado + dupExcess) > 0 ? "medio" : "ok",
     };
   }, [coletas, periodo.start, periodo.end]);
 

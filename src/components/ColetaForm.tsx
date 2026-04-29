@@ -121,14 +121,11 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
   }
 
   function build(): ColetaInput | null {
-    // Permite salvar coleta sem peso (vira pendência "Sem peso")
-    const itensValidos = itens.filter((it) => it.tipo_residuo_nome && Number(it.peso_kg) > 0);
+    if (itens.length === 0) { toast.error("Adicione ao menos um item"); return null; }
     for (const [i, it] of itens.entries()) {
-      // Se preencheu tipo OU peso, exige consistência
-      const temAlgo = !!it.tipo_residuo_nome || (it.peso_kg !== "" && Number(it.peso_kg) > 0);
-      if (!temAlgo) continue;
       if (!it.tipo_residuo_nome) { toast.error(`Item ${i + 1}: selecione o tipo de resíduo`); return null; }
-      if (Number(it.peso_kg) > 0 && !it.tratamento) { toast.error(`Item ${i + 1}: informe o tratamento`); return null; }
+      if (!it.peso_kg || Number(it.peso_kg) <= 0) { toast.error(`Item ${i + 1}: informe o peso`); return null; }
+      if (!it.tratamento) { toast.error(`Item ${i + 1}: informe o tratamento`); return null; }
     }
     return {
       unidade_id: unidadeId,
@@ -141,7 +138,7 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
       peso_estimado: pesoEstimado,
       dmr_manual: dmrManual,
       observacoes: obs || null,
-      itens: itensValidos.map((it) => ({
+      itens: itens.map((it) => ({
         tipo_residuo_id: it.tipo_residuo_id,
         tipo_residuo_nome: it.tipo_residuo_nome,
         peso_kg: Number(it.peso_kg),
