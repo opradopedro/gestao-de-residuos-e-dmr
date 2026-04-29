@@ -95,7 +95,8 @@ function Dashboard() {
           <div className="flex-1">
             <div className="font-medium">
               {nivelRisco === "alto" ? "Risco alto detectado" : "Atenção"} —
-              {stats.semMtr > 0 && ` ${stats.semMtr} sem MTR`}
+              {stats.semMtr > 0 && ` ${stats.semMtr} sem MTR (erro)`}
+              {stats.semMtrOperacao > 0 && ` · ${stats.semMtrOperacao} sem MTR (operação)`}
               {stats.estimadoCount > 0 && ` · ${stats.estimadoCount} estimadas`}
               {stats.foraDmr && stats.foraDmr > 0 ? ` · ${formatTon(stats.foraDmr)} fora da DMR` : ""}
             </div>
