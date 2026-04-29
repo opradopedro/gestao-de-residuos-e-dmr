@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo } from "@/hooks/use-periodo";
-import { listColetasByUnidade, totalPesoColeta } from "@/lib/data";
+import { listColetasByUnidade, totalPesoColeta, isPendenciaSemMtr, isSemMtrOperacao } from "@/lib/data";
 import { listDmrUploads, getDmrLinhas } from "@/lib/dmr";
 import { formatTon, formatKg } from "@/lib/format";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
@@ -40,7 +40,8 @@ function Dashboard() {
   const stats = useMemo(() => {
     const noTri = coletas.filter((c) => c.data >= periodo.start && c.data <= periodo.end);
     const peso = noTri.reduce((s, c) => s + totalPesoColeta(c), 0);
-    const semMtr = noTri.filter((c) => !c.mtr);
+    const semMtr = noTri.filter(isPendenciaSemMtr);
+    const semMtrOperacao = noTri.filter(isSemMtrOperacao);
     const estimado = noTri.filter((c) => c.peso_estimado);
     const pesoSemMtr = semMtr.reduce((s, c) => s + totalPesoColeta(c), 0);
     const pesoEstimado = estimado.reduce((s, c) => s + totalPesoColeta(c), 0);
@@ -65,6 +66,7 @@ function Dashboard() {
       pesoTotal: peso,
       semMtr: semMtr.length,
       pesoSemMtr,
+      semMtrOperacao: semMtrOperacao.length,
       estimadoCount: estimado.length,
       pesoEstimado,
       foraDmr,
@@ -76,7 +78,8 @@ function Dashboard() {
   if (!unidade) return <NoUnidade />;
 
   const nivelRisco = stats.semMtr > 5 || (stats.foraDmr ?? 0) > 1000 ? "alto"
-    : stats.semMtr > 0 || stats.estimadoCount > 0 ? "medio" : "ok";
+    : stats.semMtr > 0 || stats.estimadoCount > 0 || stats.semMtrOperacao > 0 ? "medio" : "ok";
+
 
   return (
     <div className="p-6 max-w-7xl space-y-6">
@@ -92,7 +95,8 @@ function Dashboard() {
           <div className="flex-1">
             <div className="font-medium">
               {nivelRisco === "alto" ? "Risco alto detectado" : "Atenção"} —
-              {stats.semMtr > 0 && ` ${stats.semMtr} sem MTR`}
+              {stats.semMtr > 0 && ` ${stats.semMtr} sem MTR (erro)`}
+              {stats.semMtrOperacao > 0 && ` · ${stats.semMtrOperacao} sem MTR (operação)`}
               {stats.estimadoCount > 0 && ` · ${stats.estimadoCount} estimadas`}
               {stats.foraDmr && stats.foraDmr > 0 ? ` · ${formatTon(stats.foraDmr)} fora da DMR` : ""}
             </div>
