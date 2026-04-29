@@ -6,8 +6,6 @@ import {
   totalPesoColeta,
   findMtrDuplicates,
   ALERTA_PESO_KG,
-  bulkInsertColetas,
-  type ColetaInput,
   type ColetaComItens,
 } from "@/lib/data";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
@@ -16,12 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { MultiSelectFilter } from "@/components/MultiSelectFilter";
+import { ColetaImportWizard } from "@/components/ColetaImportWizard";
 import { Plus, AlertTriangle, FileWarning, Scale, ArrowUp, ArrowDown, Upload } from "lucide-react";
 import { formatDate, formatKg } from "@/lib/format";
 import { quarterOf } from "@/lib/quarter";
-import { useMemo, useRef, useState } from "react";
-import * as XLSX from "xlsx";
-import { toast } from "sonner";
+import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/coletas/")({
   head: () => ({ meta: [{ title: "Coletas — DMR" }] }),
