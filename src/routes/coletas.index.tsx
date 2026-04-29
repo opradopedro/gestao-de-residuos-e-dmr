@@ -1,13 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
 import {
   listColetasByUnidade,
   totalPesoColeta,
   findMtrDuplicates,
   ALERTA_PESO_KG,
-  bulkInsertColetas,
-  type ColetaInput,
   type ColetaComItens,
 } from "@/lib/data";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
@@ -16,12 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { MultiSelectFilter } from "@/components/MultiSelectFilter";
+import { ColetaImportWizard } from "@/components/ColetaImportWizard";
 import { Plus, AlertTriangle, FileWarning, Scale, ArrowUp, ArrowDown, Upload } from "lucide-react";
 import { formatDate, formatKg } from "@/lib/format";
 import { quarterOf } from "@/lib/quarter";
-import { useMemo, useRef, useState } from "react";
-import * as XLSX from "xlsx";
-import { toast } from "sonner";
+import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/coletas/")({
   head: () => ({ meta: [{ title: "Coletas — DMR" }] }),
@@ -33,7 +30,7 @@ type SortDir = "asc" | "desc";
 
 function ColetasList() {
   const unidade = useUnidadeAtiva();
-  const qc = useQueryClient();
+  
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<"todas" | "sem_mtr" | "estimado" | "alerta" | "manual">("todas");
   const [residuoSel, setResiduoSel] = useState<string[]>([]);
@@ -41,7 +38,7 @@ function ColetasList() {
   const [transportadorSel, setTransportadorSel] = useState<string[]>([]);
   const [sortKey, setSortKey] = useState<SortKey>("data");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: coletas = [], isLoading } = useQuery({
     queryKey: ["coletas", unidade],
@@ -104,109 +101,13 @@ function ColetasList() {
     return sorted;
   }, [coletas, filtro, busca, dups, residuoSel, destinadorSel, transportadorSel, sortKey, sortDir]);
 
-  const mutImport = useMutation({
-    mutationFn: bulkInsertColetas,
-    onSuccess: (n) => {
-      toast.success(`${n} coleta(s) importada(s)`);
-      qc.invalidateQueries({ queryKey: ["coletas"] });
-      if (fileRef.current) fileRef.current.value = "";
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
 
   function toggleSort(k: SortKey) {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(k); setSortDir("asc"); }
   }
 
-  function handleImport(file: File) {
-    if (!unidade) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target!.result as ArrayBuffer);
-        const wb = XLSX.read(data, { type: "array" });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
-        if (rows.length === 0) return toast.error("Arquivo vazio");
 
-        // Auto-detect header names (lowercase contains)
-        const headers = Object.keys(rows[0]);
-        const find = (...patterns: RegExp[]) => headers.find((h) => patterns.some((p) => p.test(h.toLowerCase())));
-        const hData = find(/data/);
-        const hMtr = find(/^mtr/, /^n.*mtr/);
-        const hDest = find(/destin/);
-        const hTrans = find(/transport/);
-        const hResiduo = find(/res[íi]duo|tipo/);
-        const hPeso = find(/peso|kg/);
-        const hTrat = find(/tratamento/);
-
-        if (!hResiduo || !hPeso) {
-          return toast.error("Planilha precisa ter colunas de resíduo e peso (kg)");
-        }
-
-        // Group by MTR; if no MTR, by data+destinador
-        const groups = new Map<string, ColetaInput>();
-        for (const r of rows) {
-          const mtr = hMtr ? String(r[hMtr] ?? "").trim() : "";
-          const dataRaw = hData ? r[hData] : null;
-          let dataStr = "";
-          if (dataRaw instanceof Date) dataStr = dataRaw.toISOString().slice(0, 10);
-          else if (typeof dataRaw === "number") {
-            // Excel serial date
-            const d = new Date(Math.round((dataRaw - 25569) * 86400 * 1000));
-            dataStr = d.toISOString().slice(0, 10);
-          } else if (dataRaw) {
-            const s = String(dataRaw);
-            const m = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-            if (m) {
-              const [, d, mo, y] = m;
-              const yy = y.length === 2 ? "20" + y : y;
-              dataStr = `${yy}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
-            } else if (/\d{4}-\d{2}-\d{2}/.test(s)) dataStr = s.slice(0, 10);
-          }
-          if (!dataStr) dataStr = new Date().toISOString().slice(0, 10);
-
-          const destinador = hDest ? String(r[hDest] ?? "").trim() : "";
-          const transportador = hTrans ? String(r[hTrans] ?? "").trim() : "";
-          const residuo = String(r[hResiduo!] ?? "").trim();
-          const pesoRaw = String(r[hPeso!] ?? "0").replace(/\./g, "").replace(",", ".");
-          const peso = Number(pesoRaw) || 0;
-          const tratamento = hTrat ? String(r[hTrat] ?? "").trim() || "Reciclagem" : "Reciclagem";
-          if (!residuo || peso <= 0) continue;
-
-          const key = mtr ? `mtr:${mtr}` : `data:${dataStr}|dest:${destinador.toLowerCase()}`;
-          if (!groups.has(key)) {
-            groups.set(key, {
-              unidade_id: unidade,
-              data: dataStr,
-              transportador: transportador || null,
-              destinador: destinador || null,
-              transportador_id: null,
-              destinador_id: null,
-              mtr: mtr || null,
-              peso_estimado: false,
-              dmr_manual: false,
-              observacoes: null,
-              itens: [],
-            });
-          }
-          groups.get(key)!.itens.push({
-            tipo_residuo_id: null,
-            tipo_residuo_nome: residuo,
-            peso_kg: peso,
-            tratamento,
-          });
-        }
-        const list = Array.from(groups.values()).filter((g) => g.itens.length > 0);
-        if (list.length === 0) return toast.error("Nenhuma coleta válida encontrada");
-        mutImport.mutate(list);
-      } catch (err: any) {
-        toast.error("Erro ao ler arquivo: " + err.message);
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  }
 
   if (!unidade) return <NoUnidade />;
 
@@ -226,14 +127,7 @@ function ColetasList() {
         description={`${coletas.length} coletas registradas · ${filtradas.length} visíveis após filtros.`}
         actions={
           <div className="flex gap-2">
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleImport(e.target.files[0])}
-            />
-            <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={mutImport.isPending}>
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
               <Upload className="size-4 mr-1" /> Importar planilha
             </Button>
             <Button asChild><Link to="/coletas/nova"><Plus className="size-4 mr-1" /> Nova coleta</Link></Button>
@@ -323,6 +217,7 @@ function ColetasList() {
           </div>
         </CardContent>
       </Card>
+      <ColetaImportWizard open={importOpen} onOpenChange={setImportOpen} unidadeAtiva={unidade} />
     </div>
   );
 }
