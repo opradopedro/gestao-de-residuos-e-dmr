@@ -15,7 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { Plus, AlertTriangle, FileWarning, Scale, ArrowUp, ArrowDown, Upload } from "lucide-react";
 import { formatDate, formatKg } from "@/lib/format";
 import { quarterOf } from "@/lib/quarter";
@@ -36,9 +36,9 @@ function ColetasList() {
   const qc = useQueryClient();
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<"todas" | "sem_mtr" | "estimado" | "alerta" | "manual">("todas");
-  const [residuoFiltro, setResiduoFiltro] = useState<string>("__all__");
-  const [destinadorFiltro, setDestinadorFiltro] = useState<string>("__all__");
-  const [transportadorFiltro, setTransportadorFiltro] = useState<string>("__all__");
+  const [residuoSel, setResiduoSel] = useState<string[]>([]);
+  const [destinadorSel, setDestinadorSel] = useState<string[]>([]);
+  const [transportadorSel, setTransportadorSel] = useState<string[]>([]);
   const [sortKey, setSortKey] = useState<SortKey>("data");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -72,14 +72,15 @@ function ColetasList() {
       if (filtro === "estimado" && !c.peso_estimado) return false;
       if (filtro === "manual" && !c.dmr_manual) return false;
       if (filtro === "alerta" && !itemAlerta && !(c.mtr && dups.has(c.mtr))) return false;
-      if (residuoFiltro !== "__all__" && !(c.itens ?? []).some((it) => it.tipo_residuo_nome === residuoFiltro)) return false;
-      if (destinadorFiltro !== "__all__" && c.destinador !== destinadorFiltro) return false;
-      if (transportadorFiltro !== "__all__" && c.transportador !== transportadorFiltro) return false;
+      if (residuoSel.length > 0 && !(c.itens ?? []).some((it) => residuoSel.includes(it.tipo_residuo_nome))) return false;
+      if (destinadorSel.length > 0 && !(c.destinador && destinadorSel.includes(c.destinador))) return false;
+      if (transportadorSel.length > 0 && !(c.transportador && transportadorSel.includes(c.transportador))) return false;
       if (busca) {
         const q = busca.toLowerCase();
         const inFields = [c.mtr, c.transportador, c.destinador, c.observacoes].some((v) => v?.toLowerCase().includes(q));
         const inItens = (c.itens ?? []).some((it) => it.tipo_residuo_nome.toLowerCase().includes(q));
-        if (!inFields && !inItens) return false;
+        const inData = c.data.includes(q) || formatDate(c.data).toLowerCase().includes(q);
+        if (!inFields && !inItens && !inData) return false;
       }
       return true;
     });
@@ -101,7 +102,7 @@ function ColetasList() {
       return 0;
     });
     return sorted;
-  }, [coletas, filtro, busca, dups, residuoFiltro, destinadorFiltro, transportadorFiltro, sortKey, sortDir]);
+  }, [coletas, filtro, busca, dups, residuoSel, destinadorSel, transportadorSel, sortKey, sortDir]);
 
   const mutImport = useMutation({
     mutationFn: bulkInsertColetas,
@@ -241,7 +242,7 @@ function ColetasList() {
       />
 
       <div className="flex flex-wrap gap-2 mb-3">
-        <Input placeholder="Buscar por MTR, transportador, destinador, resíduo…" value={busca} onChange={(e) => setBusca(e.target.value)} className="max-w-sm" />
+        <Input placeholder="Buscar por MTR, transportador, destinador, resíduo, data…" value={busca} onChange={(e) => setBusca(e.target.value)} className="max-w-sm" />
         {([
           ["todas", "Todas"],
           ["sem_mtr", "Sem MTR"],
@@ -256,27 +257,9 @@ function ColetasList() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
-        <Select value={residuoFiltro} onValueChange={setResiduoFiltro}>
-          <SelectTrigger><SelectValue placeholder="Resíduo" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Todos os resíduos</SelectItem>
-            {opcoes.residuos.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={destinadorFiltro} onValueChange={setDestinadorFiltro}>
-          <SelectTrigger><SelectValue placeholder="Destinador" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Todos os destinadores</SelectItem>
-            {opcoes.destinadores.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={transportadorFiltro} onValueChange={setTransportadorFiltro}>
-          <SelectTrigger><SelectValue placeholder="Transportador" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Todos os transportadores</SelectItem>
-            {opcoes.transportadores.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <MultiSelectFilter label="Resíduo" options={opcoes.residuos} value={residuoSel} onChange={setResiduoSel} />
+        <MultiSelectFilter label="Destinador" options={opcoes.destinadores} value={destinadorSel} onChange={setDestinadorSel} />
+        <MultiSelectFilter label="Transportador" options={opcoes.transportadores} value={transportadorSel} onChange={setTransportadorSel} />
       </div>
 
       <Card>
