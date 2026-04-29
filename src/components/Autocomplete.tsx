@@ -16,9 +16,16 @@ type Props = {
   placeholder?: string;
   className?: string;
   emptyText?: string;
+  /** When provided, shows "Adicionar 'X'" entry when no exact match exists. */
+  onCreate?: (value: string) => void;
+  createLabel?: (value: string) => string;
+  disabled?: boolean;
 };
 
-export function Autocomplete({ value, onChange, options, placeholder, className, emptyText = "Nenhum resultado" }: Props) {
+export function Autocomplete({
+  value, onChange, options, placeholder, className,
+  emptyText = "Nenhum resultado", onCreate, createLabel, disabled,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -42,28 +49,42 @@ export function Autocomplete({ value, onChange, options, placeholder, className,
       .slice(0, 12);
   }, [value, options]);
 
+  const showCreate = !!onCreate && value.trim().length > 0 &&
+    !options.some((o) => o.label.toLowerCase() === value.trim().toLowerCase());
+
   function pick(o: AutocompleteOption) {
     onChange(o.value, o);
     setOpen(false);
+  }
+  function triggerCreate() {
+    if (onCreate && value.trim()) {
+      onCreate(value.trim());
+      setOpen(false);
+    }
   }
 
   return (
     <div ref={wrapRef} className={cn("relative", className)}>
       <Input
         value={value}
+        disabled={disabled}
         onFocus={() => setOpen(true)}
         onChange={(e) => { onChange(e.target.value); setOpen(true); setHighlight(0); }}
         onKeyDown={(e) => {
           if (!open) return;
-          if (e.key === "ArrowDown") { e.preventDefault(); setHighlight((h) => Math.min(h + 1, filtered.length - 1)); }
+          const total = filtered.length + (showCreate ? 1 : 0);
+          if (e.key === "ArrowDown") { e.preventDefault(); setHighlight((h) => Math.min(h + 1, total - 1)); }
           else if (e.key === "ArrowUp") { e.preventDefault(); setHighlight((h) => Math.max(h - 1, 0)); }
-          else if (e.key === "Enter" && filtered[highlight]) { e.preventDefault(); pick(filtered[highlight]); }
+          else if (e.key === "Enter") {
+            if (highlight < filtered.length && filtered[highlight]) { e.preventDefault(); pick(filtered[highlight]); }
+            else if (showCreate) { e.preventDefault(); triggerCreate(); }
+          }
           else if (e.key === "Escape") setOpen(false);
         }}
         placeholder={placeholder}
         autoComplete="off"
       />
-      {open && filtered.length > 0 && (
+      {open && (filtered.length > 0 || showCreate) && (
         <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md max-h-64 overflow-auto">
           {filtered.map((o, i) => (
             <button
@@ -80,9 +101,22 @@ export function Autocomplete({ value, onChange, options, placeholder, className,
               {o.sublabel && <span className="text-xs text-muted-foreground shrink-0">{o.sublabel}</span>}
             </button>
           ))}
+          {showCreate && (
+            <button
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); triggerCreate(); }}
+              onMouseEnter={() => setHighlight(filtered.length)}
+              className={cn(
+                "w-full text-left px-3 py-2 text-sm border-t border-border flex items-center gap-2 text-primary",
+                highlight === filtered.length ? "bg-accent" : "hover:bg-accent/60"
+              )}
+            >
+              + {createLabel ? createLabel(value.trim()) : `Adicionar "${value.trim()}"`}
+            </button>
+          )}
         </div>
       )}
-      {open && value.trim() && filtered.length === 0 && (
+      {open && value.trim() && filtered.length === 0 && !showCreate && (
         <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md p-3 text-sm text-muted-foreground">
           {emptyText}
         </div>

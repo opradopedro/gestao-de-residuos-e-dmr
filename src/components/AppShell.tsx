@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Recycle, LayoutDashboard, ClipboardList, AlertTriangle, BarChart3, FileSpreadsheet, Settings, Plus, ShieldAlert, Calendar } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { listUnidades, listColetasByUnidade, totalPesoColeta } from "@/lib/data";
+import { listUnidades, listColetasByUnidade, totalPesoColeta, isPendenciaSemMtr, countMtrDuplicatesExcess } from "@/lib/data";
 import { useUnidadeAtiva, setUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo, setPeriodoAtivo } from "@/hooks/use-periodo";
 import { useEffect, useMemo } from "react";
@@ -51,12 +51,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const badges = useMemo(() => {
     const noTri = coletas.filter((c) => c.data >= periodo.start && c.data <= periodo.end);
-    const semMtr = noTri.filter((c) => !c.mtr).length;
+    const semMtr = noTri.filter(isPendenciaSemMtr).length;
     const estimado = noTri.filter((c) => c.peso_estimado).length;
-    const pesoSemMtr = noTri.filter((c) => !c.mtr).reduce((s, c) => s + totalPesoColeta(c), 0);
+    const dupExcess = countMtrDuplicatesExcess(noTri);
+    const dmrManualCount = noTri.filter((c) => c.dmr_manual).length;
+    const pesoSemMtr = noTri.filter(isPendenciaSemMtr).reduce((s, c) => s + totalPesoColeta(c), 0);
     return {
-      pendencias: semMtr + estimado,
-      risco: semMtr > 5 || pesoSemMtr > 1000 ? "alto" : semMtr + estimado > 0 ? "medio" : "ok",
+      pendencias: semMtr + estimado + dupExcess,
+      risco: semMtr > 5 || pesoSemMtr > 1000 || dmrManualCount > 0 ? "alto" : (semMtr + estimado + dupExcess) > 0 ? "medio" : "ok",
     };
   }, [coletas, periodo.start, periodo.end]);
 
@@ -107,14 +109,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Select>
             </div>
           </div>
+          <Button asChild className="w-full mt-2" size="sm">
+            <Link to="/coletas/nova"><Plus className="size-4 mr-1" /> Nova coleta</Link>
+          </Button>
         </div>
-        <nav className="flex-1 p-3 space-y-0.5 mt-2">
+        <nav className="flex-1 p-3 space-y-0.5">
           {NAV.map((item) => {
             const active = item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to);
             const Icon = item.icon;
             const badgeVal = item.badge === "pendencias" && badges.pendencias > 0 ? String(badges.pendencias)
               : item.badge === "risco" && badges.risco === "alto" ? "!" : null;
-            const badgeTone = item.badge === "risco" && badges.risco === "alto" ? "bg-destructive" : "bg-warning text-warning-foreground";
             return (
               <Link
                 key={item.to}
@@ -127,7 +131,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Icon className="size-4" />
                 <span className="flex-1">{item.label}</span>
                 {badgeVal && (
-                  <span className={cn("text-[10px] font-semibold rounded-full px-1.5 py-0.5 min-w-5 text-center", badgeTone, item.badge === "pendencias" ? "bg-warning text-warning-foreground" : "bg-destructive text-destructive-foreground")}>
+                  <span className={cn("text-[10px] font-semibold rounded-full px-1.5 py-0.5 min-w-5 text-center",
+                    item.badge === "pendencias" ? "bg-warning text-warning-foreground" : "bg-destructive text-destructive-foreground")}>
                     {badgeVal}
                   </span>
                 )}
@@ -135,11 +140,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="p-3 border-t border-sidebar-border">
-          <Button asChild className="w-full" size="sm">
-            <Link to="/coletas/nova"><Plus className="size-4 mr-1" /> Nova coleta</Link>
-          </Button>
-        </div>
       </aside>
       <main className="flex-1 min-w-0">
         {/* Mobile header */}

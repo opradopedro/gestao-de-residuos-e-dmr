@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo } from "@/hooks/use-periodo";
-import { listColetasByUnidade, totalPesoColeta, updateColetaMtr, confirmarPesoColeta } from "@/lib/data";
+import { listColetasByUnidade, totalPesoColeta, updateColetaMtr, confirmarPesoColeta, isPendenciaSemMtr } from "@/lib/data";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -29,7 +29,7 @@ function Pendencias() {
   });
 
   const noTri = useMemo(() => coletas.filter((c) => c.data >= periodo.start && c.data <= periodo.end), [coletas, periodo]);
-  const semMtr = useMemo(() => noTri.filter((c) => !c.mtr), [noTri]);
+  const semMtr = useMemo(() => noTri.filter(isPendenciaSemMtr), [noTri]);
   const estimado = useMemo(() => noTri.filter((c) => c.peso_estimado), [noTri]);
   const pesoSemMtr = semMtr.reduce((s, c) => s + totalPesoColeta(c), 0);
   const pesoEstimado = estimado.reduce((s, c) => s + totalPesoColeta(c), 0);

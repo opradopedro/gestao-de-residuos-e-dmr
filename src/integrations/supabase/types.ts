@@ -65,11 +65,14 @@ export type Database = {
           criado_em: string
           data: string
           destinador: string | null
+          destinador_id: string | null
+          dmr_manual: boolean
           id: string
           mtr: string | null
           observacoes: string | null
           peso_estimado: boolean
           transportador: string | null
+          transportador_id: string | null
           unidade_id: string
         }
         Insert: {
@@ -77,11 +80,14 @@ export type Database = {
           criado_em?: string
           data?: string
           destinador?: string | null
+          destinador_id?: string | null
+          dmr_manual?: boolean
           id?: string
           mtr?: string | null
           observacoes?: string | null
           peso_estimado?: boolean
           transportador?: string | null
+          transportador_id?: string | null
           unidade_id: string
         }
         Update: {
@@ -89,14 +95,31 @@ export type Database = {
           criado_em?: string
           data?: string
           destinador?: string | null
+          destinador_id?: string | null
+          dmr_manual?: boolean
           id?: string
           mtr?: string | null
           observacoes?: string | null
           peso_estimado?: boolean
           transportador?: string | null
+          transportador_id?: string | null
           unidade_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "coletas_destinador_id_fkey"
+            columns: ["destinador_id"]
+            isOneToOne: false
+            referencedRelation: "destinadores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coletas_transportador_id_fkey"
+            columns: ["transportador_id"]
+            isOneToOne: false
+            referencedRelation: "transportadores"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "coletas_unidade_id_fkey"
             columns: ["unidade_id"]
@@ -105,6 +128,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      destinador_residuos: {
+        Row: {
+          criado_em: string
+          destinador_id: string
+          id: string
+          tipo_residuo_id: string
+          tratamento: string
+        }
+        Insert: {
+          criado_em?: string
+          destinador_id: string
+          id?: string
+          tipo_residuo_id: string
+          tratamento: string
+        }
+        Update: {
+          criado_em?: string
+          destinador_id?: string
+          id?: string
+          tipo_residuo_id?: string
+          tratamento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "destinador_residuos_destinador_id_fkey"
+            columns: ["destinador_id"]
+            isOneToOne: false
+            referencedRelation: "destinadores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "destinador_residuos_tipo_residuo_id_fkey"
+            columns: ["tipo_residuo_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_residuo"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      destinadores: {
+        Row: {
+          cnpj: string | null
+          criado_em: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          cnpj?: string | null
+          criado_em?: string
+          id?: string
+          nome: string
+        }
+        Update: {
+          cnpj?: string | null
+          criado_em?: string
+          id?: string
+          nome?: string
+        }
+        Relationships: []
       }
       dmr_linhas: {
         Row: {
@@ -206,6 +289,27 @@ export type Database = {
           id?: string
           nome?: string
           tratamento_padrao?: string
+        }
+        Relationships: []
+      }
+      transportadores: {
+        Row: {
+          cnpj: string | null
+          criado_em: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          cnpj?: string | null
+          criado_em?: string
+          id?: string
+          nome: string
+        }
+        Update: {
+          cnpj?: string | null
+          criado_em?: string
+          id?: string
+          nome?: string
         }
         Relationships: []
       }
