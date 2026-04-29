@@ -1,89 +1,141 @@
-# Correções no fluxo de coleta — vínculos, autocomplete e modais
+## Objetivo
 
-Foco: corrigir o filtro de resíduos por destinador, permitir criação inline de resíduos/tratamentos via modal a partir do autocomplete, validar vínculos com botão de "Adicionar vínculo", e atualizar tratamento ao trocar resíduo. Sem alterar o schema do banco.
+Refinar regras de pendência, risco, filtros e cadastros sem quebrar nada já estável. Não há mudanças no schema do banco — apenas semântica das regras e UI.
 
-## 1. Bug — filtro de resíduos por destinador (`ColetaForm.tsx`)
+---
 
-Atualmente o `tipoOptions` ignora completamente os vínculos: mostra todos os tipos mesmo quando o destinador tem vínculos. Além disso, a mensagem "sem resíduos vinculados" só some quando `vinculosDest.length > 0`, mas isso depende da query estar resolvida.
+## 1. Coleta sem peso (nova categoria)
 
-Correção:
-- `tipoOptions` passa a depender de `destinadorId` + `vinculosDest`:
-  - Se `destinadorId` definido **e** `vinculosDest.length > 0`: filtrar `tipos` para apenas os `tipo_residuo_id` presentes em `vinculosDest`.
-  - Caso contrário: retornar todos os tipos.
-- Mensagem "Destinador sem resíduos vinculados — todos serão exibidos" só renderiza quando `destinadorId && !isLoadingVinculos && vinculosDest.length === 0`. Adicionar `isLoading` da query (`useQuery` retorna `isLoading`/`isFetching`) para não piscar a mensagem antes da resposta.
-- Garantir reatividade ao trocar destinador: ao mudar `destinadorId` para um diferente, limpar/manter itens (não limpar — só refiltra opções e exibe aviso por linha quando `tipo_residuo_id` atual não estiver no novo conjunto, lógica `naoVinculado` já existe).
+**Hoje:** o formulário (`ColetaForm.tsx`) bloqueia o salvamento quando qualquer item tem peso ≤ 0 (`if (!it.peso_kg || Number(it.peso_kg) <= 0) ... return null`).
 
-## 2/3/4. Autocomplete "Adicionar novo" para resíduo e tratamento + modais
+**Mudança:**
+- Permitir salvar coleta com `peso_kg = 0` (ou vazio → tratado como 0).
+- Continuar exigindo: data, destinador e ao menos um item com tipo de resíduo.
+- Mostrar aviso amarelo no formulário ("Peso não informado — coleta entrará em pendências"), mas não bloquear.
 
-Hoje o `Autocomplete` dos itens (resíduo e tratamento) não passa `onCreate`. Criar dois novos modais e ligar os callbacks.
+**Nova helper em `src/lib/data.ts`:**
+- `isPendenciaSemPeso(c)` → `true` quando `totalPesoColeta(c) === 0`.
+- `isPendenciaPesoEstimadoSemPeso(c)` → `peso_estimado === true && total === 0`.
 
-Novos componentes:
+---
 
-**`src/components/QuickResiduoDialog.tsx`** — modal para criar `tipos_residuo`:
-- Campos: Nome (pré-preenchido), Código IBAMA (texto livre, ex: `01 01 19`), Tratamento padrão (Autocomplete sobre `listTratamentos`).
-- Lista de destinadores existentes (checkbox múltiplo) usando `listDestinadores`.
-- Ao salvar:
-  1. `upsertTipoResiduo({ nome, codigo, tratamento_padrao })` — alterar `upsertTipoResiduo` para retornar o registro inserido (ajuste em `src/lib/data.ts` para usar `.select().single()` no insert e devolver o id/objeto).
-  2. Para cada destinador marcado: `addDestinadorResiduo(destinador_id, tipo_id, tratamento_padrao)`.
-  3. Invalidar `["tipos_residuo"]` e `["destinador_residuos"]`.
-  4. `onCreated(tipo)` para o form preencher a linha que disparou a criação.
+## 2. Peso estimado (regra definitiva)
 
-**`src/components/QuickTratamentoDialog.tsx`** — modal para criar `tratamentos`:
-- Campo: Nome (pré-preenchido). Código opcional.
-- Salvar via `upsertTratamento` (também ajustado para retornar o registro inserido).
-- Invalidar `["tratamentos"]` e `onCreated(nome)`.
+**Mudança:**
+- Remover `confirmarPesoColeta` da `lib/data.ts` e qualquer botão que ainda exista (já removido de `pendencias.tsx`, mas `data.ts` ainda exporta a função).
+- Tag "Emitido com peso estimado" continua aparecendo na listagem quando `peso_estimado === true`, **independente do peso ter ou não valor**.
+- Peso estimado só vira pendência se o peso estiver vazio/zero (categoria "Peso estimado sem peso").
 
-Em `ColetaForm.tsx`:
-- Adicionar estado `residuoDialog` com `{ open, defaultName, lineIndex }` e `tratDialog` com `{ open, defaultName, lineIndex }`.
-- Passar `onCreate={(name) => setResiduoDialog({ open: true, defaultName: name, lineIndex: i })}` no Autocomplete de resíduo.
-- Idem para tratamento.
-- `onCreated` do `QuickResiduoDialog`: chama `selecionarTipoPorNome(lineIndex, tipo.nome)` com o novo tipo (forçando o id via patch direto: `updateItem(lineIndex, { tipo_residuo_id: tipo.id, tipo_residuo_nome: tipo.nome, tratamento: tipo.tratamento_padrao })`).
-- `onCreated` do `QuickTratamentoDialog`: `updateItem(lineIndex, { tratamento: nome })`.
+---
 
-## 5. Validação destinador × resíduo + botão "Adicionar vínculo"
+## 3. Tipos de pendência (categorias separadas)
 
-Hoje existe a marcação `naoVinculado` por linha (apenas texto). Acrescentar:
+Reescrever `src/routes/pendencias.tsx` para mostrar 4 abas, cada uma com seu próprio contador independente:
 
-- Acima da seção "Itens da coleta", se `destinadorId && vinculosDest.length > 0` e existir alguma linha com `tipo_residuo_id` válido fora do `validIds`, renderizar um alerta (warning):
-  > "Destinador {destinadorNome} não está vinculado a: {lista de nomes de resíduos}"
-  > Botão **"Adicionar vínculo"**.
-- Ao clicar: para cada item não-vinculado com `tipo_residuo_id` e `tratamento`, executar `addDestinadorResiduo(destinadorId, tipo_id, tratamento)` em paralelo, depois `qc.invalidateQueries(["destinador_residuos", destinadorId])`. O alerta some sozinho quando os vínculos chegarem.
-- Manter a marcação inline por linha (já existente) como reforço visual, mas remover quando o vínculo passar a existir.
+| Aba | Critério |
+|---|---|
+| **Sem MTR (erro)** | `!c.mtr && !c.dmr_manual` |
+| **Sem peso** | `total === 0 && !c.peso_estimado` |
+| **Peso estimado sem peso** | `total === 0 && c.peso_estimado` |
+| **MTR duplicado** | `c.mtr && dups.has(c.mtr)` — listar todas as ocorrências, mas o **contador** mostra apenas o nº de MTRs únicos duplicados (`dups.size`), não o nº de coletas |
 
-Remover a auto-criação silenciosa de vínculos no `ensureVinculo` (substituída pela ação explícita do usuário, evitando criar vínculos sem confirmação).
+Cards de resumo no topo: 4 cards independentes (não somar entre si).
 
-## 6. Atualização automática do tratamento ao trocar resíduo
+---
 
-Em `selecionarTipoPorNome` o tratamento só é setado quando o campo está vazio (`tratamento || ...`). Mudar para sempre sobrescrever **na linha atual** quando o usuário escolhe um resíduo da lista (opt presente), priorizando:
+## 4. Contadores
 
-1. Vínculo `vinculosDest` para `(destinadorId, tipo.id)` se existir.
-2. `tipo.tratamento_padrao`.
+- `useMemo` por categoria, sem somatório global.
+- Badge da sidebar (`AppShell.tsx`): substituir `semMtr + estimado + dupExcess` por `semMtrErro + semPeso + estimadoSemPeso + mtrsDuplicadosUnicos` — soma apenas para o número total exibido na pílula, mas contagens internas permanecem separadas.
 
-Para distinguir "escolheu da lista" vs "está apenas digitando", o `Autocomplete` já invoca `onChange(value, option)` com `option` definido na seleção. Ajustar `selecionarTipoPorNome` para receber também o `option` (assinatura `(i, value, option?)`) e só sobrescrever o tratamento quando `option` estiver presente. Quando o usuário só digita texto livre, manter o tratamento atual.
+---
 
-Exceção atendida: o `setItens` faz `map` retornando o item alterado apenas no índice `i` — outras linhas ficam intactas.
+## 5. Diferenciação MTR
 
-## 7. UX dos modais
+Já existe a flag `dmr_manual` e `isPendenciaSemMtr` já a respeita. Garantir em todas as telas:
+- **Sem MTR por erro** (`!mtr && !dmr_manual`) → entra em Pendências e em Risco.
+- **DMR manual** (`dmr_manual === true`) → NUNCA aparece em Pendências; aparece em Risco em um cartão **separado e informativo**, sem cor de alerta.
 
-`src/components/ui/dialog.tsx` já usa `w-[min(90vw,72rem)] max-h-[90vh] overflow-y-auto`. Ajustar para preferir não ter scroll quando couber:
-- Trocar `overflow-y-auto` por `overflow-y-auto` apenas quando necessário — manter `max-h-[90vh]` e adicionar `h-auto` (já é o default). Sem mudança estrutural; verificar que `QuickEntityDialog` não usa `max-w-lg` rígido (atual usa `max-w-lg` que conflita com 90vw — remover/relaxar para `sm:max-w-2xl` para destinador com lista de vínculos).
-- Garantir que os novos modais (`QuickResiduoDialog`, `QuickTratamentoDialog`) não apliquem `max-w` muito restrito.
+Adicionar helper `isSemMtrOperacao(c)` → `!c.mtr && c.dmr_manual`.
+
+---
+
+## 6. Dashboard de Risco
+
+Reescrever `src/routes/risco.tsx`:
+
+- Remover do cálculo de nível alto/médio qualquer contribuição de `dmr_manual`.
+- Cartões `FatorRisco` exibidos separadamente:
+  1. Sem MTR (erro)
+  2. Sem MTR por operação (DMR manual) — tom neutro/info
+  3. Peso estimado (apenas as com peso preenchido — informativo) e Peso estimado sem peso (erro)
+  4. MTR duplicado — usa contagem de MTRs únicos
+  5. Volume fora da DMR (mantém)
+- Texto de cabeçalho ("frases") montado a partir das categorias separadas.
+
+Também ajustar badge "risco" na sidebar (`AppShell.tsx`) para não escalar para "alto" só porque há `dmr_manual`.
+
+---
+
+## 7. Filtros (multi-seleção e busca ampliada)
+
+Em `src/routes/coletas.index.tsx`:
+
+- Trocar os 3 `Select` simples (resíduo/destinador/transportador) por componentes de **multi-seleção** baseados em `Popover` + `Checkbox` + `Command` (já temos shadcn). Estado vira `string[]`. `__all__` deixa de existir; lista vazia = sem filtro.
+- Filtros aplicam OR dentro da mesma categoria, AND entre categorias.
+- Campo de busca: já cobre MTR, transportador, destinador, resíduo, observações. Adicionar suporte a **data**: aceitar substring de `formatDate(c.data)` e do ISO `c.data`.
+
+---
+
+## 8. Cadastros — abas e edição
+
+Reescrever `src/routes/cadastros.tsx`:
+
+**Abas adicionadas:** Unidades · Tipos de resíduo · Tratamentos · **Transportadores** · **Destinadores**.
+
+**Edição inline em todas as abas** (não apenas adicionar/remover):
+
+| Aba | O que pode ser editado |
+|---|---|
+| Unidades | nome (via `updateUnidade`, novo) |
+| Tipos de resíduo | nome, código, tratamento padrão (já existe `upsertTipoResiduo` com `id`) |
+| Tratamentos | nome, código (já existe `upsertTratamento` com `id`) |
+| Transportadores | nome, CNPJ (novo `updateTransportador`) |
+| Destinadores | nome, CNPJ, **vínculos resíduo↔tratamento** (já existe `setDestinadorResiduos`) |
+
+UI de edição: cada linha vira um modal de edição (`Dialog`) com botão lápis, ao lado do botão remover. Para destinadores, o modal inclui a tabela de vínculos (mesmo formato já usado no `QuickResiduoDialog`).
+
+**Novas funções em `src/lib/data.ts`** (sem mudança de schema):
+- `updateUnidade(id, nome)`
+- `updateTransportador(id, { nome, cnpj })`
+- `updateDestinador(id, { nome, cnpj })`
+
+A edição reaproveita as queries já em cache (`tipos_residuo`, `tratamentos`, etc.) — invalidação já está implementada.
+
+---
 
 ## Detalhes técnicos
 
-**Mudanças em `src/lib/data.ts`:**
-- `upsertTipoResiduo` retorna `TipoResiduo` (insert com `.select().single()`); update mantém retorno do registro atualizado.
-- `upsertTratamento` retorna `Tratamento` analogamente.
-- (Opcional) helper `linkResiduoToDestinadores(tipo_id, destinador_ids[], tratamento)` que itera `addDestinadorResiduo`.
+**Arquivos modificados:**
+- `src/lib/data.ts` — novos helpers de pendência, novos `updateX`, remover `confirmarPesoColeta` (e seu único uso já foi removido).
+- `src/components/ColetaForm.tsx` — relaxar validação de peso, mostrar aviso.
+- `src/routes/pendencias.tsx` — 4 abas + cards independentes.
+- `src/routes/risco.tsx` — cards separados, lógica de nível sem `dmr_manual`.
+- `src/routes/coletas.index.tsx` — multi-select e busca por data.
+- `src/routes/cadastros.tsx` — 5 abas + edição inline com modal.
+- `src/components/AppShell.tsx` — badge sidebar usa novas contagens.
 
-**Arquivos novos:**
-- `src/components/QuickResiduoDialog.tsx`
-- `src/components/QuickTratamentoDialog.tsx`
+**Componente novo:** `src/components/MultiSelectFilter.tsx` (Popover + Command + Checkbox) para reuso entre filtros.
 
-**Arquivos editados:**
-- `src/components/ColetaForm.tsx` — filtro de tipos por vínculos, alerta agregado com botão, autocomplete `onCreate` em resíduo/tratamento, override de tratamento ao escolher resíduo, remover auto-vinculação silenciosa.
-- `src/lib/data.ts` — retornos dos upserts.
-- `src/components/QuickEntityDialog.tsx` — relaxar `max-w-lg` (cap 90vw já vem do Dialog).
-- `src/routes/cadastros.tsx` — se chamadas existentes a `upsertTipoResiduo`/`upsertTratamento` ignoram retorno, nenhuma mudança necessária; verificar para não quebrar.
+**Garantias preservadas:**
+- Schema do banco intacto.
+- Separação por unidade (`unidade_id` continua na chave de query).
+- Lógica DMR (`/dmr` e `lib/dmr.ts`) não tocada.
+- Nenhuma migração SQL.
 
-**Não alterado:** schema do banco, lógica de DMR, importação em massa, indicadores de risco.
+---
+
+## Fora do escopo
+
+- Não toca em `coletas.$id.tsx`, `coletas.nova.tsx`, `consolidacao.tsx`, `dmr.tsx`, `index.tsx` (dashboard).
+- Mantém comportamento atual de importação em massa, modais, ordenação de tabelas.
