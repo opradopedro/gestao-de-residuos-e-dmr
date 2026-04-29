@@ -58,8 +58,11 @@ function EditarColeta() {
           data: coleta.data,
           transportador: coleta.transportador,
           destinador: coleta.destinador,
+          transportador_id: (coleta as any).transportador_id ?? null,
+          destinador_id: (coleta as any).destinador_id ?? null,
           mtr: coleta.mtr,
           peso_estimado: coleta.peso_estimado,
+          dmr_manual: (coleta as any).dmr_manual ?? false,
           observacoes: coleta.observacoes,
           itens: (coleta.itens ?? []).map((it) => ({
             tipo_residuo_id: it.tipo_residuo_id,
