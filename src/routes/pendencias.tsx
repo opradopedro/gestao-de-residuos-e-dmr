@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo } from "@/hooks/use-periodo";
-import { listColetasByUnidade, totalPesoColeta, updateColetaMtr, confirmarPesoColeta, isPendenciaSemMtr } from "@/lib/data";
+import { listColetasByUnidade, totalPesoColeta, updateColetaMtr, isPendenciaSemMtr } from "@/lib/data";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -84,11 +84,6 @@ function PendenciaTable({ rows, tipo }: { rows: any[]; tipo: "mtr" | "estimado" 
     onSuccess: () => { toast.success("MTR adicionado"); qc.invalidateQueries({ queryKey: ["coletas"] }); setMtrDialog(null); },
     onError: (e: any) => toast.error(e.message),
   });
-  const mutPeso = useMutation({
-    mutationFn: (id: string) => confirmarPesoColeta(id),
-    onSuccess: () => { toast.success("Peso confirmado"); qc.invalidateQueries({ queryKey: ["coletas"] }); },
-    onError: (e: any) => toast.error(e.message),
-  });
 
   if (rows.length === 0) return (
     <Card>
@@ -120,10 +115,8 @@ function PendenciaTable({ rows, tipo }: { rows: any[]; tipo: "mtr" | "estimado" 
                   <td className="p-3 text-xs">{(c.itens ?? []).map((it: any) => it.tipo_residuo_nome).join(", ") || "—"}</td>
                   <td className="p-3 text-right tabular-nums">{formatKg(totalPesoColeta(c))}</td>
                   <td className="p-3 text-right whitespace-nowrap">
-                    {tipo === "mtr" ? (
+                    {tipo === "mtr" && (
                       <Button size="sm" onClick={() => setMtrDialog({ id: c.id, mtr: "" })}>Adicionar MTR</Button>
-                    ) : (
-                      <Button size="sm" variant="outline" onClick={() => mutPeso.mutate(c.id)}>Confirmar peso</Button>
                     )}
                     <Button asChild size="sm" variant="ghost"><Link to="/coletas/$id" params={{ id: c.id }}>Editar</Link></Button>
                   </td>

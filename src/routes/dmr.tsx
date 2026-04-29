@@ -35,6 +35,8 @@ function DmrPage() {
   const periodo = usePeriodoAtivo();
   const qc = useQueryClient();
   const [parsed, setParsed] = useState<Parsed | null>(null);
+  const [allRows, setAllRows] = useState<Record<string, any>[]>([]);
+  const [linhaInicial, setLinhaInicial] = useState(1);
   const [map, setMap] = useState<DmrMapeamento>({});
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -58,7 +60,7 @@ function DmrPage() {
     },
     onSuccess: (id) => {
       toast.success("DMR importada");
-      setParsed(null); setMap({}); if (fileRef.current) fileRef.current.value = "";
+      setParsed(null); setMap({}); setAllRows([]); setLinhaInicial(1); if (fileRef.current) fileRef.current.value = "";
       qc.invalidateQueries({ queryKey: ["dmr_uploads"] });
       setSelectedUpload(id);
     },
@@ -71,19 +73,42 @@ function DmrPage() {
       const data = new Uint8Array(e.target!.result as ArrayBuffer);
       const wb = XLSX.read(data, { type: "array" });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
-      const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
-      setParsed({ headers, rows, fileName: f.name });
-      const auto: DmrMapeamento = {};
-      for (const h of headers) {
-        const l = h.toLowerCase();
-        if (!auto.residuo && /res[íi]duo|tipo/.test(l)) auto.residuo = h;
-        if (!auto.destinador && /destin/.test(l)) auto.destinador = h;
-        if (!auto.peso_kg && /peso|quant|ton|kg/.test(l)) auto.peso_kg = h;
-      }
-      setMap(auto);
+      // Lê sem cabeçalho — usuário escolhe linha inicial.
+      const matrix = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, defval: "" }) as any[][];
+      const rows = matrix.map((arr) => {
+        const obj: Record<string, any> = {};
+        arr.forEach((v, i) => { obj[`Coluna ${i + 1}`] = v; });
+        return obj;
+      });
+      setAllRows(rows);
+      setLinhaInicial(1);
+      applyLinhaInicial(rows, 1, f.name);
     };
     reader.readAsArrayBuffer(f);
+  }
+
+  function applyLinhaInicial(rows: Record<string, any>[], inicial: number, fileName: string) {
+    if (rows.length === 0) { setParsed({ headers: [], rows: [], fileName }); return; }
+    const headerIdx = Math.max(0, inicial - 1);
+    const headerRow = rows[headerIdx] ?? {};
+    const headers = Object.values(headerRow).map((v, i) => {
+      const s = String(v ?? "").trim();
+      return s || `Coluna ${i + 1}`;
+    });
+    const dataRows = rows.slice(headerIdx + 1).map((r) => {
+      const obj: Record<string, any> = {};
+      Object.values(r).forEach((v, i) => { obj[headers[i] ?? `Coluna ${i + 1}`] = v; });
+      return obj;
+    });
+    setParsed({ headers, rows: dataRows, fileName });
+    const auto: DmrMapeamento = {};
+    for (const h of headers) {
+      const l = h.toLowerCase();
+      if (!auto.residuo && /res[íi]duo|tipo/.test(l)) auto.residuo = h;
+      if (!auto.destinador && /destin/.test(l)) auto.destinador = h;
+      if (!auto.peso_kg && /peso|quant|ton|kg/.test(l)) auto.peso_kg = h;
+    }
+    setMap(auto);
   }
 
   if (!unidade) return <NoUnidade />;
@@ -112,13 +137,45 @@ function DmrPage() {
             </div>
             <div>
               <Label className="text-xs">Arquivo Excel da DMR</Label>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} className="block text-sm mt-1" />
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+              />
+              <div className="mt-1">
+                <Button type="button" onClick={() => fileRef.current?.click()}>
+                  <Upload className="size-4 mr-1" /> Selecionar arquivo
+                </Button>
+                {parsed && <span className="ml-2 text-xs text-muted-foreground">{parsed.fileName}</span>}
+              </div>
             </div>
           </div>
 
           {parsed && (
             <div className="space-y-3 border-t pt-4">
-              <div className="text-sm text-muted-foreground">{parsed.rows.length} linhas detectadas em <b>{parsed.fileName}</b>. Confirme o mapeamento das colunas:</div>
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <Label className="text-xs">Linha do cabeçalho</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={Math.max(1, allRows.length)}
+                    value={linhaInicial}
+                    onChange={(e) => {
+                      const n = Math.max(1, Number(e.target.value) || 1);
+                      setLinhaInicial(n);
+                      if (parsed) applyLinhaInicial(allRows, n, parsed.fileName);
+                    }}
+                    className="w-28 mt-1"
+                  />
+                </div>
+                <div className="text-sm text-muted-foreground pb-2">
+                  {parsed.rows.length} linhas de dados após o cabeçalho · <b>{parsed.fileName}</b>
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground">Confirme o mapeamento das colunas:</div>
               <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs">
                 ⚠ Os pesos da DMR são interpretados em <b>toneladas</b>. Ex: o valor <code>10</code> será tratado como 10 toneladas (10.000 kg).
               </div>
