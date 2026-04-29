@@ -53,11 +53,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const noTri = coletas.filter((c) => c.data >= periodo.start && c.data <= periodo.end);
     const semMtr = noTri.filter(isPendenciaSemMtr).length;
     const semPeso = noTri.filter(isPendenciaSemPeso).length;
-    const estSemPeso = noTri.filter(isPendenciaPesoEstimadoSemPeso).length;
     const dupUnicos = findMtrDuplicates(noTri).size;
     const pesoSemMtr = noTri.filter(isPendenciaSemMtr).reduce((s, c) => s + totalPesoColeta(c), 0);
-    const pendencias = semMtr + semPeso + estSemPeso + dupUnicos;
-    const risco = (semMtr > 5 || pesoSemMtr > 1000 || estSemPeso > 0)
+    const pendencias = semMtr + semPeso + dupUnicos;
+    const risco = (semMtr > 5 || pesoSemMtr > 1000)
       ? "alto"
       : pendencias > 0 ? "medio" : "ok";
     return { pendencias, risco };
