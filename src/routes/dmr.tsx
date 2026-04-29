@@ -44,13 +44,16 @@ function DmrPage() {
   const mutUpload = useMutation({
     mutationFn: async () => {
       if (!parsed || !unidade) throw new Error("Sem arquivo");
-      const linhas = parsed.rows.map((r) => ({
-        residuo: map.residuo ? String(r[map.residuo] ?? "") : undefined,
-        destinador: map.destinador ? String(r[map.destinador] ?? "") : undefined,
-        peso_kg: map.peso_kg ? Number(String(r[map.peso_kg] ?? "0").replace(",", ".")) || 0 : undefined,
-        mtr: map.mtr ? String(r[map.mtr] ?? "") : undefined,
-        data: map.data ? String(r[map.data] ?? "") : undefined,
-      }));
+      const linhas = parsed.rows.map((r) => {
+        const tonRaw = map.peso_kg ? String(r[map.peso_kg] ?? "0").replace(/\./g, "").replace(",", ".") : "0";
+        const ton = Number(tonRaw) || 0;
+        return {
+          residuo: map.residuo ? String(r[map.residuo] ?? "") : undefined,
+          destinador: map.destinador ? String(r[map.destinador] ?? "") : undefined,
+          // Valor é interpretado como TONELADAS — convertido para kg internamente.
+          peso_kg: ton * 1000,
+        };
+      });
       return createDmrUpload({ unidade_id: unidade, ano: periodo.ano, trimestre: periodo.trimestre, arquivo_nome: parsed.fileName, mapeamento: map, linhas });
     },
     onSuccess: (id) => {
