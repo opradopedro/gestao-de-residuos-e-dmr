@@ -52,13 +52,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const badges = useMemo(() => {
     const noTri = coletas.filter((c) => c.data >= periodo.start && c.data <= periodo.end);
     const semMtr = noTri.filter(isPendenciaSemMtr).length;
-    const estimado = noTri.filter((c) => c.peso_estimado).length;
-    const dupExcess = countMtrDuplicatesExcess(noTri);
-    const dmrManualCount = noTri.filter((c) => c.dmr_manual).length;
+    const estimadoPend = noTri.filter(isPendenciaEstimadoSemPeso).length;
+    const semPeso = noTri.filter(isPendenciaSemPeso).length;
+    const dupUnique = countMtrDuplicatesUnique(noTri);
+    const semMtrOperacao = noTri.filter(isSemMtrOperacao).length;
     const pesoSemMtr = noTri.filter(isPendenciaSemMtr).reduce((s, c) => s + totalPesoColeta(c), 0);
+    const pendencias = semMtr + estimadoPend + semPeso + dupUnique;
+    const temRisco = semMtr > 0 || semMtrOperacao > 0 || dupUnique > 0 || estimadoPend > 0;
     return {
-      pendencias: semMtr + estimado + dupExcess,
-      risco: semMtr > 5 || pesoSemMtr > 1000 || dmrManualCount > 0 ? "alto" : (semMtr + estimado + dupExcess) > 0 ? "medio" : "ok",
+      pendencias,
+      risco: semMtr > 5 || pesoSemMtr > 1000 ? "alto" : temRisco ? "medio" : "ok",
     };
   }, [coletas, periodo.start, periodo.end]);
 
