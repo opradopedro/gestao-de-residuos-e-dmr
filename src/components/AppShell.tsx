@@ -109,7 +109,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Select>
             </div>
           </div>
-        </div>
+          </div>
           <Button asChild className="w-full mt-2" size="sm">
             <Link to="/coletas/nova"><Plus className="size-4 mr-1" /> Nova coleta</Link>
           </Button>
