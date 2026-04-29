@@ -79,9 +79,7 @@ function DmrPage() {
         const l = h.toLowerCase();
         if (!auto.residuo && /res[íi]duo|tipo/.test(l)) auto.residuo = h;
         if (!auto.destinador && /destin/.test(l)) auto.destinador = h;
-        if (!auto.peso_kg && /peso|quant|kg/.test(l)) auto.peso_kg = h;
-        if (!auto.mtr && /mtr/.test(l)) auto.mtr = h;
-        if (!auto.data && /data/.test(l)) auto.data = h;
+        if (!auto.peso_kg && /peso|quant|ton|kg/.test(l)) auto.peso_kg = h;
       }
       setMap(auto);
     };
