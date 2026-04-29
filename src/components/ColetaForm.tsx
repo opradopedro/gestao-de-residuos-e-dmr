@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listTiposResiduo, listTratamentos, listTransportadores, listDestinadores,
   listDestinadorResiduos, addDestinadorResiduo,
-  ColetaInput, ALERTA_PESO_KG, type Transportador, type Destinador,
+  ColetaInput, ALERTA_PESO_KG, type Transportador, type Destinador, type TipoResiduo, type Tratamento,
 } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,8 @@ import { Trash2, Plus, AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
 import { Autocomplete } from "@/components/Autocomplete";
 import { QuickEntityDialog } from "@/components/QuickEntityDialog";
+import { QuickResiduoDialog } from "@/components/QuickResiduoDialog";
+import { QuickTratamentoDialog } from "@/components/QuickTratamentoDialog";
 
 type ItemForm = { tipo_residuo_id: string | null; tipo_residuo_nome: string; peso_kg: number | ""; tratamento: string };
 
@@ -28,6 +30,7 @@ type Props = {
 
 export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAnother }: Props) {
   const today = new Date().toISOString().slice(0, 10);
+  const qc = useQueryClient();
   const { data: tipos = [] } = useQuery({ queryKey: ["tipos_residuo"], queryFn: listTiposResiduo });
   const { data: tratamentos = [] } = useQuery({ queryKey: ["tratamentos"], queryFn: listTratamentos });
   const { data: transportadores = [] } = useQuery({ queryKey: ["transportadores"], queryFn: listTransportadores });
@@ -51,9 +54,11 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
   // Modais de criação rápida
   const [transpDialog, setTranspDialog] = useState<{ open: boolean; defaultName?: string }>({ open: false });
   const [destDialog, setDestDialog] = useState<{ open: boolean; defaultName?: string }>({ open: false });
+  const [residuoDialog, setResiduoDialog] = useState<{ open: boolean; defaultName?: string; lineIndex?: number }>({ open: false });
+  const [tratDialog, setTratDialog] = useState<{ open: boolean; defaultName?: string; lineIndex?: number }>({ open: false });
 
   // Vínculos do destinador atual
-  const { data: vinculosDest = [] } = useQuery({
+  const { data: vinculosDest = [], isLoading: vinculosLoading } = useQuery({
     queryKey: ["destinador_residuos", destinadorId],
     queryFn: () => listDestinadorResiduos(destinadorId!),
     enabled: !!destinadorId,
@@ -72,39 +77,48 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
     [tratamentos]
   );
 
-  // Filtro de resíduos baseado nos vínculos do destinador (item 9 — "Mostrar todos + aviso")
+  const validIds = useMemo(() => new Set(vinculosDest.map((v) => v.tipo_residuo_id)), [vinculosDest]);
+  const destSemVinculos = !!destinadorId && !vinculosLoading && vinculosDest.length === 0;
+
+  // Filtra resíduos de acordo com vínculos do destinador
   const tipoOptions = useMemo(() => {
-    return tipos.map((t) => ({
+    const base = (destinadorId && vinculosDest.length > 0)
+      ? tipos.filter((t) => validIds.has(t.id))
+      : tipos;
+    return base.map((t) => ({
       value: t.nome,
       label: t.nome,
       sublabel: t.codigo || t.tratamento_padrao,
       searchTokens: [t.codigo ?? "", t.tratamento_padrao],
     }));
-  }, [tipos]);
-
-  const destSemVinculos = !!destinadorId && vinculosDest.length === 0;
-  const validIds = useMemo(() => new Set(vinculosDest.map((v) => v.tipo_residuo_id)), [vinculosDest]);
+  }, [tipos, destinadorId, vinculosDest, validIds]);
 
   const totalPeso = useMemo(() => itens.reduce((s, it) => s + (Number(it.peso_kg) || 0), 0), [itens]);
   const alertaPeso = itens.some((it) => Number(it.peso_kg) > ALERTA_PESO_KG);
 
+  // Itens não vinculados ao destinador atual
+  const itensNaoVinculados = useMemo(() => {
+    if (!destinadorId || vinculosDest.length === 0) return [];
+    return itens.filter((it) => it.tipo_residuo_id && !validIds.has(it.tipo_residuo_id));
+  }, [itens, destinadorId, vinculosDest, validIds]);
+
   function updateItem(i: number, patch: Partial<ItemForm>) {
     setItens((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
   }
-  function selecionarTipoPorNome(i: number, nome: string) {
-    const t = tipos.find((x) => x.nome.toLowerCase() === nome.toLowerCase());
-    let tratamento = itens[i].tratamento;
-    // Tratamento sugerido pelo vínculo do destinador, se existir
-    if (t && destinadorId) {
-      const v = vinculosDest.find((x) => x.tipo_residuo_id === t.id);
-      if (v) tratamento = tratamento || v.tratamento;
+
+  function selecionarTipo(i: number, value: string, optionPicked: boolean) {
+    const t = tipos.find((x) => x.nome.toLowerCase() === value.toLowerCase());
+    if (optionPicked && t) {
+      // Sobrescreve tratamento: vínculo do destinador > tratamento padrão do tipo
+      const v = destinadorId ? vinculosDest.find((x) => x.tipo_residuo_id === t.id) : undefined;
+      const novoTrat = v?.tratamento || t.tratamento_padrao || "";
+      updateItem(i, { tipo_residuo_id: t.id, tipo_residuo_nome: t.nome, tratamento: novoTrat });
+    } else {
+      // Apenas digitando — mantém tratamento atual
+      updateItem(i, { tipo_residuo_id: t?.id ?? null, tipo_residuo_nome: value });
     }
-    updateItem(i, {
-      tipo_residuo_id: t?.id ?? null,
-      tipo_residuo_nome: nome,
-      tratamento: tratamento || (t?.tratamento_padrao ?? ""),
-    });
   }
+
   function addItem() {
     setItens((p) => [...p, { tipo_residuo_id: null, tipo_residuo_nome: "", peso_kg: "", tratamento: "" }]);
   }
@@ -155,11 +169,17 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
     if (addAnother) reset();
   }
 
-  // Auto-cria vínculo destinador↔resíduo silenciosamente quando o usuário escolhe um par novo
-  async function ensureVinculo(item: ItemForm) {
-    if (!destinadorId || !item.tipo_residuo_id || !item.tratamento) return;
-    if (validIds.has(item.tipo_residuo_id)) return;
-    try { await addDestinadorResiduo(destinadorId, item.tipo_residuo_id, item.tratamento); } catch {}
+  async function adicionarVinculosFaltantes() {
+    if (!destinadorId) return;
+    const alvo = itensNaoVinculados.filter((it) => it.tipo_residuo_id && it.tratamento);
+    if (alvo.length === 0) { toast.error("Itens sem tratamento informado"); return; }
+    try {
+      await Promise.all(alvo.map((it) => addDestinadorResiduo(destinadorId, it.tipo_residuo_id!, it.tratamento)));
+      qc.invalidateQueries({ queryKey: ["destinador_residuos", destinadorId] });
+      toast.success(`${alvo.length} vínculo(s) adicionado(s)`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro ao adicionar vínculo");
+    }
   }
 
   return (
@@ -235,6 +255,21 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
         </CardContent>
       </Card>
 
+      {itensNaoVinculados.length > 0 && (
+        <div className="rounded-md border border-warning/40 bg-warning/10 p-3 flex items-start gap-3">
+          <AlertTriangle className="size-4 text-warning-foreground mt-0.5 shrink-0" />
+          <div className="flex-1 text-sm">
+            <div className="font-medium">Destinador {destinadorNome} não está vinculado a:</div>
+            <div className="text-muted-foreground">
+              {itensNaoVinculados.map((it) => it.tipo_residuo_nome).join(", ")}
+            </div>
+          </div>
+          <Button type="button" size="sm" variant="outline" onClick={adicionarVinculosFaltantes}>
+            Adicionar vínculo
+          </Button>
+        </div>
+      )}
+
       <div>
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-medium">Itens da coleta</h3>
@@ -255,9 +290,11 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
                     <Label className="text-xs">Tipo de resíduo</Label>
                     <Autocomplete
                       value={it.tipo_residuo_nome}
-                      onChange={(v) => selecionarTipoPorNome(i, v)}
+                      onChange={(v, opt) => selecionarTipo(i, opt?.label ?? v, !!opt)}
                       options={tipoOptions}
                       placeholder="Digite para buscar..."
+                      onCreate={(name) => setResiduoDialog({ open: true, defaultName: name, lineIndex: i })}
+                      createLabel={(v) => `Adicionar resíduo "${v}"`}
                     />
                     {naoVinculado && (
                       <div className="mt-1 text-[11px] text-warning-foreground flex items-center gap-1">
@@ -281,6 +318,8 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
                       onChange={(v) => updateItem(i, { tratamento: v })}
                       options={tratamentoOptions}
                       placeholder="Ex.: Reciclagem"
+                      onCreate={(name) => setTratDialog({ open: true, defaultName: name, lineIndex: i })}
+                      createLabel={(v) => `Adicionar tratamento "${v}"`}
                     />
                   </div>
                   <div className="md:col-span-1 flex items-end justify-end">
@@ -298,11 +337,11 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
 
       <div className="flex justify-end gap-2">
         {showAddAnother && (
-          <Button type="button" variant="outline" disabled={submitting} onClick={(e) => { itens.forEach(ensureVinculo); submit(e as any, true); }}>
+          <Button type="button" variant="outline" disabled={submitting} onClick={(e) => submit(e as any, true)}>
             Salvar e adicionar nova coleta
           </Button>
         )}
-        <Button type="submit" disabled={submitting} onClick={() => itens.forEach(ensureVinculo)}>
+        <Button type="submit" disabled={submitting}>
           {submitting ? "Salvando..." : "Salvar coleta"}
         </Button>
       </div>
@@ -320,6 +359,31 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
         defaultName={destDialog.defaultName}
         onOpenChange={(o) => setDestDialog((s) => ({ ...s, open: o }))}
         onCreated={(d: Destinador) => { setDestinadorId(d.id); setDestinadorNome(d.nome); }}
+      />
+      <QuickResiduoDialog
+        open={residuoDialog.open}
+        defaultName={residuoDialog.defaultName}
+        defaultDestinadorId={destinadorId}
+        onOpenChange={(o) => setResiduoDialog((s) => ({ ...s, open: o }))}
+        onCreated={(tipo: TipoResiduo) => {
+          const idx = residuoDialog.lineIndex;
+          if (idx === undefined) return;
+          updateItem(idx, {
+            tipo_residuo_id: tipo.id,
+            tipo_residuo_nome: tipo.nome,
+            tratamento: tipo.tratamento_padrao || "",
+          });
+        }}
+      />
+      <QuickTratamentoDialog
+        open={tratDialog.open}
+        defaultName={tratDialog.defaultName}
+        onOpenChange={(o) => setTratDialog((s) => ({ ...s, open: o }))}
+        onCreated={(t: Tratamento) => {
+          const idx = tratDialog.lineIndex;
+          if (idx === undefined) return;
+          updateItem(idx, { tratamento: t.nome });
+        }}
       />
     </form>
   );
