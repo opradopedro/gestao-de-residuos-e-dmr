@@ -78,10 +78,11 @@ function RiscoPage() {
   const Icon = tone.icon;
 
   const frases: string[] = [];
-  if (analise.semMtr.length > 0) frases.push(`${analise.semMtr.length} coleta(s) sem MTR`);
+  if (analise.semMtr.length > 0) frases.push(`${analise.semMtr.length} sem MTR (erro)`);
+  if (analise.semMtrOperacao.length > 0) frases.push(`${analise.semMtrOperacao.length} sem MTR (operação)`);
   if (analise.foraDmr > 0) frases.push(`${formatTon(analise.foraDmr)} fora da DMR`);
   if (analise.estimado.length > 0) frases.push(`${analise.estimado.length} com peso estimado`);
-  if (analise.dupColetas.length > 0) frases.push(`${analise.dupColetas.length} MTR(s) duplicado(s)`);
+  if (analise.dupUnique > 0) frases.push(`${analise.dupUnique} MTR(s) duplicado(s)`);
   if (frases.length === 0) frases.push("Nenhum fator de risco identificado");
 
   return (
@@ -108,16 +109,32 @@ function RiscoPage() {
           ativa={analise.semMtr.length > 0}
           nivel={analise.semMtr.length > 5 ? "alto" : analise.semMtr.length > 0 ? "medio" : "baixo"}
           icon={FileWarning}
-          titulo="Coletas sem MTR"
-          descricao={analise.semMtr.length > 0 ? `${analise.semMtr.length} coleta(s) totalizando ${formatKg(analise.pesoSemMtr)} não terão rastreio oficial.` : "Todas as coletas possuem MTR."}
+          titulo="Sem MTR (erro / esquecimento)"
+          descricao={analise.semMtr.length > 0 ? `${analise.semMtr.length} coleta(s) totalizando ${formatKg(analise.pesoSemMtr)} sem rastreio oficial. É também pendência.` : "Todas as coletas obrigatórias possuem MTR."}
           link="/pendencias"
+        />
+        <FatorRisco
+          ativa={analise.semMtrOperacao.length > 0}
+          nivel="medio"
+          icon={ClipboardEdit}
+          titulo="Sem MTR (operação / DMR manual)"
+          descricao={analise.semMtrOperacao.length > 0 ? `${analise.semMtrOperacao.length} coleta(s) com ${formatKg(analise.pesoSemMtrOperacao)} incluídas manualmente na DMR — não é pendência, mas representa risco.` : "Nenhuma coleta inserida manualmente na DMR."}
+          link="/coletas"
         />
         <FatorRisco
           ativa={analise.estimado.length > 0}
           nivel={analise.estimado.length > 0 && analise.totalKg > 0 && analise.pesoEstimado / analise.totalKg > 0.1 ? "medio" : "baixo"}
           icon={Scale}
-          titulo="Peso estimado não confirmado"
-          descricao={analise.estimado.length > 0 ? `${analise.estimado.length} coleta(s) com ${formatKg(analise.pesoEstimado)} estimados — confirmar antes da DMR.` : "Todos os pesos estão confirmados."}
+          titulo="Peso estimado"
+          descricao={analise.estimado.length > 0 ? `${analise.estimado.length} coleta(s) com ${formatKg(analise.pesoEstimado)} emitidas com peso estimado.` : "Nenhuma coleta com peso estimado."}
+          link="/pendencias"
+        />
+        <FatorRisco
+          ativa={analise.dupUnique > 0}
+          nivel="medio"
+          icon={AlertTriangle}
+          titulo="MTRs duplicados"
+          descricao={analise.dupUnique > 0 ? `${analise.dupUnique} número(s) de MTR aparecem em ${analise.dupColetas.length} coleta(s).` : "Nenhum MTR duplicado detectado."}
           link="/pendencias"
         />
         <FatorRisco
@@ -127,14 +144,6 @@ function RiscoPage() {
           titulo="Volume fora da DMR"
           descricao={!analise.temUpload ? "Nenhuma DMR foi importada para este trimestre ainda." : analise.foraDmr > 0 ? `${formatTon(analise.foraDmr)} no sistema interno não aparecem na DMR oficial.` : "Sistema interno e DMR estão alinhados."}
           link="/dmr"
-        />
-        <FatorRisco
-          ativa={analise.dupColetas.length > 0}
-          nivel="medio"
-          icon={AlertTriangle}
-          titulo="MTRs duplicados"
-          descricao={analise.dupColetas.length > 0 ? `${analise.dupColetas.length} coleta(s) compartilham o mesmo número de MTR.` : "Nenhum MTR duplicado detectado."}
-          link="/coletas"
         />
       </div>
     </div>
