@@ -314,7 +314,7 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
                       type="number" step="0.001" min={0}
                       value={it.peso_kg}
                       onChange={(e) => updateItem(i, { peso_kg: e.target.value === "" ? "" : Number(e.target.value) })}
-                      required
+                      placeholder="0"
                     />
                   </div>
                   <div className="md:col-span-4">
