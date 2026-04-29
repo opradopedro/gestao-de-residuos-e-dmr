@@ -177,7 +177,7 @@ function RiscoPage() {
   );
 }
 
-function FatorRisco({ ativa, nivel, icon: Icon, titulo, descricao, link }: { ativa: boolean; nivel: "alto" | "medio" | "baixo"; icon: any; titulo: string; descricao: string; link: string }) {
+function FatorRisco({ ativa, nivel, icon: Icon, titulo, descricao, link, subtitulo }: { ativa: boolean; nivel: "alto" | "medio" | "baixo"; icon: any; titulo: string; descricao: string; link: string; subtitulo?: string }) {
   const tone = !ativa ? "text-success border-success/30 bg-success/5"
     : nivel === "alto" ? "text-destructive border-destructive/30 bg-destructive/5"
     : "text-warning-foreground border-warning/40 bg-warning/10";
@@ -186,7 +186,10 @@ function FatorRisco({ ativa, nivel, icon: Icon, titulo, descricao, link }: { ati
       <CardContent className="p-4 flex items-center gap-4">
         <Icon className="size-6 shrink-0" />
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-foreground">{titulo}</div>
+          <div className="font-medium text-foreground">
+            {titulo}
+            {subtitulo && <span className="text-xs text-muted-foreground font-normal ml-2">· {subtitulo}</span>}
+          </div>
           <div className="text-sm text-muted-foreground">{descricao}</div>
         </div>
         {ativa && (
