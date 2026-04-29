@@ -119,6 +119,7 @@ function RiscoPage() {
             ? `${analise.semMtrErro.length} coleta(s) totalizando ${formatKg(analise.pesoSemMtr)} sem rastreio oficial.`
             : "Todas as coletas que deveriam ter MTR possuem MTR."}
           link="/pendencias"
+          subtitulo="risco — erro de preenchimento"
         />
         <FatorRisco
           ativa={analise.semMtrOp.length > 0}
