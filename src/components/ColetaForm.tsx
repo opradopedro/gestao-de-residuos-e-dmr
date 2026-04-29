@@ -281,6 +281,11 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
             <AlertTriangle className="size-4" /> Algum item tem peso acima de {ALERTA_PESO_KG.toLocaleString("pt-BR")} kg — confira.
           </div>
         )}
+        {totalPeso === 0 && (
+          <div className="mb-2 text-sm flex items-center gap-2 text-warning-foreground">
+            <Info className="size-4" /> Peso não informado — a coleta entrará em pendências como {pesoEstimado ? '"Peso estimado sem peso"' : '"Sem peso"'}.
+          </div>
+        )}
         <div className="space-y-3">
           {itens.map((it, i) => {
             const naoVinculado = !!destinadorId && vinculosDest.length > 0 && !!it.tipo_residuo_id && !validIds.has(it.tipo_residuo_id);
