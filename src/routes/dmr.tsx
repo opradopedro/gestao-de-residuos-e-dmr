@@ -137,7 +137,19 @@ function DmrPage() {
             </div>
             <div>
               <Label className="text-xs">Arquivo Excel da DMR</Label>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} className="block text-sm mt-1" />
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+              />
+              <div className="mt-1">
+                <Button type="button" onClick={() => fileRef.current?.click()}>
+                  <Upload className="size-4 mr-1" /> Selecionar arquivo
+                </Button>
+                {parsed && <span className="ml-2 text-xs text-muted-foreground">{parsed.fileName}</span>}
+              </div>
             </div>
           </div>
 
