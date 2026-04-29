@@ -60,7 +60,7 @@ function DmrPage() {
     },
     onSuccess: (id) => {
       toast.success("DMR importada");
-      setParsed(null); setMap({}); if (fileRef.current) fileRef.current.value = "";
+      setParsed(null); setMap({}); setAllRows([]); setLinhaInicial(1); if (fileRef.current) fileRef.current.value = "";
       qc.invalidateQueries({ queryKey: ["dmr_uploads"] });
       setSelectedUpload(id);
     },
