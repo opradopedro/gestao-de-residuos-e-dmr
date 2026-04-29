@@ -156,7 +156,7 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
       itens: itens.map((it) => ({
         tipo_residuo_id: it.tipo_residuo_id,
         tipo_residuo_nome: it.tipo_residuo_nome,
-        peso_kg: Number(it.peso_kg),
+        peso_kg: it.peso_kg === "" ? 0 : Number(it.peso_kg),
         tratamento: it.tratamento,
       })),
     };
