@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo } from "@/hooks/use-periodo";
-import { listColetasByUnidade, totalPesoColeta } from "@/lib/data";
+import { listColetasByUnidade, totalPesoColeta, isPendenciaSemMtr, isSemMtrOperacao } from "@/lib/data";
 import { listDmrUploads, getDmrLinhas } from "@/lib/dmr";
 import { formatTon, formatKg } from "@/lib/format";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
@@ -40,7 +40,8 @@ function Dashboard() {
   const stats = useMemo(() => {
     const noTri = coletas.filter((c) => c.data >= periodo.start && c.data <= periodo.end);
     const peso = noTri.reduce((s, c) => s + totalPesoColeta(c), 0);
-    const semMtr = noTri.filter((c) => !c.mtr);
+    const semMtr = noTri.filter(isPendenciaSemMtr);
+    const semMtrOperacao = noTri.filter(isSemMtrOperacao);
     const estimado = noTri.filter((c) => c.peso_estimado);
     const pesoSemMtr = semMtr.reduce((s, c) => s + totalPesoColeta(c), 0);
     const pesoEstimado = estimado.reduce((s, c) => s + totalPesoColeta(c), 0);
