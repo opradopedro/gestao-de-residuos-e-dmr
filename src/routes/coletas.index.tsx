@@ -127,14 +127,7 @@ function ColetasList() {
         description={`${coletas.length} coletas registradas · ${filtradas.length} visíveis após filtros.`}
         actions={
           <div className="flex gap-2">
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleImport(e.target.files[0])}
-            />
-            <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={mutImport.isPending}>
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
               <Upload className="size-4 mr-1" /> Importar planilha
             </Button>
             <Button asChild><Link to="/coletas/nova"><Plus className="size-4 mr-1" /> Nova coleta</Link></Button>
