@@ -279,9 +279,21 @@ export async function updateColetaMtr(id: string, mtr: string | null) {
   if (error) throw error;
 }
 
-export async function confirmarPesoColeta(id: string) {
-  const { error } = await supabase.from("coletas").update({ peso_estimado: false }).eq("id", id);
+// ===== Atualizações de cadastros =====
+export async function updateUnidade(id: string, nome: string): Promise<Unidade> {
+  const { data, error } = await supabase.from("unidades").update({ nome }).eq("id", id).select().single();
   if (error) throw error;
+  return data as any;
+}
+export async function updateTransportador(id: string, input: { nome: string; cnpj?: string | null }): Promise<Transportador> {
+  const { data, error } = await supabase.from("transportadores").update({ nome: input.nome, cnpj: input.cnpj ?? null }).eq("id", id).select().single();
+  if (error) throw error;
+  return data as any;
+}
+export async function updateDestinador(id: string, input: { nome: string; cnpj?: string | null }): Promise<Destinador> {
+  const { data, error } = await supabase.from("destinadores").update({ nome: input.nome, cnpj: input.cnpj ?? null }).eq("id", id).select().single();
+  if (error) throw error;
+  return data as any;
 }
 
 // Helpers para análises
@@ -316,9 +328,29 @@ export function countMtrDuplicatesExcess(coletas: ColetaComItens[]): number {
   return n;
 }
 
-// Item 5: Sem MTR Tipo 1 (pendência real) = sem MTR e NÃO marcado como dmr_manual.
+// Item 5: Sem MTR por erro = sem MTR e NÃO marcado como dmr_manual.
 export function isPendenciaSemMtr(c: ColetaComItens): boolean {
   return !c.mtr && !c.dmr_manual;
+}
+
+// Sem MTR por operação (DMR manual) — informativo, não é pendência.
+export function isSemMtrOperacao(c: ColetaComItens): boolean {
+  return !c.mtr && !!c.dmr_manual;
+}
+
+// Coleta sem peso (total = 0) e sem flag de estimado.
+export function isPendenciaSemPeso(c: ColetaComItens): boolean {
+  return totalPesoColeta(c) === 0 && !c.peso_estimado;
+}
+
+// Peso estimado mas sem valor de peso informado.
+export function isPendenciaPesoEstimadoSemPeso(c: ColetaComItens): boolean {
+  return totalPesoColeta(c) === 0 && !!c.peso_estimado;
+}
+
+// Quantidade de MTRs únicos duplicados no conjunto.
+export function countMtrsDuplicadosUnicos(coletas: ColetaComItens[]): number {
+  return findMtrDuplicates(coletas).size;
 }
 
 // Importação em massa de coletas (item 11): cada grupo já vem agrupado.

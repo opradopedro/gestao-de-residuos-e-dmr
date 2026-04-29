@@ -138,7 +138,8 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
     if (itens.length === 0) { toast.error("Adicione ao menos um item"); return null; }
     for (const [i, it] of itens.entries()) {
       if (!it.tipo_residuo_nome) { toast.error(`Item ${i + 1}: selecione o tipo de resíduo`); return null; }
-      if (!it.peso_kg || Number(it.peso_kg) <= 0) { toast.error(`Item ${i + 1}: informe o peso`); return null; }
+      // Peso pode ficar vazio (será 0 → entra em pendência "Sem peso"), mas se preenchido deve ser positivo
+      if (it.peso_kg !== "" && Number(it.peso_kg) < 0) { toast.error(`Item ${i + 1}: peso inválido`); return null; }
       if (!it.tratamento) { toast.error(`Item ${i + 1}: informe o tratamento`); return null; }
     }
     return {
@@ -155,7 +156,7 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
       itens: itens.map((it) => ({
         tipo_residuo_id: it.tipo_residuo_id,
         tipo_residuo_nome: it.tipo_residuo_nome,
-        peso_kg: Number(it.peso_kg),
+        peso_kg: it.peso_kg === "" ? 0 : Number(it.peso_kg),
         tratamento: it.tratamento,
       })),
     };
@@ -280,6 +281,11 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
             <AlertTriangle className="size-4" /> Algum item tem peso acima de {ALERTA_PESO_KG.toLocaleString("pt-BR")} kg — confira.
           </div>
         )}
+        {totalPeso === 0 && (
+          <div className="mb-2 text-sm flex items-center gap-2 text-warning-foreground">
+            <Info className="size-4" /> Peso não informado — a coleta entrará em pendências como {pesoEstimado ? '"Peso estimado sem peso"' : '"Sem peso"'}.
+          </div>
+        )}
         <div className="space-y-3">
           {itens.map((it, i) => {
             const naoVinculado = !!destinadorId && vinculosDest.length > 0 && !!it.tipo_residuo_id && !validIds.has(it.tipo_residuo_id);
@@ -308,7 +314,7 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
                       type="number" step="0.001" min={0}
                       value={it.peso_kg}
                       onChange={(e) => updateItem(i, { peso_kg: e.target.value === "" ? "" : Number(e.target.value) })}
-                      required
+                      placeholder="0"
                     />
                   </div>
                   <div className="md:col-span-4">

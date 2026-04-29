@@ -2,7 +2,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo } from "@/hooks/use-periodo";
-import { listColetasByUnidade, totalPesoColeta, updateColetaMtr, isPendenciaSemMtr } from "@/lib/data";
+import {
+  listColetasByUnidade, totalPesoColeta, updateColetaMtr,
+  isPendenciaSemMtr, isPendenciaSemPeso, isPendenciaPesoEstimadoSemPeso, findMtrDuplicates,
+} from "@/lib/data";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatDate, formatKg, formatTon } from "@/lib/format";
 import { useMemo, useState } from "react";
-import { FileWarning, Scale, CheckCircle2 } from "lucide-react";
+import { FileWarning, Scale, CheckCircle2, ScaleIcon, Copy } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/pendencias")({
@@ -28,11 +31,19 @@ function Pendencias() {
     enabled: !!unidade,
   });
 
-  const noTri = useMemo(() => coletas.filter((c) => c.data >= periodo.start && c.data <= periodo.end), [coletas, periodo]);
-  const semMtr = useMemo(() => noTri.filter(isPendenciaSemMtr), [noTri]);
-  const estimado = useMemo(() => noTri.filter((c) => c.peso_estimado), [noTri]);
-  const pesoSemMtr = semMtr.reduce((s, c) => s + totalPesoColeta(c), 0);
-  const pesoEstimado = estimado.reduce((s, c) => s + totalPesoColeta(c), 0);
+  const { semMtr, semPeso, estimadoSemPeso, dupColetas, dupUnicos, pesoSemMtr } = useMemo(() => {
+    const noTri = coletas.filter((c) => c.data >= periodo.start && c.data <= periodo.end);
+    const dups = findMtrDuplicates(noTri);
+    const semMtr = noTri.filter(isPendenciaSemMtr);
+    return {
+      semMtr,
+      semPeso: noTri.filter(isPendenciaSemPeso),
+      estimadoSemPeso: noTri.filter(isPendenciaPesoEstimadoSemPeso),
+      dupColetas: noTri.filter((c) => c.mtr && dups.has(c.mtr)),
+      dupUnicos: dups.size,
+      pesoSemMtr: semMtr.reduce((s, c) => s + totalPesoColeta(c), 0),
+    };
+  }, [coletas, periodo]);
 
   if (!unidade) return <NoUnidade />;
 
@@ -40,42 +51,48 @@ function Pendencias() {
     <div className="p-6 max-w-7xl">
       <PageHeader title="Pendências" description={`Coletas que precisam de ajuste antes da DMR · ${periodo.label}`} />
 
-      <div className="grid gap-4 sm:grid-cols-2 mb-6">
-        <Card className="border-destructive/40 bg-destructive/5">
-          <CardContent className="p-5 flex items-start gap-3">
-            <FileWarning className="size-7 text-destructive" />
-            <div>
-              <div className="text-sm text-muted-foreground">Coletas sem MTR</div>
-              <div className="text-2xl font-semibold">{semMtr.length}</div>
-              <div className="text-sm text-destructive">{formatTon(pesoSemMtr)} fora do sistema oficial</div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-warning/50 bg-warning/10">
-          <CardContent className="p-5 flex items-start gap-3">
-            <Scale className="size-7 text-warning-foreground" />
-            <div>
-              <div className="text-sm text-muted-foreground">Coletas com peso estimado</div>
-              <div className="text-2xl font-semibold">{estimado.length}</div>
-              <div className="text-sm">{formatTon(pesoEstimado)} a confirmar</div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+        <SummaryCard tone="destructive" icon={FileWarning} label="Sem MTR (erro)" count={semMtr.length} extra={formatTon(pesoSemMtr) + " sem rastreio"} />
+        <SummaryCard tone="warning" icon={ScaleIcon} label="Sem peso" count={semPeso.length} extra="Peso não informado" />
+        <SummaryCard tone="warning" icon={Scale} label="Peso estimado sem peso" count={estimadoSemPeso.length} extra="Estimado mas vazio" />
+        <SummaryCard tone="destructive" icon={Copy} label="MTR duplicado" count={dupUnicos} extra={`${dupColetas.length} coletas envolvidas`} />
       </div>
 
       <Tabs defaultValue="mtr">
         <TabsList>
           <TabsTrigger value="mtr">Sem MTR ({semMtr.length})</TabsTrigger>
-          <TabsTrigger value="estimado">Peso estimado ({estimado.length})</TabsTrigger>
+          <TabsTrigger value="sem_peso">Sem peso ({semPeso.length})</TabsTrigger>
+          <TabsTrigger value="est_sem_peso">Estimado sem peso ({estimadoSemPeso.length})</TabsTrigger>
+          <TabsTrigger value="dup">MTR duplicado ({dupUnicos})</TabsTrigger>
         </TabsList>
         <TabsContent value="mtr"><PendenciaTable rows={semMtr} tipo="mtr" /></TabsContent>
-        <TabsContent value="estimado"><PendenciaTable rows={estimado} tipo="estimado" /></TabsContent>
+        <TabsContent value="sem_peso"><PendenciaTable rows={semPeso} tipo="sem_peso" /></TabsContent>
+        <TabsContent value="est_sem_peso"><PendenciaTable rows={estimadoSemPeso} tipo="est_sem_peso" /></TabsContent>
+        <TabsContent value="dup"><PendenciaTable rows={dupColetas} tipo="dup" /></TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function PendenciaTable({ rows, tipo }: { rows: any[]; tipo: "mtr" | "estimado" }) {
+function SummaryCard({ tone, icon: Icon, label, count, extra }: { tone: "destructive" | "warning"; icon: any; label: string; count: number; extra: string }) {
+  const cls = tone === "destructive"
+    ? "border-destructive/40 bg-destructive/5 text-destructive"
+    : "border-warning/50 bg-warning/10 text-warning-foreground";
+  return (
+    <Card className={cls.split(" ").slice(0, 2).join(" ")}>
+      <CardContent className="p-4 flex items-start gap-3">
+        <Icon className={`size-6 ${cls.split(" ")[2]}`} />
+        <div className="min-w-0">
+          <div className="text-xs text-muted-foreground">{label}</div>
+          <div className="text-2xl font-semibold">{count}</div>
+          <div className="text-xs text-muted-foreground truncate">{extra}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PendenciaTable({ rows, tipo }: { rows: any[]; tipo: "mtr" | "sem_peso" | "est_sem_peso" | "dup" }) {
   const qc = useQueryClient();
   const [mtrDialog, setMtrDialog] = useState<{ id: string; mtr: string } | null>(null);
 
@@ -103,6 +120,7 @@ function PendenciaTable({ rows, tipo }: { rows: any[]; tipo: "mtr" | "estimado" 
                 <th className="text-left p-3">Data</th>
                 <th className="text-left p-3">Destinador</th>
                 <th className="text-left p-3">Resíduos</th>
+                {tipo === "dup" && <th className="text-left p-3">MTR</th>}
                 <th className="text-right p-3">Peso</th>
                 <th className="text-right p-3"></th>
               </tr>
@@ -113,6 +131,7 @@ function PendenciaTable({ rows, tipo }: { rows: any[]; tipo: "mtr" | "estimado" 
                   <td className="p-3 whitespace-nowrap">{formatDate(c.data)}</td>
                   <td className="p-3">{c.destinador || "—"}</td>
                   <td className="p-3 text-xs">{(c.itens ?? []).map((it: any) => it.tipo_residuo_nome).join(", ") || "—"}</td>
+                  {tipo === "dup" && <td className="p-3 font-mono text-xs">{c.mtr}</td>}
                   <td className="p-3 text-right tabular-nums">{formatKg(totalPesoColeta(c))}</td>
                   <td className="p-3 text-right whitespace-nowrap">
                     {tipo === "mtr" && (
@@ -128,7 +147,7 @@ function PendenciaTable({ rows, tipo }: { rows: any[]; tipo: "mtr" | "estimado" 
       </Card>
 
       <Dialog open={!!mtrDialog} onOpenChange={(o) => !o && setMtrDialog(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Adicionar MTR</DialogTitle></DialogHeader>
           <Input
             autoFocus
