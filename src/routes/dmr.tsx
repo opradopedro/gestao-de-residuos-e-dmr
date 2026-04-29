@@ -119,7 +119,10 @@ function DmrPage() {
           {parsed && (
             <div className="space-y-3 border-t pt-4">
               <div className="text-sm text-muted-foreground">{parsed.rows.length} linhas detectadas em <b>{parsed.fileName}</b>. Confirme o mapeamento das colunas:</div>
-              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-5">
+              <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs">
+                ⚠ Os pesos da DMR são interpretados em <b>toneladas</b>. Ex: o valor <code>10</code> será tratado como 10 toneladas (10.000 kg).
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
                 {FIELDS.map((f) => (
                   <div key={f.key}>
                     <Label className="text-xs">{f.label}</Label>
