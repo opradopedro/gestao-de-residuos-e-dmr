@@ -27,9 +27,7 @@ type Parsed = { headers: string[]; rows: Record<string, any>[]; fileName: string
 const FIELDS: { key: keyof DmrMapeamento; label: string }[] = [
   { key: "residuo", label: "Resíduo" },
   { key: "destinador", label: "Destinador" },
-  { key: "peso_kg", label: "Peso (kg)" },
-  { key: "mtr", label: "MTR" },
-  { key: "data", label: "Data" },
+  { key: "peso_kg", label: "Peso (toneladas)" },
 ];
 
 function DmrPage() {
@@ -46,13 +44,16 @@ function DmrPage() {
   const mutUpload = useMutation({
     mutationFn: async () => {
       if (!parsed || !unidade) throw new Error("Sem arquivo");
-      const linhas = parsed.rows.map((r) => ({
-        residuo: map.residuo ? String(r[map.residuo] ?? "") : undefined,
-        destinador: map.destinador ? String(r[map.destinador] ?? "") : undefined,
-        peso_kg: map.peso_kg ? Number(String(r[map.peso_kg] ?? "0").replace(",", ".")) || 0 : undefined,
-        mtr: map.mtr ? String(r[map.mtr] ?? "") : undefined,
-        data: map.data ? String(r[map.data] ?? "") : undefined,
-      }));
+      const linhas = parsed.rows.map((r) => {
+        const tonRaw = map.peso_kg ? String(r[map.peso_kg] ?? "0").replace(/\./g, "").replace(",", ".") : "0";
+        const ton = Number(tonRaw) || 0;
+        return {
+          residuo: map.residuo ? String(r[map.residuo] ?? "") : undefined,
+          destinador: map.destinador ? String(r[map.destinador] ?? "") : undefined,
+          // Valor é interpretado como TONELADAS — convertido para kg internamente.
+          peso_kg: ton * 1000,
+        };
+      });
       return createDmrUpload({ unidade_id: unidade, ano: periodo.ano, trimestre: periodo.trimestre, arquivo_nome: parsed.fileName, mapeamento: map, linhas });
     },
     onSuccess: (id) => {
@@ -78,9 +79,7 @@ function DmrPage() {
         const l = h.toLowerCase();
         if (!auto.residuo && /res[íi]duo|tipo/.test(l)) auto.residuo = h;
         if (!auto.destinador && /destin/.test(l)) auto.destinador = h;
-        if (!auto.peso_kg && /peso|quant|kg/.test(l)) auto.peso_kg = h;
-        if (!auto.mtr && /mtr/.test(l)) auto.mtr = h;
-        if (!auto.data && /data/.test(l)) auto.data = h;
+        if (!auto.peso_kg && /peso|quant|ton|kg/.test(l)) auto.peso_kg = h;
       }
       setMap(auto);
     };
@@ -120,7 +119,10 @@ function DmrPage() {
           {parsed && (
             <div className="space-y-3 border-t pt-4">
               <div className="text-sm text-muted-foreground">{parsed.rows.length} linhas detectadas em <b>{parsed.fileName}</b>. Confirme o mapeamento das colunas:</div>
-              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-5">
+              <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs">
+                ⚠ Os pesos da DMR são interpretados em <b>toneladas</b>. Ex: o valor <code>10</code> será tratado como 10 toneladas (10.000 kg).
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
                 {FIELDS.map((f) => (
                   <div key={f.key}>
                     <Label className="text-xs">{f.label}</Label>
@@ -342,7 +344,7 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
                     <div className="space-y-1 text-xs">
                       {detail.dmrLinhas.slice(0, 20).map((l, i) => (
                         <div key={i} className="border rounded-md p-2 flex justify-between">
-                          <span>MTR {l.mtr || "—"} · {l.data || ""}</span>
+                          <span>{l.residuo || "—"} · {l.destinador || "—"}</span>
                           <span className="tabular-nums">{formatKg(Number(l.peso_kg ?? 0))}</span>
                         </div>
                       ))}
