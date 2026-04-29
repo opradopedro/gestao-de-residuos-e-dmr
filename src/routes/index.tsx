@@ -66,6 +66,7 @@ function Dashboard() {
       pesoTotal: peso,
       semMtr: semMtr.length,
       pesoSemMtr,
+      semMtrOperacao: semMtrOperacao.length,
       estimadoCount: estimado.length,
       pesoEstimado,
       foraDmr,
@@ -73,6 +74,11 @@ function Dashboard() {
       destinadorData: Array.from(porDestinador.entries()).map(([nome, kg]) => ({ nome, kg })).sort((a, b) => b.kg - a.kg).slice(0, 8),
     };
   }, [coletas, periodo, upload, linhasDmr]);
+
+  if (!unidade) return <NoUnidade />;
+
+  const nivelRisco = stats.semMtr > 5 || (stats.foraDmr ?? 0) > 1000 ? "alto"
+    : stats.semMtr > 0 || stats.estimadoCount > 0 || stats.semMtrOperacao > 0 ? "medio" : "ok";
 
   if (!unidade) return <NoUnidade />;
 
