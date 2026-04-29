@@ -35,6 +35,8 @@ function DmrPage() {
   const periodo = usePeriodoAtivo();
   const qc = useQueryClient();
   const [parsed, setParsed] = useState<Parsed | null>(null);
+  const [allRows, setAllRows] = useState<Record<string, any>[]>([]);
+  const [linhaInicial, setLinhaInicial] = useState(1);
   const [map, setMap] = useState<DmrMapeamento>({});
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -71,19 +73,42 @@ function DmrPage() {
       const data = new Uint8Array(e.target!.result as ArrayBuffer);
       const wb = XLSX.read(data, { type: "array" });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
-      const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
-      setParsed({ headers, rows, fileName: f.name });
-      const auto: DmrMapeamento = {};
-      for (const h of headers) {
-        const l = h.toLowerCase();
-        if (!auto.residuo && /res[íi]duo|tipo/.test(l)) auto.residuo = h;
-        if (!auto.destinador && /destin/.test(l)) auto.destinador = h;
-        if (!auto.peso_kg && /peso|quant|ton|kg/.test(l)) auto.peso_kg = h;
-      }
-      setMap(auto);
+      // Lê sem cabeçalho — usuário escolhe linha inicial.
+      const matrix = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, defval: "" }) as any[][];
+      const rows = matrix.map((arr) => {
+        const obj: Record<string, any> = {};
+        arr.forEach((v, i) => { obj[`Coluna ${i + 1}`] = v; });
+        return obj;
+      });
+      setAllRows(rows);
+      setLinhaInicial(1);
+      applyLinhaInicial(rows, 1, f.name);
     };
     reader.readAsArrayBuffer(f);
+  }
+
+  function applyLinhaInicial(rows: Record<string, any>[], inicial: number, fileName: string) {
+    if (rows.length === 0) { setParsed({ headers: [], rows: [], fileName }); return; }
+    const headerIdx = Math.max(0, inicial - 1);
+    const headerRow = rows[headerIdx] ?? {};
+    const headers = Object.values(headerRow).map((v, i) => {
+      const s = String(v ?? "").trim();
+      return s || `Coluna ${i + 1}`;
+    });
+    const dataRows = rows.slice(headerIdx + 1).map((r) => {
+      const obj: Record<string, any> = {};
+      Object.values(r).forEach((v, i) => { obj[headers[i] ?? `Coluna ${i + 1}`] = v; });
+      return obj;
+    });
+    setParsed({ headers, rows: dataRows, fileName });
+    const auto: DmrMapeamento = {};
+    for (const h of headers) {
+      const l = h.toLowerCase();
+      if (!auto.residuo && /res[íi]duo|tipo/.test(l)) auto.residuo = h;
+      if (!auto.destinador && /destin/.test(l)) auto.destinador = h;
+      if (!auto.peso_kg && /peso|quant|ton|kg/.test(l)) auto.peso_kg = h;
+    }
+    setMap(auto);
   }
 
   if (!unidade) return <NoUnidade />;
