@@ -120,23 +120,25 @@ function RiscoPage() {
             : "Todas as coletas que deveriam ter MTR possuem MTR."}
           link="/pendencias"
         />
-        <FatorInformativo
+        <FatorRisco
           ativa={analise.semMtrOp.length > 0}
+          nivel="medio"
           icon={FileCheck}
-          titulo="Sem MTR por operação (DMR manual)"
+          titulo="Sem MTR (operação manual / INCLUIR NA DMR)"
           descricao={analise.semMtrOp.length > 0
-            ? `${analise.semMtrOp.length} coleta(s) marcadas como DMR manual — sem MTR por escolha operacional.`
-            : "Nenhuma coleta marcada como DMR manual."}
+            ? `${analise.semMtrOp.length} coleta(s) totalizando ${formatKg(analise.pesoSemMtrOp)} marcadas para inclusão manual na DMR — também são risco, embora intencional.`
+            : "Nenhuma coleta marcada para inclusão manual na DMR."}
           link="/coletas"
+          subtitulo="risco — operação"
         />
         <FatorRisco
           ativa={analise.estimadoSemPeso.length > 0}
           nivel="alto"
           icon={Scale}
-          titulo="Peso estimado sem peso"
+          titulo="Sem peso (inclui peso estimado vazio)"
           descricao={analise.estimadoSemPeso.length > 0
-            ? `${analise.estimadoSemPeso.length} coleta(s) marcada(s) como estimado mas sem valor de peso.`
-            : "Nenhuma coleta estimada sem peso."}
+            ? `${analise.estimadoSemPeso.length} coleta(s) sem valor de peso informado.`
+            : "Todas as coletas têm peso informado."}
           link="/pendencias"
         />
         <FatorInformativo
