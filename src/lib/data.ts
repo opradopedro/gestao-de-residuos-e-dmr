@@ -212,7 +212,7 @@ function coletaPayload(input: ColetaInput) {
   };
 }
 
-export async function createColeta(input: ColetaInput): Promise<string> {
+export async function createColeta(input: ColetaInput, opts?: { skipAudit?: boolean }): Promise<string> {
   const { data: coleta, error } = await supabase
     .from("coletas")
     .insert(coletaPayload(input))
@@ -231,10 +231,19 @@ export async function createColeta(input: ColetaInput): Promise<string> {
     );
     if (e2) throw e2;
   }
+  if (!opts?.skipAudit) {
+    const { logAction } = await import("@/lib/audit");
+    await logAction({
+      unidade_id: input.unidade_id,
+      tipo: "coleta_criada",
+      descricao: `Coleta criada${input.mtr ? ` (MTR ${input.mtr})` : ""}`,
+      quantidade: 1,
+    });
+  }
   return coleta.id;
 }
 
-export async function updateColeta(id: string, input: ColetaInput) {
+export async function updateColeta(id: string, input: ColetaInput, opts?: { skipAudit?: boolean }) {
   const { error } = await supabase.from("coletas").update(coletaPayload(input)).eq("id", id);
   if (error) throw error;
   await supabase.from("coleta_itens").delete().eq("coleta_id", id);
@@ -249,6 +258,15 @@ export async function updateColeta(id: string, input: ColetaInput) {
       }))
     );
     if (e2) throw e2;
+  }
+  if (!opts?.skipAudit) {
+    const { logAction } = await import("@/lib/audit");
+    await logAction({
+      unidade_id: input.unidade_id,
+      tipo: "coleta_editada",
+      descricao: `Coleta editada${input.mtr ? ` (MTR ${input.mtr})` : ""}`,
+      quantidade: 1,
+    });
   }
 }
 
