@@ -279,150 +279,38 @@ export function ColetaImportWizard({
   }
 
   async function runImport() {
-    setStep("running");
-    try {
-      // 1) Resolver itens faltantes (criar / substituir)
-      const tipoMap = new Map(tipos.map((t) => [t.nome.toLowerCase(), t]));
-      const tratMap = new Map(trats.map((t) => [t.nome.toLowerCase(), t]));
-      const destMap = new Map(destinadores.map((d) => [d.nome.toLowerCase(), d]));
-      const transMap = new Map(transportadores.map((t) => [t.nome.toLowerCase(), t]));
-
-      const resolveOrCreate = async (cat: "residuo" | "tratamento" | "destinador" | "transportador", nome: string): Promise<string> => {
-        const key = `${cat}:${nome.toLowerCase()}`;
-        const sub = missingMap[key];
-        if (sub && sub !== "__new__") return sub; // substituir por id existente => devolve id (o nome será usado abaixo)
-        // criar novo
-        if (cat === "residuo") {
-          const novo = await upsertTipoResiduo({ nome, tratamento_padrao: "Reciclagem" });
-          tipoMap.set(novo.nome.toLowerCase(), novo as any);
-          return novo.id;
-        } else if (cat === "tratamento") {
-          const novo = await upsertTratamento({ nome });
-          tratMap.set(novo.nome.toLowerCase(), novo as any);
-          return novo.id;
-        } else if (cat === "destinador") {
-          const novo = await createDestinador({ nome });
-          destMap.set(novo.nome.toLowerCase(), novo as any);
-          return novo.id;
-        } else {
-          const novo = await createTransportador({ nome });
-          transMap.set(novo.nome.toLowerCase(), novo as any);
-          return novo.id;
-        }
-      };
-
-      // criar itens marcados como __new__ (ou que ainda não estão mapeados e não existem)
-      for (const nome of missingItems.residuos) {
-        const k = `residuo:${nome.toLowerCase()}`;
-        if (!missingMap[k] || missingMap[k] === "__new__") await resolveOrCreate("residuo", nome);
-      }
-      for (const nome of missingItems.tratamentos) {
-        const k = `tratamento:${nome.toLowerCase()}`;
-        if (!missingMap[k] || missingMap[k] === "__new__") await resolveOrCreate("tratamento", nome);
-      }
-      for (const nome of missingItems.destinadores) {
-        const k = `destinador:${nome.toLowerCase()}`;
-        if (!missingMap[k] || missingMap[k] === "__new__") await resolveOrCreate("destinador", nome);
-      }
-      for (const nome of missingItems.transportadores) {
-        const k = `transportador:${nome.toLowerCase()}`;
-        if (!missingMap[k] || missingMap[k] === "__new__") await resolveOrCreate("transportador", nome);
-      }
-
-      // helper p/ pegar nome final (substituições)
-      const finalName = (cat: "residuo" | "tratamento" | "destinador" | "transportador", nome: string): string => {
-        const k = `${cat}:${nome.toLowerCase()}`;
-        const sub = missingMap[k];
-        if (!sub || sub === "__new__") return nome;
-        const list = cat === "residuo" ? Array.from(tipoMap.values())
-          : cat === "tratamento" ? Array.from(tratMap.values())
-          : cat === "destinador" ? Array.from(destMap.values())
-          : Array.from(transMap.values());
-        const found = (list as any[]).find((x) => x.id === sub);
-        return found ? found.nome : nome;
-      };
-
-      // 2) Processar grupos
-      const exMap = new Map<string, ColetaComItens>();
-      for (const c of coletasUnidade) if (c.mtr) exMap.set(c.mtr, c);
-
-      let criadas = 0, atualizadas = 0, ignoradas = 0;
-      const idsCriadas: string[] = [];
-      const total = grupos.length;
-      setProgress({ done: 0, total });
-
-      for (let i = 0; i < grupos.length; i++) {
-        const g = grupos[i];
-        const action: ConflictAction = (g.mtr && exMap.has(g.mtr)) ? (conflictActions[g.key] ?? "manter") : "substituir";
-        if (action === "ignorar" || action === "manter" && exMap.has(g.mtr)) {
-          if (g.mtr && exMap.has(g.mtr)) { ignoradas++; setProgress({ done: i + 1, total }); continue; }
-        }
-        const first = g.rows[0];
-        const dest = first.destinador ? finalName("destinador", first.destinador) : "";
-        const trans = first.transportador ? finalName("transportador", first.transportador) : "";
-        const destObj = dest ? destMap.get(dest.toLowerCase()) : null;
-        const transObj = trans ? transMap.get(trans.toLowerCase()) : null;
-        const itens = g.rows.map((r) => {
-          const residuoNome = r.residuo ? finalName("residuo", r.residuo) : "";
-          const tratNome = r.tratamento ? finalName("tratamento", r.tratamento) : (tipoMap.get(residuoNome.toLowerCase())?.tratamento_padrao || "Reciclagem");
-          const tipo = tipoMap.get(residuoNome.toLowerCase());
-          return {
-            tipo_residuo_id: tipo?.id ?? null,
-            tipo_residuo_nome: residuoNome,
-            peso_kg: r.peso,
-            tratamento: tratNome,
-          };
-        }).filter((it) => it.tipo_residuo_nome);
-        if (itens.length === 0) { ignoradas++; setProgress({ done: i + 1, total }); continue; }
-
-        const input: ColetaInput = {
-          unidade_id: unidadeSel,
-          data: first.data || new Date().toISOString().slice(0, 10),
-          transportador: trans || null,
-          destinador: dest || null,
-          transportador_id: transObj?.id ?? null,
-          destinador_id: destObj?.id ?? null,
-          mtr: g.mtr || null,
-          peso_estimado: false,
-          dmr_manual: false,
-          observacoes: g.rows.map((r) => r.observacoes).filter(Boolean).join(" | ") || null,
-          itens,
-        };
-
-        if (action === "substituir" && g.mtr && exMap.has(g.mtr)) {
-          await updateColeta(exMap.get(g.mtr)!.id, input, { skipAudit: true });
-          atualizadas++;
-        } else {
-          const novoId = await createColeta(input, { skipAudit: true });
-          idsCriadas.push(novoId);
-          criadas++;
-        }
-        setProgress({ done: i + 1, total });
-      }
-
-      // Registra UM evento único de importação (com IDs criadas para rollback)
-      const { logAction } = await import("@/lib/audit");
-      await logAction({
-        unidade_id: unidadeSel,
-        tipo: "importacao",
-        descricao: `Importação de planilha "${file?.name ?? ""}": ${criadas} criadas, ${atualizadas} atualizadas, ${ignoradas} ignoradas`,
-        quantidade: criadas + atualizadas,
-        snapshot: { idsCriadas, arquivo: file?.name ?? null },
-        rollback_disponivel: idsCriadas.length > 0,
-      });
-
-      toast.success(`Importação concluída: ${criadas} criadas, ${atualizadas} atualizadas, ${ignoradas} ignoradas`);
-      qc.invalidateQueries({ queryKey: ["coletas"] });
-      qc.invalidateQueries({ queryKey: ["tipos_residuo"] });
-      qc.invalidateQueries({ queryKey: ["tratamentos"] });
-      qc.invalidateQueries({ queryKey: ["destinadores"] });
-      qc.invalidateQueries({ queryKey: ["transportadores"] });
-      qc.invalidateQueries({ queryKey: ["audit_log"] });
-      onOpenChange(false);
-    } catch (err: any) {
-      toast.error("Erro ao importar: " + (err?.message ?? String(err)));
-      setStep("final");
+    const { startImportJob, isImportActive } = await import("@/lib/import-job");
+    if (isImportActive()) {
+      toast.error("Já existe uma importação em andamento. Aguarde concluir.");
+      return;
     }
+    const res = await startImportJob({
+      fileName: file?.name ?? "planilha",
+      unidadeId: unidadeSel,
+      grupos: grupos.map((g) => ({
+        key: g.key,
+        mtr: g.mtr,
+        rows: g.rows.map((r) => ({
+          data: r.data, mtr: r.mtr, residuo: r.residuo, peso: r.peso,
+          tratamento: r.tratamento, destinador: r.destinador,
+          transportador: r.transportador, observacoes: r.observacoes,
+        })),
+      })),
+      conflictActions,
+      coletasExistentes: coletasUnidade,
+      missingItems,
+      missingMap,
+      tipos: tipos as any,
+      trats: trats as any,
+      destinadores: destinadores as any,
+      transportadores: transportadores as any,
+    });
+    if (!res.ok) {
+      toast.error(res.reason ?? "Não foi possível iniciar a importação");
+      return;
+    }
+    toast.success("Importação iniciada em background. Você pode continuar usando o sistema.");
+    onOpenChange(false);
   }
 
   // Final summary numbers

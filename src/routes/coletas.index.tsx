@@ -21,6 +21,7 @@ import { Plus, AlertTriangle, FileWarning, Scale, ArrowUp, ArrowDown, Upload, Tr
 import { formatDate, formatKg } from "@/lib/format";
 import { quarterOf } from "@/lib/quarter";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/coletas/")({
   head: () => ({ meta: [{ title: "Coletas — DMR" }] }),
@@ -137,7 +138,11 @@ function ColetasList() {
             <Button variant="outline" size="sm" onClick={() => setBulkDeleteOpen(true)}>
               <Trash2 className="size-4 mr-1" /> Excluir em massa
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+            <Button variant="outline" size="sm" onClick={async () => {
+              const { isImportActive } = await import("@/lib/import-job");
+              if (isImportActive()) { toast.error("Já existe uma importação em andamento. Aguarde concluir."); return; }
+              setImportOpen(true);
+            }}>
               <Upload className="size-4 mr-1" /> Importar planilha
             </Button>
             <Button asChild size="sm"><Link to="/coletas/nova"><Plus className="size-4 mr-1" /> Nova coleta</Link></Button>
