@@ -7,6 +7,7 @@ import {
   listTransportadores, createTransportador, updateTransportador, deleteTransportador,
   listDestinadores, createDestinador, updateDestinador, deleteDestinador,
   listDestinadorResiduos, setDestinadorResiduos,
+  mergeDestinadores, mergeTransportadores,
   type TipoResiduo, type Tratamento, type Transportador, type Destinador, type Unidade,
 } from "@/lib/data";
 import { PageHeader } from "@/components/NoUnidade";
