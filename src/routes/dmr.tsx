@@ -47,8 +47,8 @@ function DmrPage() {
     mutationFn: async () => {
       if (!parsed || !unidade) throw new Error("Sem arquivo");
       const linhas = parsed.rows.map((r) => {
-        const tonRaw = map.peso_kg ? String(r[map.peso_kg] ?? "0").replace(/\./g, "").replace(",", ".") : "0";
-        const ton = Number(tonRaw) || 0;
+        const raw = map.peso_kg ? r[map.peso_kg] : 0;
+        const ton = parseTonelada(raw);
         return {
           residuo: map.residuo ? String(r[map.residuo] ?? "") : undefined,
           destinador: map.destinador ? String(r[map.destinador] ?? "") : undefined,
