@@ -7,6 +7,7 @@ import {
   listTransportadores, createTransportador, updateTransportador, deleteTransportador,
   listDestinadores, createDestinador, updateDestinador, deleteDestinador,
   listDestinadorResiduos, setDestinadorResiduos,
+  mergeDestinadores, mergeTransportadores,
   type TipoResiduo, type Tratamento, type Transportador, type Destinador, type Unidade,
 } from "@/lib/data";
 import { PageHeader } from "@/components/NoUnidade";
@@ -17,7 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Trash2, Plus, Upload, Pencil } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Trash2, Plus, Upload, Pencil, Merge } from "lucide-react";
 import { useRef, useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { parseCsv } from "@/lib/csv";
@@ -321,6 +323,7 @@ function TransportadoresTab() {
   const [nome, setNome] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [edit, setEdit] = useState<Transportador | null>(null);
+  const [mergeOpen, setMergeOpen] = useState(false);
   const mutAdd = useMutation({
     mutationFn: () => createTransportador({ nome: nome.trim(), cnpj: cnpj.trim() || null }),
     onSuccess: () => { setNome(""); setCnpj(""); qc.invalidateQueries({ queryKey: ["transportadores"] }); toast.success("Adicionado"); },
@@ -334,6 +337,11 @@ function TransportadoresTab() {
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={() => setMergeOpen(true)} disabled={lista.length < 2}>
+            <Merge className="size-4 mr-1" /> Unificar duplicados
+          </Button>
+        </div>
         <form className="grid gap-2 md:grid-cols-3" onSubmit={(e) => { e.preventDefault(); if (nome.trim()) mutAdd.mutate(); }}>
           <div><Label className="text-xs">Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
           <div><Label className="text-xs">CNPJ (opcional)</Label><Input value={cnpj} onChange={(e) => setCnpj(e.target.value)} /></div>
@@ -354,6 +362,11 @@ function TransportadoresTab() {
           ))}
         </div>
         <TransportadorEditDialog transportador={edit} onClose={() => setEdit(null)} />
+        <MergeDialog
+          open={mergeOpen} onOpenChange={setMergeOpen}
+          tipo="transportador"
+          itens={lista.map((t) => ({ id: t.id, nome: t.nome }))}
+        />
       </CardContent>
     </Card>
   );
@@ -392,6 +405,7 @@ function DestinadoresTab() {
   const { data: lista = [] } = useQuery({ queryKey: ["destinadores"], queryFn: listDestinadores });
   const [add, setAdd] = useState(false);
   const [edit, setEdit] = useState<Destinador | null>(null);
+  const [mergeOpen, setMergeOpen] = useState(false);
   const mutDel = useMutation({
     mutationFn: (id: string) => deleteDestinador(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["destinadores"] }); toast.success("Removido"); },
@@ -400,7 +414,10 @@ function DestinadoresTab() {
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => setMergeOpen(true)} disabled={lista.length < 2}>
+            <Merge className="size-4 mr-1" /> Unificar duplicados
+          </Button>
           <Button onClick={() => setAdd(true)}><Plus className="size-4 mr-1" />Adicionar destinador</Button>
         </div>
         <div className="border rounded-md divide-y">
@@ -419,8 +436,79 @@ function DestinadoresTab() {
         </div>
         {add && <DestinadorFullDialog mode="create" onClose={() => setAdd(false)} />}
         {edit && <DestinadorFullDialog mode="edit" destinador={edit} onClose={() => setEdit(null)} />}
+        <MergeDialog
+          open={mergeOpen} onOpenChange={setMergeOpen}
+          tipo="destinador"
+          itens={lista.map((d) => ({ id: d.id, nome: d.nome }))}
+        />
       </CardContent>
     </Card>
+  );
+}
+
+// ============ Merge dialog (transportador / destinador) ============
+function MergeDialog({ open, onOpenChange, tipo, itens }: {
+  open: boolean; onOpenChange: (v: boolean) => void;
+  tipo: "destinador" | "transportador";
+  itens: { id: string; nome: string }[];
+}) {
+  const qc = useQueryClient();
+  const [manterId, setManterId] = useState("");
+  const [removerId, setRemoverId] = useState("");
+  useEffect(() => { if (!open) { setManterId(""); setRemoverId(""); } }, [open]);
+  const mut = useMutation({
+    mutationFn: () => tipo === "destinador" ? mergeDestinadores(manterId, removerId) : mergeTransportadores(manterId, removerId),
+    onSuccess: (r: any) => {
+      toast.success(`Unificação concluída: ${r.coletasAtualizadas ?? 0} coleta(s) transferida(s)`);
+      qc.invalidateQueries({ queryKey: [tipo === "destinador" ? "destinadores" : "transportadores"] });
+      qc.invalidateQueries({ queryKey: ["coletas"] });
+      qc.invalidateQueries({ queryKey: ["audit_log"] });
+      onOpenChange(false);
+    },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const valid = manterId && removerId && manterId !== removerId;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Merge className="size-5" /> Unificar {tipo === "destinador" ? "destinadores" : "transportadores"}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="text-sm text-muted-foreground">
+            Selecione o registro <strong>correto</strong> (que será mantido) e o registro <strong>duplicado</strong> (será removido). Todas as coletas e vínculos serão transferidos sem duplicar.
+          </div>
+          <div>
+            <Label className="text-xs">Manter (correto)</Label>
+            <Select value={manterId} onValueChange={setManterId}>
+              <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+              <SelectContent>
+                {itens.map((i) => <SelectItem key={i.id} value={i.id}>{i.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">Remover (duplicado)</Label>
+            <Select value={removerId} onValueChange={setRemoverId}>
+              <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+              <SelectContent>
+                {itens.filter((i) => i.id !== manterId).map((i) => <SelectItem key={i.id} value={i.id}>{i.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button disabled={!valid || mut.isPending} onClick={() => {
+            const m = itens.find((i) => i.id === manterId)?.nome;
+            const r = itens.find((i) => i.id === removerId)?.nome;
+            if (confirm(`Unificar "${r}" → "${m}"? Esta ação não pode ser desfeita.`)) mut.mutate();
+          }}>
+            {mut.isPending ? "Unificando…" : "Confirmar unificação"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

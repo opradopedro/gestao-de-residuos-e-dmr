@@ -15,7 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { ColetaImportWizard } from "@/components/ColetaImportWizard";
-import { Plus, AlertTriangle, FileWarning, Scale, ArrowUp, ArrowDown, Upload } from "lucide-react";
+import { BulkDeleteDialog } from "@/components/BulkDeleteDialog";
+import { HistoryDialog } from "@/components/HistoryDialog";
+import { Plus, AlertTriangle, FileWarning, Scale, ArrowUp, ArrowDown, Upload, Trash2, History } from "lucide-react";
 import { formatDate, formatKg } from "@/lib/format";
 import { quarterOf } from "@/lib/quarter";
 import { useMemo, useState } from "react";
@@ -39,6 +41,8 @@ function ColetasList() {
   const [sortKey, setSortKey] = useState<SortKey>("data");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [importOpen, setImportOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const { data: coletas = [], isLoading } = useQuery({
     queryKey: ["coletas", unidade],
@@ -126,11 +130,17 @@ function ColetasList() {
         title="Coletas"
         description={`${coletas.length} coletas registradas · ${filtradas.length} visíveis após filtros.`}
         actions={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setImportOpen(true)}>
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
+              <History className="size-4 mr-1" /> Histórico
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setBulkDeleteOpen(true)}>
+              <Trash2 className="size-4 mr-1" /> Excluir em massa
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <Upload className="size-4 mr-1" /> Importar planilha
             </Button>
-            <Button asChild><Link to="/coletas/nova"><Plus className="size-4 mr-1" /> Nova coleta</Link></Button>
+            <Button asChild size="sm"><Link to="/coletas/nova"><Plus className="size-4 mr-1" /> Nova coleta</Link></Button>
           </div>
         }
       />
@@ -218,6 +228,8 @@ function ColetasList() {
         </CardContent>
       </Card>
       <ColetaImportWizard open={importOpen} onOpenChange={setImportOpen} unidadeAtiva={unidade} />
+      <BulkDeleteDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen} coletas={coletas} unidadeId={unidade} totalGeral={coletas.length} />
+      <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} unidadeId={unidade} />
     </div>
   );
 }

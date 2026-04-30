@@ -30,6 +30,30 @@ const FIELDS: { key: keyof DmrMapeamento; label: string }[] = [
   { key: "peso_kg", label: "Peso (toneladas)" },
 ];
 
+// Converte um valor de planilha (que representa TONELADAS) em número.
+// Aceita: número JS (xlsx já parseou), string com vírgula decimal (BR) ou ponto (EN).
+// NÃO remove pontos cegamente (bug anterior multiplicava 2.7 por 10).
+function parseTonelada(v: any): number {
+  if (v == null || v === "") return 0;
+  if (typeof v === "number") return isFinite(v) ? v : 0;
+  let s = String(v).trim();
+  if (!s) return 0;
+  // remove espaços e símbolos de unidade
+  s = s.replace(/\s+/g, "").replace(/t(on(eladas?)?)?$/i, "");
+  const hasComma = s.includes(",");
+  const hasDot = s.includes(".");
+  if (hasComma && hasDot) {
+    // formato BR: "1.234,56" -> remove pontos (milhar), troca vírgula por ponto
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else if (hasComma) {
+    // só vírgula -> decimal BR
+    s = s.replace(",", ".");
+  }
+  // só ponto OU sem separador -> mantém (ponto é decimal padrão)
+  const n = Number(s);
+  return isFinite(n) ? n : 0;
+}
+
 function DmrPage() {
   const unidade = useUnidadeAtiva();
   const periodo = usePeriodoAtivo();
@@ -47,8 +71,8 @@ function DmrPage() {
     mutationFn: async () => {
       if (!parsed || !unidade) throw new Error("Sem arquivo");
       const linhas = parsed.rows.map((r) => {
-        const tonRaw = map.peso_kg ? String(r[map.peso_kg] ?? "0").replace(/\./g, "").replace(",", ".") : "0";
-        const ton = Number(tonRaw) || 0;
+        const raw = map.peso_kg ? r[map.peso_kg] : 0;
+        const ton = parseTonelada(raw);
         return {
           residuo: map.residuo ? String(r[map.residuo] ?? "") : undefined,
           destinador: map.destinador ? String(r[map.destinador] ?? "") : undefined,
