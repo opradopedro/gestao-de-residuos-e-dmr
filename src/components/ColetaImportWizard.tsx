@@ -347,6 +347,7 @@ export function ColetaImportWizard({
       for (const c of coletasUnidade) if (c.mtr) exMap.set(c.mtr, c);
 
       let criadas = 0, atualizadas = 0, ignoradas = 0;
+      const idsCriadas: string[] = [];
       const total = grupos.length;
       setProgress({ done: 0, total });
 
@@ -389,14 +390,26 @@ export function ColetaImportWizard({
         };
 
         if (action === "substituir" && g.mtr && exMap.has(g.mtr)) {
-          await updateColeta(exMap.get(g.mtr)!.id, input);
+          await updateColeta(exMap.get(g.mtr)!.id, input, { skipAudit: true });
           atualizadas++;
         } else {
-          await createColeta(input);
+          const novoId = await createColeta(input, { skipAudit: true });
+          idsCriadas.push(novoId);
           criadas++;
         }
         setProgress({ done: i + 1, total });
       }
+
+      // Registra UM evento único de importação (com IDs criadas para rollback)
+      const { logAction } = await import("@/lib/audit");
+      await logAction({
+        unidade_id: unidadeSel,
+        tipo: "importacao",
+        descricao: `Importação de planilha "${file?.name ?? ""}": ${criadas} criadas, ${atualizadas} atualizadas, ${ignoradas} ignoradas`,
+        quantidade: criadas + atualizadas,
+        snapshot: { idsCriadas, arquivo: file?.name ?? null },
+        rollback_disponivel: idsCriadas.length > 0,
+      });
 
       toast.success(`Importação concluída: ${criadas} criadas, ${atualizadas} atualizadas, ${ignoradas} ignoradas`);
       qc.invalidateQueries({ queryKey: ["coletas"] });
@@ -404,6 +417,7 @@ export function ColetaImportWizard({
       qc.invalidateQueries({ queryKey: ["tratamentos"] });
       qc.invalidateQueries({ queryKey: ["destinadores"] });
       qc.invalidateQueries({ queryKey: ["transportadores"] });
+      qc.invalidateQueries({ queryKey: ["audit_log"] });
       onOpenChange(false);
     } catch (err: any) {
       toast.error("Erro ao importar: " + (err?.message ?? String(err)));
