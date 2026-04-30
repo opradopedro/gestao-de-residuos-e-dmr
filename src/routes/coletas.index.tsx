@@ -130,11 +130,17 @@ function ColetasList() {
         title="Coletas"
         description={`${coletas.length} coletas registradas · ${filtradas.length} visíveis após filtros.`}
         actions={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setImportOpen(true)}>
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
+              <History className="size-4 mr-1" /> Histórico
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setBulkDeleteOpen(true)}>
+              <Trash2 className="size-4 mr-1" /> Excluir em massa
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <Upload className="size-4 mr-1" /> Importar planilha
             </Button>
-            <Button asChild><Link to="/coletas/nova"><Plus className="size-4 mr-1" /> Nova coleta</Link></Button>
+            <Button asChild size="sm"><Link to="/coletas/nova"><Plus className="size-4 mr-1" /> Nova coleta</Link></Button>
           </div>
         }
       />
