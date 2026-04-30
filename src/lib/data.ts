@@ -270,9 +270,102 @@ export async function updateColeta(id: string, input: ColetaInput, opts?: { skip
   }
 }
 
-export async function deleteColeta(id: string) {
+export async function deleteColeta(id: string, opts?: { skipAudit?: boolean }) {
+  let snap: any = null;
+  let unidadeId: string | null = null;
+  if (!opts?.skipAudit) {
+    const c = await getColeta(id);
+    if (c) {
+      const { snapshotColeta } = await import("@/lib/audit");
+      snap = snapshotColeta(c);
+      unidadeId = c.unidade_id;
+    }
+  }
   const { error } = await supabase.from("coletas").delete().eq("id", id);
   if (error) throw error;
+  if (!opts?.skipAudit) {
+    const { logAction } = await import("@/lib/audit");
+    await logAction({
+      unidade_id: unidadeId,
+      tipo: "coleta_excluida",
+      descricao: `Coleta excluída${snap?.mtr ? ` (MTR ${snap.mtr})` : ""}`,
+      quantidade: 1,
+      snapshot: snap ? [snap] : null,
+      rollback_disponivel: !!snap,
+    });
+  }
+}
+
+// Exclusão em massa: registra UM evento com snapshot de todas as coletas para rollback.
+export async function bulkDeleteColetas(ids: string[], unidade_id: string | null): Promise<number> {
+  if (ids.length === 0) return 0;
+  const { snapshotColeta, logAction } = await import("@/lib/audit");
+  // Buscar snapshots completos
+  const { data: rows, error: e1 } = await supabase
+    .from("coletas")
+    .select("*, itens:coleta_itens(*)")
+    .in("id", ids);
+  if (e1) throw e1;
+  const snaps = (rows ?? []).map((c: any) => snapshotColeta(c as ColetaComItens));
+  const { error } = await supabase.from("coletas").delete().in("id", ids);
+  if (error) throw error;
+  await logAction({
+    unidade_id,
+    tipo: "exclusao_em_massa",
+    descricao: `Exclusão em massa de ${snaps.length} coleta(s)`,
+    quantidade: snaps.length,
+    snapshot: snaps,
+    rollback_disponivel: true,
+  });
+  return snaps.length;
+}
+
+// ===== Merge =====
+export async function mergeDestinadores(manterId: string, removerId: string): Promise<{ coletasAtualizadas: number; vinculosTransferidos: number }> {
+  const { logAction } = await import("@/lib/audit");
+  const { data: manter } = await supabase.from("destinadores").select("nome").eq("id", manterId).single();
+  const { data: remover } = await supabase.from("destinadores").select("nome").eq("id", removerId).single();
+  // Transferir coletas
+  const { data: coletasUpd } = await supabase.from("coletas").update({ destinador_id: manterId, destinador: manter?.nome ?? null }).eq("destinador_id", removerId).select("id");
+  const coletasN = coletasUpd?.length ?? 0;
+  // Transferir vínculos resíduo (sem duplicar)
+  const { data: vincManter } = await supabase.from("destinador_residuos").select("tipo_residuo_id").eq("destinador_id", manterId);
+  const existSet = new Set((vincManter ?? []).map((v: any) => v.tipo_residuo_id));
+  const { data: vincRemover } = await supabase.from("destinador_residuos").select("*").eq("destinador_id", removerId);
+  let transferidos = 0;
+  for (const v of vincRemover ?? []) {
+    if (!existSet.has((v as any).tipo_residuo_id)) {
+      await supabase.from("destinador_residuos").insert({
+        destinador_id: manterId,
+        tipo_residuo_id: (v as any).tipo_residuo_id,
+        tratamento: (v as any).tratamento,
+      });
+      transferidos++;
+    }
+  }
+  await supabase.from("destinador_residuos").delete().eq("destinador_id", removerId);
+  await supabase.from("destinadores").delete().eq("id", removerId);
+  await logAction({
+    tipo: "merge_destinador",
+    descricao: `Merge: "${remover?.nome}" → "${manter?.nome}" (${coletasN} coletas, ${transferidos} vínculos novos)`,
+    quantidade: coletasN,
+  });
+  return { coletasAtualizadas: coletasN, vinculosTransferidos: transferidos };
+}
+
+export async function mergeTransportadores(manterId: string, removerId: string): Promise<{ coletasAtualizadas: number }> {
+  const { logAction } = await import("@/lib/audit");
+  const { data: manter } = await supabase.from("transportadores").select("nome").eq("id", manterId).single();
+  const { data: remover } = await supabase.from("transportadores").select("nome").eq("id", removerId).single();
+  const { data: coletasUpd } = await supabase.from("coletas").update({ transportador_id: manterId, transportador: manter?.nome ?? null }).eq("transportador_id", removerId).select("id");
+  const n = coletasUpd?.length ?? 0;
+  await supabase.from("transportadores").delete().eq("id", removerId);
+  await logAction({
+    tipo: "merge_transportador",
+    descricao: `Merge: "${remover?.nome}" → "${manter?.nome}" (${n} coletas)`,
+    quantidade: n,
+  });
+  return { coletasAtualizadas: n };
 }
 
 export async function getColeta(id: string): Promise<ColetaComItens | null> {
