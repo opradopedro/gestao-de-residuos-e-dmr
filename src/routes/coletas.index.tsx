@@ -228,6 +228,8 @@ function ColetasList() {
         </CardContent>
       </Card>
       <ColetaImportWizard open={importOpen} onOpenChange={setImportOpen} unidadeAtiva={unidade} />
+      <BulkDeleteDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen} coletas={coletas} unidadeId={unidade} totalGeral={coletas.length} />
+      <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} unidadeId={unidade} />
     </div>
   );
 }
