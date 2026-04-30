@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          criado_em: string
+          descricao: string
+          id: string
+          quantidade: number
+          revertido: boolean
+          rollback_disponivel: boolean
+          snapshot: Json | null
+          tipo: string
+          unidade_id: string | null
+        }
+        Insert: {
+          criado_em?: string
+          descricao: string
+          id?: string
+          quantidade?: number
+          revertido?: boolean
+          rollback_disponivel?: boolean
+          snapshot?: Json | null
+          tipo: string
+          unidade_id?: string | null
+        }
+        Update: {
+          criado_em?: string
+          descricao?: string
+          id?: string
+          quantidade?: number
+          revertido?: boolean
+          rollback_disponivel?: boolean
+          snapshot?: Json | null
+          tipo?: string
+          unidade_id?: string | null
+        }
+        Relationships: []
+      }
       coleta_itens: {
         Row: {
           coleta_id: string
