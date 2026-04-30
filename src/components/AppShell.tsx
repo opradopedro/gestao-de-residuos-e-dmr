@@ -8,6 +8,7 @@ import { useUnidadeAtiva, setUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo, setPeriodoAtivo } from "@/hooks/use-periodo";
 import { useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { ImportStatusBanner } from "@/components/ImportStatusBanner";
 
 type NavItem = { to: string; label: string; icon: any; exact?: boolean; badge?: "pendencias" | "risco" };
 const NAV: NavItem[] = [
