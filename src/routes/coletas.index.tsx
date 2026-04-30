@@ -41,6 +41,8 @@ function ColetasList() {
   const [sortKey, setSortKey] = useState<SortKey>("data");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [importOpen, setImportOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const { data: coletas = [], isLoading } = useQuery({
     queryKey: ["coletas", unidade],
