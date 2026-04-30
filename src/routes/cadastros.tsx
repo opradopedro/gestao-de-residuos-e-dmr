@@ -323,6 +323,7 @@ function TransportadoresTab() {
   const [nome, setNome] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [edit, setEdit] = useState<Transportador | null>(null);
+  const [mergeOpen, setMergeOpen] = useState(false);
   const mutAdd = useMutation({
     mutationFn: () => createTransportador({ nome: nome.trim(), cnpj: cnpj.trim() || null }),
     onSuccess: () => { setNome(""); setCnpj(""); qc.invalidateQueries({ queryKey: ["transportadores"] }); toast.success("Adicionado"); },
@@ -336,6 +337,11 @@ function TransportadoresTab() {
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={() => setMergeOpen(true)} disabled={lista.length < 2}>
+            <Merge className="size-4 mr-1" /> Unificar duplicados
+          </Button>
+        </div>
         <form className="grid gap-2 md:grid-cols-3" onSubmit={(e) => { e.preventDefault(); if (nome.trim()) mutAdd.mutate(); }}>
           <div><Label className="text-xs">Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
           <div><Label className="text-xs">CNPJ (opcional)</Label><Input value={cnpj} onChange={(e) => setCnpj(e.target.value)} /></div>
@@ -356,6 +362,11 @@ function TransportadoresTab() {
           ))}
         </div>
         <TransportadorEditDialog transportador={edit} onClose={() => setEdit(null)} />
+        <MergeDialog
+          open={mergeOpen} onOpenChange={setMergeOpen}
+          tipo="transportador"
+          itens={lista.map((t) => ({ id: t.id, nome: t.nome }))}
+        />
       </CardContent>
     </Card>
   );
