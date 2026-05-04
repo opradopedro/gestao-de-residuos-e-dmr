@@ -35,6 +35,7 @@ const TRIS: { v: 1 | 2 | 3 | 4; l: string }[] = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const [historyOpen, setHistoryOpen] = useState(false);
   const unidadeAtiva = useUnidadeAtiva();
   const periodo = usePeriodoAtivo();
   const { data: unidades = [] } = useQuery({ queryKey: ["unidades"], queryFn: listUnidades });
@@ -141,6 +142,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          <button
+            onClick={() => setHistoryOpen(true)}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors text-sidebar-foreground hover:bg-sidebar-accent/60"
+          >
+            <History className="size-4" />
+            <span className="flex-1 text-left">Histórico</span>
+          </button>
         </nav>
       </aside>
       <main className="flex-1 min-w-0">
