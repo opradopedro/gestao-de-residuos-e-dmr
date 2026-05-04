@@ -385,6 +385,16 @@ export async function listColetasByUnidade(unidade_id: string): Promise<ColetaCo
   return (data ?? []) as any;
 }
 
+export async function listAllColetas(): Promise<ColetaComItens[]> {
+  const { data, error } = await supabase
+    .from("coletas")
+    .select("*, itens:coleta_itens(*)")
+    .order("data", { ascending: false })
+    .limit(1000);
+  if (error) throw error;
+  return (data ?? []) as any;
+}
+
 export async function updateColetaMtr(id: string, mtr: string | null) {
   const { error } = await supabase.from("coletas").update({ mtr: mtr || null }).eq("id", id);
   if (error) throw error;
