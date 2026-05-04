@@ -304,6 +304,33 @@ export type Database = {
           },
         ]
       }
+      filtros_salvos: {
+        Row: {
+          criado_em: string
+          escopo: string
+          id: string
+          nome: string
+          regras: Json
+          unidade_id: string | null
+        }
+        Insert: {
+          criado_em?: string
+          escopo?: string
+          id?: string
+          nome: string
+          regras?: Json
+          unidade_id?: string | null
+        }
+        Update: {
+          criado_em?: string
+          escopo?: string
+          id?: string
+          nome?: string
+          regras?: Json
+          unidade_id?: string | null
+        }
+        Relationships: []
+      }
       tipos_residuo: {
         Row: {
           codigo: string | null
