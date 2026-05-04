@@ -1,14 +1,15 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Recycle, LayoutDashboard, ClipboardList, AlertTriangle, BarChart3, FileSpreadsheet, Settings, Plus, ShieldAlert, Calendar } from "lucide-react";
+import { Recycle, LayoutDashboard, ClipboardList, AlertTriangle, BarChart3, FileSpreadsheet, Settings, Plus, ShieldAlert, Calendar, History } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { listUnidades, listColetasByUnidade, totalPesoColeta, isPendenciaSemMtr, isPendenciaSemPeso, findMtrDuplicates } from "@/lib/data";
 import { useUnidadeAtiva, setUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo, setPeriodoAtivo } from "@/hooks/use-periodo";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ImportStatusBanner } from "@/components/ImportStatusBanner";
+import { HistoryDialog } from "@/components/HistoryDialog";
 
 type NavItem = { to: string; label: string; icon: any; exact?: boolean; badge?: "pendencias" | "risco" };
 const NAV: NavItem[] = [
@@ -34,6 +35,7 @@ const TRIS: { v: 1 | 2 | 3 | 4; l: string }[] = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const [historyOpen, setHistoryOpen] = useState(false);
   const unidadeAtiva = useUnidadeAtiva();
   const periodo = usePeriodoAtivo();
   const { data: unidades = [] } = useQuery({ queryKey: ["unidades"], queryFn: listUnidades });
@@ -140,6 +142,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          <button
+            onClick={() => setHistoryOpen(true)}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors text-sidebar-foreground hover:bg-sidebar-accent/60"
+          >
+            <History className="size-4" />
+            <span className="flex-1 text-left">Histórico</span>
+          </button>
         </nav>
       </aside>
       <main className="flex-1 min-w-0">
@@ -190,6 +199,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <ImportStatusBanner />
         {children}
       </main>
+      <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} unidadeId={null} />
     </div>
   );
 }

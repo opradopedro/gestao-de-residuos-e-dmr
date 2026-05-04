@@ -149,4 +149,14 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+
+  /* Garante cursor pointer em todos os elementos clicáveis (Fase 1 UX) */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  summary,
+  label[for],
+  [data-clickable] {
+    cursor: pointer;
+  }
 }

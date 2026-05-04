@@ -1,11 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
+import { usePeriodoAtivo } from "@/hooks/use-periodo";
 import {
   listColetasByUnidade,
+  listAllColetas,
+  listUnidades,
   totalPesoColeta,
   findMtrDuplicates,
   ALERTA_PESO_KG,
+  deleteColeta,
   type ColetaComItens,
 } from "@/lib/data";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
@@ -13,13 +17,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { MultiSelectFilter } from "@/components/MultiSelectFilter";
+import { Switch } from "@/components/ui/switch";
 import { ColetaImportWizard } from "@/components/ColetaImportWizard";
 import { BulkDeleteDialog } from "@/components/BulkDeleteDialog";
-import { HistoryDialog } from "@/components/HistoryDialog";
-import { Plus, AlertTriangle, FileWarning, Scale, ArrowUp, ArrowDown, Upload, Trash2, History } from "lucide-react";
-import { formatDate, formatKg } from "@/lib/format";
-import { quarterOf } from "@/lib/quarter";
+import { AdvancedFilterDialog, SavedFiltersDialog } from "@/components/AdvancedFilterDialog";
+import { aplicarFiltro, type FiltroAvancado } from "@/lib/coletas-filtros";
+import {
+  Plus, AlertTriangle, FileWarning, Scale, ArrowUp, ArrowDown,
+  Upload, Trash2, Filter, Bookmark, Pencil,
+} from "lucide-react";
+import { formatDate, formatKgPlain } from "@/lib/format";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -28,64 +35,61 @@ export const Route = createFileRoute("/coletas/")({
   component: ColetasList,
 });
 
-type SortKey = "data" | "destinador" | "transportador" | "mtr" | "peso" | "residuo";
+type SortKey = "data" | "destinador" | "transportador" | "mtr" | "peso" | "residuo" | "unidade";
 type SortDir = "asc" | "desc";
 
 function ColetasList() {
   const unidade = useUnidadeAtiva();
-  
+  const periodo = usePeriodoAtivo();
+  const qc = useQueryClient();
+
   const [busca, setBusca] = useState("");
-  const [filtro, setFiltro] = useState<"todas" | "sem_mtr" | "estimado" | "alerta" | "manual">("todas");
-  const [residuoSel, setResiduoSel] = useState<string[]>([]);
-  const [destinadorSel, setDestinadorSel] = useState<string[]>([]);
-  const [transportadorSel, setTransportadorSel] = useState<string[]>([]);
+  const [todasUnidades, setTodasUnidades] = useState(false);
+  const [filtroAvancado, setFiltroAvancado] = useState<FiltroAvancado | null>(null);
+  const [advOpen, setAdvOpen] = useState(false);
+  const [savedOpen, setSavedOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("data");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [importOpen, setImportOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
+
+  const { data: unidades = [] } = useQuery({ queryKey: ["unidades"], queryFn: listUnidades });
+  const unidadeNomes = useMemo(() => Object.fromEntries(unidades.map((u) => [u.id, u.nome])), [unidades]);
 
   const { data: coletas = [], isLoading } = useQuery({
-    queryKey: ["coletas", unidade],
-    queryFn: () => listColetasByUnidade(unidade!),
-    enabled: !!unidade,
+    queryKey: todasUnidades ? ["coletas", "all"] : ["coletas", unidade],
+    queryFn: () => (todasUnidades ? listAllColetas() : listColetasByUnidade(unidade!)),
+    enabled: todasUnidades || !!unidade,
   });
 
   const dups = useMemo(() => findMtrDuplicates(coletas), [coletas]);
 
-  const opcoes = useMemo(() => {
-    const r = new Set<string>(), d = new Set<string>(), t = new Set<string>();
-    for (const c of coletas) {
-      if (c.destinador) d.add(c.destinador);
-      if (c.transportador) t.add(c.transportador);
-      for (const it of c.itens ?? []) if (it.tipo_residuo_nome) r.add(it.tipo_residuo_nome);
-    }
-    return {
-      residuos: Array.from(r).sort(),
-      destinadores: Array.from(d).sort(),
-      transportadores: Array.from(t).sort(),
-    };
-  }, [coletas]);
+  const delMut = useMutation({
+    mutationFn: (id: string) => deleteColeta(id),
+    onSuccess: () => {
+      toast.success("Coleta removida");
+      qc.invalidateQueries({ queryKey: ["coletas"] });
+    },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
 
   const filtradas = useMemo(() => {
-    const arr = coletas.filter((c) => {
-      const itemAlerta = (c.itens ?? []).some((it) => Number(it.peso_kg) > ALERTA_PESO_KG);
-      if (filtro === "sem_mtr" && (c.mtr || c.dmr_manual)) return false;
-      if (filtro === "estimado" && !c.peso_estimado) return false;
-      if (filtro === "manual" && !c.dmr_manual) return false;
-      if (filtro === "alerta" && !itemAlerta && !(c.mtr && dups.has(c.mtr))) return false;
-      if (residuoSel.length > 0 && !(c.itens ?? []).some((it) => residuoSel.includes(it.tipo_residuo_nome))) return false;
-      if (destinadorSel.length > 0 && !(c.destinador && destinadorSel.includes(c.destinador))) return false;
-      if (transportadorSel.length > 0 && !(c.transportador && transportadorSel.includes(c.transportador))) return false;
-      if (busca) {
-        const q = busca.toLowerCase();
+    let arr = coletas;
+    // Filtro de período (sempre aplicado)
+    arr = arr.filter((c) => c.data >= periodo.start && c.data <= periodo.end);
+    // Busca livre
+    if (busca) {
+      const q = busca.toLowerCase();
+      arr = arr.filter((c) => {
         const inFields = [c.mtr, c.transportador, c.destinador, c.observacoes].some((v) => v?.toLowerCase().includes(q));
         const inItens = (c.itens ?? []).some((it) => it.tipo_residuo_nome.toLowerCase().includes(q));
         const inData = c.data.includes(q) || formatDate(c.data).toLowerCase().includes(q);
-        if (!inFields && !inItens && !inData) return false;
-      }
-      return true;
-    });
+        return inFields || inItens || inData;
+      });
+    }
+    // Filtro avançado
+    arr = aplicarFiltro(arr, filtroAvancado, unidadeNomes);
+
     const sorted = [...arr].sort((a, b) => {
       const dir = sortDir === "asc" ? 1 : -1;
       const get = (c: ColetaComItens): string | number => {
@@ -96,6 +100,7 @@ function ColetasList() {
           case "mtr": return (c.mtr || "").toLowerCase();
           case "peso": return totalPesoColeta(c);
           case "residuo": return (c.itens?.[0]?.tipo_residuo_nome || "").toLowerCase();
+          case "unidade": return (unidadeNomes[c.unidade_id] || "").toLowerCase();
         }
       };
       const av = get(a), bv = get(b);
@@ -104,17 +109,14 @@ function ColetasList() {
       return 0;
     });
     return sorted;
-  }, [coletas, filtro, busca, dups, residuoSel, destinadorSel, transportadorSel, sortKey, sortDir]);
-
+  }, [coletas, busca, filtroAvancado, sortKey, sortDir, unidadeNomes, periodo.start, periodo.end]);
 
   function toggleSort(k: SortKey) {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(k); setSortDir("asc"); }
   }
 
-
-
-  if (!unidade) return <NoUnidade />;
+  if (!todasUnidades && !unidade) return <NoUnidade />;
 
   const SortHead = ({ k, children, align = "left" }: { k: SortKey; children: React.ReactNode; align?: "left" | "right" }) => (
     <th className={`p-3 font-medium text-${align}`}>
@@ -125,22 +127,22 @@ function ColetasList() {
     </th>
   );
 
+  const colCount = todasUnidades ? 9 : 8;
+
   return (
     <div className="p-6 max-w-7xl">
       <PageHeader
         title="Coletas"
-        description={`${coletas.length} coletas registradas · ${filtradas.length} visíveis após filtros.`}
+        description={`${coletas.length} coletas no escopo · ${filtradas.length} visíveis após filtros (período ${periodo.label}).`}
         actions={
           <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
-              <History className="size-4 mr-1" /> Histórico
-            </Button>
             <Button variant="outline" size="sm" onClick={() => setBulkDeleteOpen(true)}>
               <Trash2 className="size-4 mr-1" /> Excluir em massa
             </Button>
             <Button variant="outline" size="sm" onClick={async () => {
               const { isImportActive } = await import("@/lib/import-job");
               if (isImportActive()) { toast.error("Já existe uma importação em andamento. Aguarde concluir."); return; }
+              if (!unidade) { toast.error("Selecione uma unidade para importar."); return; }
               setImportOpen(true);
             }}>
               <Upload className="size-4 mr-1" /> Importar planilha
@@ -150,25 +152,29 @@ function ColetasList() {
         }
       />
 
-      <div className="flex flex-wrap gap-2 mb-3">
-        <Input placeholder="Buscar por MTR, transportador, destinador, resíduo, data…" value={busca} onChange={(e) => setBusca(e.target.value)} className="max-w-sm" />
-        {([
-          ["todas", "Todas"],
-          ["sem_mtr", "Sem MTR"],
-          ["estimado", "Peso estimado"],
-          ["manual", "DMR manual"],
-          ["alerta", "Alertas"],
-        ] as const).map(([k, label]) => (
-          <Button key={k} variant={filtro === k ? "default" : "outline"} size="sm" onClick={() => setFiltro(k)}>
-            {label}
-          </Button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
-        <MultiSelectFilter label="Resíduo" options={opcoes.residuos} value={residuoSel} onChange={setResiduoSel} />
-        <MultiSelectFilter label="Destinador" options={opcoes.destinadores} value={destinadorSel} onChange={setDestinadorSel} />
-        <MultiSelectFilter label="Transportador" options={opcoes.transportadores} value={transportadorSel} onChange={setTransportadorSel} />
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <Input
+          placeholder="Buscar por MTR, transportador, destinador, resíduo, data…"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          className="max-w-sm"
+        />
+        <Button variant="outline" size="sm" onClick={() => setAdvOpen(true)}>
+          <Filter className="size-4 mr-1" /> Filtro avançado
+          {filtroAvancado && filtroAvancado.regras.length > 0 && (
+            <Badge variant="secondary" className="ml-2 text-[10px]">{filtroAvancado.regras.length}</Badge>
+          )}
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setSavedOpen(true)}>
+          <Bookmark className="size-4 mr-1" /> Filtros salvos
+        </Button>
+        {filtroAvancado && (
+          <Button variant="ghost" size="sm" onClick={() => setFiltroAvancado(null)}>Limpar filtro</Button>
+        )}
+        <div className="ml-auto flex items-center gap-2 text-sm">
+          <Switch id="todas-un" checked={todasUnidades} onCheckedChange={setTodasUnidades} />
+          <label htmlFor="todas-un" className="cursor-pointer">Ver todas as unidades</label>
+        </div>
       </div>
 
       <Card>
@@ -178,7 +184,7 @@ function ColetasList() {
               <thead className="bg-muted/50 text-muted-foreground">
                 <tr>
                   <SortHead k="data">Data</SortHead>
-                  <th className="text-left p-3 font-medium">Trimestre</th>
+                  {todasUnidades && <SortHead k="unidade">Unidade</SortHead>}
                   <SortHead k="residuo">Tipo de resíduo</SortHead>
                   <SortHead k="destinador">Destinador</SortHead>
                   <SortHead k="transportador">Transportador</SortHead>
@@ -190,9 +196,9 @@ function ColetasList() {
               </thead>
               <tbody>
                 {isLoading ? (
-                  <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Carregando…</td></tr>
+                  <tr><td colSpan={colCount} className="p-6 text-center text-muted-foreground">Carregando…</td></tr>
                 ) : filtradas.length === 0 ? (
-                  <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Nenhuma coleta encontrada.</td></tr>
+                  <tr><td colSpan={colCount} className="p-6 text-center text-muted-foreground">Nenhuma coleta encontrada.</td></tr>
                 ) : (
                   filtradas.map((c) => {
                     const peso = totalPesoColeta(c);
@@ -206,12 +212,12 @@ function ColetasList() {
                     return (
                       <tr key={c.id} className="border-t border-border hover:bg-muted/30">
                         <td className="p-3">{formatDate(c.data)}</td>
-                        <td className="p-3 text-muted-foreground">{quarterOf(c.data).label}</td>
+                        {todasUnidades && <td className="p-3 text-muted-foreground">{unidadeNomes[c.unidade_id] ?? "—"}</td>}
                         <td className="p-3">{residuoLabel}</td>
                         <td className="p-3">{c.destinador || <span className="text-muted-foreground">—</span>}</td>
                         <td className="p-3">{c.transportador || <span className="text-muted-foreground">—</span>}</td>
                         <td className="p-3 font-mono text-xs">{c.mtr || <span className="text-muted-foreground italic">{c.dmr_manual ? "manual" : "sem MTR"}</span>}</td>
-                        <td className="p-3 text-right tabular-nums">{formatKg(peso)}</td>
+                        <td className="p-3 text-right tabular-nums">{formatKgPlain(peso)}</td>
                         <td className="p-3 space-x-1">
                           {!c.mtr && !c.dmr_manual && <Badge variant="outline" className="border-warning/50 text-warning"><FileWarning className="size-3 mr-1" />Sem MTR</Badge>}
                           {c.dmr_manual && <Badge className="bg-destructive text-destructive-foreground hover:bg-destructive/90">INCLUIR NA DMR</Badge>}
@@ -221,7 +227,23 @@ function ColetasList() {
                           {c.mtr && !c.peso_estimado && !itemAlerta && !mtrDup && <Badge variant="secondary">OK</Badge>}
                         </td>
                         <td className="p-3 text-right">
-                          <Button asChild size="sm" variant="ghost"><Link to="/coletas/$id" params={{ id: c.id }}>Editar</Link></Button>
+                          <div className="flex justify-end gap-1">
+                            <Button asChild size="sm" variant="ghost" title="Editar">
+                              <Link to="/coletas/$id" params={{ id: c.id }}><Pencil className="size-4" /></Link>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              title="Excluir"
+                              onClick={() => {
+                                if (confirm(`Excluir esta coleta${c.mtr ? ` (MTR ${c.mtr})` : ""}?`)) {
+                                  delMut.mutate(c.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="size-4 text-destructive" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -232,9 +254,11 @@ function ColetasList() {
           </div>
         </CardContent>
       </Card>
-      <ColetaImportWizard open={importOpen} onOpenChange={setImportOpen} unidadeAtiva={unidade} />
+
+      {unidade && <ColetaImportWizard open={importOpen} onOpenChange={setImportOpen} unidadeAtiva={unidade} />}
       <BulkDeleteDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen} coletas={coletas} unidadeId={unidade} totalGeral={coletas.length} />
-      <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} unidadeId={unidade} />
+      <AdvancedFilterDialog open={advOpen} onOpenChange={setAdvOpen} filtro={filtroAvancado} onApply={setFiltroAvancado} />
+      <SavedFiltersDialog open={savedOpen} onOpenChange={setSavedOpen} onPick={setFiltroAvancado} />
     </div>
   );
 }

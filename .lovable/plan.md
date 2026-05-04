@@ -1,141 +1,216 @@
-## Objetivo
+# Plano de evolução do sistema (8 fases)
 
-Refinar regras de pendência, risco, filtros e cadastros sem quebrar nada já estável. Não há mudanças no schema do banco — apenas semântica das regras e UI.
-
----
-
-## 1. Coleta sem peso (nova categoria)
-
-**Hoje:** o formulário (`ColetaForm.tsx`) bloqueia o salvamento quando qualquer item tem peso ≤ 0 (`if (!it.peso_kg || Number(it.peso_kg) <= 0) ... return null`).
-
-**Mudança:**
-- Permitir salvar coleta com `peso_kg = 0` (ou vazio → tratado como 0).
-- Continuar exigindo: data, destinador e ao menos um item com tipo de resíduo.
-- Mostrar aviso amarelo no formulário ("Peso não informado — coleta entrará em pendências"), mas não bloquear.
-
-**Nova helper em `src/lib/data.ts`:**
-- `isPendenciaSemPeso(c)` → `true` quando `totalPesoColeta(c) === 0`.
-- `isPendenciaPesoEstimadoSemPeso(c)` → `peso_estimado === true && total === 0`.
+Vou agrupar todas as mudanças em fases coerentes, cada uma entregável e testável de forma independente. Nada será dividido entre mensagens — cada fase será executada inteira quando aprovada. Você pode aprovar este plano e pedir para executar tudo de uma vez, ou fase por fase.
 
 ---
 
-## 2. Peso estimado (regra definitiva)
+## Fase 1 — Histórico global + UX clicável
 
-**Mudança:**
-- Remover `confirmarPesoColeta` da `lib/data.ts` e qualquer botão que ainda exista (já removido de `pendencias.tsx`, mas `data.ts` ainda exporta a função).
-- Tag "Emitido com peso estimado" continua aparecendo na listagem quando `peso_estimado === true`, **independente do peso ter ou não valor**.
-- Peso estimado só vira pendência se o peso estiver vazio/zero (categoria "Peso estimado sem peso").
+**Histórico de alterações**
 
----
+- Mover acesso ao Histórico do botão da página de Coletas para o **menu lateral** (`AppShell.tsx`), com ícone próprio.
+- Registrar **todas as ações do sistema** (cadastros, edições, merges, importações, DMR, exclusões, rollbacks de qualquer entidade) — não só coletas.
+- O modal passa a ter seletor de unidade: "Todas as unidades" (padrão) ou unidade específica.
+- Limite passa a ser **15 por unidade** (consulta por unidade quando filtrado; quando "Todas", mostra 15 por unidade agrupadas por seção).
+- Quando uma entrada afeta **1 único registro**, mostrar botão **"Ver registro"** que abre modal lado-a-lado: estado anterior (snapshot) × estado atual, com ações **"Editar atual"** e **"Reverter para anterior"**.
+- Rollbacks em massa passam a rodar em **background** com barra de progresso (reaproveitar infra do `import-job.ts`, generalizando para "long-running jobs").
 
-## 3. Tipos de pendência (categorias separadas)
+**UX de clicabilidade**
 
-Reescrever `src/routes/pendencias.tsx` para mostrar 4 abas, cada uma com seu próprio contador independente:
-
-| Aba | Critério |
-|---|---|
-| **Sem MTR (erro)** | `!c.mtr && !c.dmr_manual` |
-| **Sem peso** | `total === 0 && !c.peso_estimado` |
-| **Peso estimado sem peso** | `total === 0 && c.peso_estimado` |
-| **MTR duplicado** | `c.mtr && dups.has(c.mtr)` — listar todas as ocorrências, mas o **contador** mostra apenas o nº de MTRs únicos duplicados (`dups.size`), não o nº de coletas |
-
-Cards de resumo no topo: 4 cards independentes (não somar entre si).
+- Em `src/styles.css` / classes utilitárias: garantir `cursor-pointer` em todo elemento clicável (botões, badges interativas, linhas de tabela com ação, ícones).
+- Adicionar micro-animação padrão (`hover:scale-[1.02] active:scale-[0.98] transition`) nos botões via variante do `Button`.
 
 ---
 
-## 4. Contadores
+## Fase 2 — Filtros avançados de Coletas + visualização multi-unidade
 
-- `useMemo` por categoria, sem somatório global.
-- Badge da sidebar (`AppShell.tsx`): substituir `semMtr + estimado + dupExcess` por `semMtrErro + semPeso + estimadoSemPeso + mtrsDuplicadosUnicos` — soma apenas para o número total exibido na pílula, mas contagens internas permanecem separadas.
+**Reestruturação dos filtros (`coletas.index.tsx`)**
 
----
+- Remover os 3 `MultiSelectFilter` (resíduo/destinador/transportador) e os botões rápidos de filtro.
+- Manter busca livre e **ordenação por cabeçalho** (não alterar).
+- Novo botão **"Filtro avançado"** abrindo painel/sheet com regras compostas:
+  - Campo (data, mtr, resíduo, destinador, transportador, peso, observações, unidade, status)
+  - Operador (igual, contém, começa com, maior que, menor que, entre, vazio, não vazio)
+  - Valor (input adequado ao tipo; data = `De DD/MM/AAAA → A DD/MM/AAAA`)
+  - Múltiplas regras com AND/OR
+- Botão **"Filtros salvos"** ao lado: salvar conjunto atual com nome, listar, aplicar, excluir. Persistência em nova tabela `filtros_salvos` (user-less, por unidade ou global).
 
-## 5. Diferenciação MTR
+**Multi-unidade**
 
-Já existe a flag `dmr_manual` e `isPendenciaSemMtr` já a respeita. Garantir em todas as telas:
-- **Sem MTR por erro** (`!mtr && !dmr_manual`) → entra em Pendências e em Risco.
-- **DMR manual** (`dmr_manual === true`) → NUNCA aparece em Pendências; aparece em Risco em um cartão **separado e informativo**, sem cor de alerta.
+- Toggle no topo: **"Apenas unidade ativa"** (padrão) × **"Todas as unidades"**.
+- Quando "Todas": adicionar coluna **Unidade** na tabela; respeitar período do menu lateral.
+- **Remover coluna "Trimestre"**.
+- Ações de linha: manter **lápis (Editar)** e adicionar **lixeira (Excluir)** com confirmação simples.
 
-Adicionar helper `isSemMtrOperacao(c)` → `!c.mtr && c.dmr_manual`.
+**Formato de peso**
 
----
-
-## 6. Dashboard de Risco
-
-Reescrever `src/routes/risco.tsx`:
-
-- Remover do cálculo de nível alto/médio qualquer contribuição de `dmr_manual`.
-- Cartões `FatorRisco` exibidos separadamente:
-  1. Sem MTR (erro)
-  2. Sem MTR por operação (DMR manual) — tom neutro/info
-  3. Peso estimado (apenas as com peso preenchido — informativo) e Peso estimado sem peso (erro)
-  4. MTR duplicado — usa contagem de MTRs únicos
-  5. Volume fora da DMR (mantém)
-- Texto de cabeçalho ("frases") montado a partir das categorias separadas.
-
-Também ajustar badge "risco" na sidebar (`AppShell.tsx`) para não escalar para "alto" só porque há `dmr_manual`.
+- `formatKg` na tabela de coletas passa a sempre exibir em **kg** (sem conversão automática para t). Demais telas (DMR, consolidação) mantêm comportamento atual.
 
 ---
 
-## 7. Filtros (multi-seleção e busca ampliada)
+## Fase 3 — Indicadores de risco unificados + dashboard de risco
 
-Em `src/routes/coletas.index.tsx`:
+**Sistema de severidade**
 
-- Trocar os 3 `Select` simples (resíduo/destinador/transportador) por componentes de **multi-seleção** baseados em `Popover` + `Checkbox` + `Command` (já temos shadcn). Estado vira `string[]`. `__all__` deixa de existir; lista vazia = sem filtro.
-- Filtros aplicam OR dentro da mesma categoria, AND entre categorias.
-- Campo de busca: já cobre MTR, transportador, destinador, resíduo, observações. Adicionar suporte a **data**: aceitar substring de `formatDate(c.data)` e do ISO `c.data`.
+- Criar helper `getColetaRiscos(coleta)` retornando array de riscos com nível:
+  - Sem MTR por erro de preenchimento → **amarelo**
+  - Sem MTR por operação (DMR manual) → **laranja**
+  - Sem peso (peso 0 ou nulo em qualquer item) → **vermelho**
+  - Peso estimado → **amarelo**
+  - MTR duplicado → **amarelo**
+  - Volume fora da DMR → **laranja**
+- Na tabela de coletas e em qualquer listagem: **um único ícone de exclamação**, cor = maior severidade. Tooltip lista todos os riscos.
 
----
+**Dashboard de risco (`risco.tsx`)**
 
-## 8. Cadastros — abas e edição
-
-Reescrever `src/routes/cadastros.tsx`:
-
-**Abas adicionadas:** Unidades · Tipos de resíduo · Tratamentos · **Transportadores** · **Destinadores**.
-
-**Edição inline em todas as abas** (não apenas adicionar/remover):
-
-| Aba | O que pode ser editado |
-|---|---|
-| Unidades | nome (via `updateUnidade`, novo) |
-| Tipos de resíduo | nome, código, tratamento padrão (já existe `upsertTipoResiduo` com `id`) |
-| Tratamentos | nome, código (já existe `upsertTratamento` com `id`) |
-| Transportadores | nome, CNPJ (novo `updateTransportador`) |
-| Destinadores | nome, CNPJ, **vínculos resíduo↔tratamento** (já existe `setDestinadorResiduos`) |
-
-UI de edição: cada linha vira um modal de edição (`Dialog`) com botão lápis, ao lado do botão remover. Para destinadores, o modal inclui a tabela de vínculos (mesmo formato já usado no `QuickResiduoDialog`).
-
-**Novas funções em `src/lib/data.ts`** (sem mudança de schema):
-- `updateUnidade(id, nome)`
-- `updateTransportador(id, { nome, cnpj })`
-- `updateDestinador(id, { nome, cnpj })`
-
-A edição reaproveita as queries já em cache (`tipos_residuo`, `tratamentos`, etc.) — invalidação já está implementada.
+- Contabilizar **peso 0 / nulo como "Sem peso"** (hoje só aparece em pendências).
+- Garantir que pendências e dashboard usem o mesmo helper.
 
 ---
 
-## Detalhes técnicos
+## Fase 4 — Wizard de importação melhorado
 
-**Arquivos modificados:**
-- `src/lib/data.ts` — novos helpers de pendência, novos `updateX`, remover `confirmarPesoColeta` (e seu único uso já foi removido).
-- `src/components/ColetaForm.tsx` — relaxar validação de peso, mostrar aviso.
-- `src/routes/pendencias.tsx` — 4 abas + cards independentes.
-- `src/routes/risco.tsx` — cards separados, lógica de nível sem `dmr_manual`.
-- `src/routes/coletas.index.tsx` — multi-select e busca por data.
-- `src/routes/cadastros.tsx` — 5 abas + edição inline com modal.
-- `src/components/AppShell.tsx` — badge sidebar usa novas contagens.
+**Conflitos**
 
-**Componente novo:** `src/components/MultiSelectFilter.tsx` (Popover + Command + Checkbox) para reuso entre filtros.
+- Reduzir opções por linha para **"Substituir"** ou **"Ignorar"** (remover "Manter existente" redundante).
+- Barra superior com ações em massa:
+  - Substituir todos / Ignorar todos
+  - **Substituir onde {campo} {operador} {valor}**
+  - **Ignorar onde {campo} {operador} {valor}**
 
-**Garantias preservadas:**
-- Schema do banco intacto.
-- Separação por unidade (`unidade_id` continua na chave de query).
-- Lógica DMR (`/dmr` e `lib/dmr.ts`) não tocada.
-- Nenhuma migração SQL.
+**Detecção de duplicatas sem MTR**
+
+- Quando MTR vazio, comparar (data + resíduo + destinador + transportador + tratamento + peso) — ignora observações.
+- Marcar como **"Possível duplicata"** e exibir tela lado-a-lado: importada × existente, ambas editáveis antes de confirmar.
+
+**Detecção "estimado" em observações**
+
+- Regex tolerante a acentos/typos: `/est[ií]m[ao]?d?[ao]?s?/i` aplicado ao campo observações → marca `peso_estimado = true` automaticamente.
+
+**MTR = "DMR" / "DRM" / variações**
+
+- Regex `/^d[mr]{2}$|incluir.*dmr/i` → trata como `dmr_manual = true`, MTR vazio.
+- Mostrar tabela resumo dessas linhas com ação "Sem MTR / Incluir na DMR" ou "Editar manualmente".
+- **Não agregar** em uma única coleta: cada linha vira coleta separada — exceto quando data + destinador + transportador batem (aí agrupa itens).
+
+**Cadastro inline durante importação**
+
+- Ao clicar **"Adicionar novo"** numa entidade ausente, abrir o **modal completo** da entidade:
+  - Resíduo → modal com tratamento padrão e código IBAMA
+  - Destinador → modal com CNPJ + tipos de tratamento aceitos
+  - Transportador → modal com CNPJ
+- Se houver N novos a cadastrar, abrir modais sequencialmente com contador **"1/N", "2/N"…** no botão de avançar. Se N=1, só "Continuar".
+- Não perder progresso do wizard.
+
+**Validação de CNPJ**
+
+- Ao cadastrar transportador/destinador (em qualquer fluxo): consultar duplicidade de CNPJ **dentro da mesma entidade** (transportador e destinador são independentes).
+- Se duplicado: mensagem **"CNPJ já cadastrado, clique aqui para ver"** → abre modal de edição do existente.
 
 ---
 
-## Fora do escopo
+## Fase 5 — Cadastros: vínculos automáticos, merge ampliado, exclusão inteligente
 
-- Não toca em `coletas.$id.tsx`, `coletas.nova.tsx`, `consolidacao.tsx`, `dmr.tsx`, `index.tsx` (dashboard).
-- Mantém comportamento atual de importação em massa, modais, ordenação de tabelas.
+**Vínculos automáticos**
+
+- Ao salvar coleta com resíduo não vinculado ao destinador: criar vínculo em `destinador_residuos` automaticamente e disparar **toast** "Resíduo X vinculado ao destinador Y". Funciona para múltiplos itens.
+
+**UI de resíduos por destinador**
+
+- Mostrar apenas vinculados + botão **"Expandir lista"** revelando todos.
+
+**Validação dura nos autocompletes**
+
+- `Autocomplete` usado em `ColetaForm`: ao perder foco com valor não existente em (resíduo, tratamento, destinador, transportador), abrir automaticamente o modal de cadastro pré-preenchido. Só aceita o valor se cadastrado.
+
+**Edição em cascata**
+
+- Ao renomear resíduo / destinador / transportador / tratamento no cadastro: `UPDATE` em todas as coletas e itens que usam o nome antigo (já existe via `_id`, mas o **nome textual** em `coleta_itens.tipo_residuo_nome` / `coletas.destinador` / `coletas.transportador` precisa ser propagado). Implementar com transação SQL.
+
+**Merge ampliado**
+
+- Hoje só transportador e destinador. Adicionar merge para **resíduos** e **tratamentos**.
+- Botão "Unificar duplicados" disponível também ao **editar** o item (não só na lista).
+- Confirmação destacada: **"Esta ação não pode ser desfeita"**, mas registrar no histórico.
+
+**Exclusão com transferência**
+
+- Ao excluir unidade/resíduo/tratamento/transportador/destinador com dados associados: dialog perguntando **"Transferir dados para outro {tipo}?"** com dropdown dos existentes.
+- Se transferir: mover coletas/itens/vínculos; ignorar duplicatas (vínculos que já existem no destino).
+- Se não transferir: coletas afetadas perdem o vínculo e entram em **Pendências**.
+
+---
+
+## Fase 6 — DMR melhorada (parsing IBAMA + cadastro inline + drilldown)
+
+**Match por código IBAMA**
+
+- Resíduos ganham campo `codigo_ibama` (já existe `codigo` em `tipos_residuo` — reutilizar e renomear semanticamente).
+- Ao casar resíduo da DMR: `dmrResiduo.startsWith(tipo.codigo_ibama)` (não "contém").
+- Exemplo: "200138 - madeira não abrangida..." casa com tipo cujo código é `200138`.
+
+**Resíduos não cadastrados na DMR**
+
+- Mesmo fluxo da importação de coletas: lista os ausentes, opção **"Substituir por existente"** ou **"Criar novo"** (modal completo, com contador N/N).
+
+**Editar resíduo a partir da DMR**
+
+- Clicar em resíduo interno na DMR: abre modal de edição do tipo de resíduo (incluindo código IBAMA).
+- Ao salvar: propagação em cascata (Fase 5) para todas coletas/itens.
+
+**Drilldown**
+
+- Adicionar ordenação por data.
+- Botões de filtro: **Todas**, **Peso estimado**, **Sem MTR**.
+
+---
+
+## Fase 7 — Coleta: merge/import com validação cruzada de MTR
+
+**Detecção em merge**
+
+- Ao fazer merge de transportador/destinador, se houver coletas com MTR já presente em outra coleta do sistema: avisar e abrir comparativo lado-a-lado, opção de editar uma das duas.
+
+**Duplicata sem MTR no merge/import**
+
+- Mesma regra da Fase 4 (data + resíduo + destinador + tratamento bateram → duplicata).
+
+---
+
+## Fase 8 — Correção do bug crítico de DMR em toneladas
+
+Já foi corrigido em fase anterior — fazer **revisão + testes**:
+
+- Conferir que valores como "2,7" continuam virando 2.7 t (não 270 t).
+- Adicionar testes unitários simples em `parseTonelada` para os formatos: `2,7`, `1.234,56`, `1234.56`, `2700`.
+
+---
+
+## Mudanças de banco previstas
+
+```sql
+-- Fase 1: histórico global (audit_log já existe; permitir unidade_id null = global)
+-- Já está null-able; ajustar apenas listAuditLog para agrupar por unidade.
+
+-- Fase 2: filtros salvos
+CREATE TABLE filtros_salvos (
+  id uuid PK, nome text, escopo text, -- 'coletas'
+  unidade_id uuid NULL, regras jsonb, criado_em timestamptz
+);
+
+-- Fase 6: garantir tipos_residuo.codigo_ibama (usar coluna 'codigo' existente; documentar)
+```
+
+Sem mudanças destrutivas. RLS mantida como `public all` (modo atual do projeto).
+
+---
+
+## Garantias
+
+- Cada fase é independente: rollback de uma não quebra as outras.
+- Funcionalidades existentes (ordenação por cabeçalho, importação em background, rollback de import, formato BR de números, etc.) **não serão alteradas** exceto onde explicitamente listado.
+- Testes manuais sugeridos ao fim de cada fase: checklist por bullet.
+
+---
+
+**Como prosseguir:** Faça 2 fases por vez.
