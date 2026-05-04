@@ -1,14 +1,15 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Recycle, LayoutDashboard, ClipboardList, AlertTriangle, BarChart3, FileSpreadsheet, Settings, Plus, ShieldAlert, Calendar } from "lucide-react";
+import { Recycle, LayoutDashboard, ClipboardList, AlertTriangle, BarChart3, FileSpreadsheet, Settings, Plus, ShieldAlert, Calendar, History } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { listUnidades, listColetasByUnidade, totalPesoColeta, isPendenciaSemMtr, isPendenciaSemPeso, findMtrDuplicates } from "@/lib/data";
 import { useUnidadeAtiva, setUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo, setPeriodoAtivo } from "@/hooks/use-periodo";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ImportStatusBanner } from "@/components/ImportStatusBanner";
+import { HistoryDialog } from "@/components/HistoryDialog";
 
 type NavItem = { to: string; label: string; icon: any; exact?: boolean; badge?: "pendencias" | "risco" };
 const NAV: NavItem[] = [
