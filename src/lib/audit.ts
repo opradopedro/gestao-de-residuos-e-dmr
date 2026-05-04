@@ -54,11 +54,38 @@ export async function logAction(input: {
 }
 
 export async function listAuditLog(unidade_id?: string | null, limit = 15): Promise<AuditEntry[]> {
-  let q = (supabase as any).from("audit_log").select("*").order("criado_em", { ascending: false }).limit(limit);
-  if (unidade_id) q = q.eq("unidade_id", unidade_id);
-  const { data, error } = await q;
+  // Quando unidade_id for fornecido: últimas N daquela unidade.
+  // Quando NÃO fornecido (todas): pega últimas 15 por unidade (incluindo entradas globais com unidade_id null) e mistura ordenadas por data.
+  if (unidade_id) {
+    const { data, error } = await (supabase as any)
+      .from("audit_log")
+      .select("*")
+      .eq("unidade_id", unidade_id)
+      .order("criado_em", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []) as AuditEntry[];
+  }
+
+  // Buscar mais que o limite, particionar por unidade no cliente, manter 15 por partição
+  const { data, error } = await (supabase as any)
+    .from("audit_log")
+    .select("*")
+    .order("criado_em", { ascending: false })
+    .limit(500);
   if (error) throw error;
-  return (data ?? []) as AuditEntry[];
+  const all = (data ?? []) as AuditEntry[];
+  const byUnit = new Map<string, AuditEntry[]>();
+  for (const e of all) {
+    const k = e.unidade_id ?? "__global__";
+    if (!byUnit.has(k)) byUnit.set(k, []);
+    const arr = byUnit.get(k)!;
+    if (arr.length < limit) arr.push(e);
+  }
+  const merged: AuditEntry[] = [];
+  byUnit.forEach((arr) => merged.push(...arr));
+  merged.sort((a, b) => (a.criado_em < b.criado_em ? 1 : -1));
+  return merged;
 }
 
 export async function markRevertido(id: string) {
