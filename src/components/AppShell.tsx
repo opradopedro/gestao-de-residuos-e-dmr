@@ -199,6 +199,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <ImportStatusBanner />
         {children}
       </main>
+      <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} unidadeId={null} />
     </div>
   );
 }
