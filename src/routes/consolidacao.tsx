@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Download, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { useMemo, useState } from "react";
 import { quarterOf } from "@/lib/quarter";
-import { formatKg, formatDate } from "@/lib/format";
+import { formatTon, formatDate } from "@/lib/format";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { ColetaForm } from "@/components/ColetaForm";
@@ -154,7 +154,7 @@ function Consolidacao() {
                     <td className="p-3">{r.residuo}</td>
                     <td className="p-3">{r.destinador}</td>
                     <td className="p-3 text-right tabular-nums text-muted-foreground">{r.coletas.length}</td>
-                    <td className="p-3 text-right tabular-nums">{formatKg(r.kg)}</td>
+                    <td className="p-3 text-right tabular-nums">{formatTon(r.kg)}</td>
                     <td className="p-3 text-muted-foreground"><ChevronRight className="size-4" /></td>
                   </tr>
                 ))
@@ -162,7 +162,7 @@ function Consolidacao() {
               {pivot.length > 0 && (
                 <tr className="border-t-2 border-border font-semibold">
                   <td colSpan={3} className="p-3">Total</td>
-                  <td className="p-3 text-right tabular-nums">{formatKg(total)}</td>
+                  <td className="p-3 text-right tabular-nums">{formatTon(total)}</td>
                   <td></td>
                 </tr>
               )}
@@ -181,7 +181,7 @@ function Consolidacao() {
               <div className="mt-4 space-y-3 text-sm">
                 <div className="rounded-md border p-3 flex items-center justify-between">
                   <span className="text-muted-foreground">Total agrupado</span>
-                  <span className="font-semibold tabular-nums">{formatKg(detail.kg)}</span>
+                  <span className="font-semibold tabular-nums">{formatTon(detail.kg)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="font-medium">Coletas de origem ({detail.coletas.length})</div>
@@ -204,12 +204,12 @@ function Consolidacao() {
                             <div className="text-sm">Transportador: {c.transportador || "—"}</div>
                           </div>
                           <div className="text-right">
-                            <div className="font-semibold tabular-nums">{formatKg(subtotal)}</div>
+                            <div className="font-semibold tabular-nums">{formatTon(subtotal)}</div>
                             <Button size="sm" variant="ghost" onClick={() => setEditColetaId(c.id)}>Abrir</Button>
                           </div>
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
-                          Total da coleta: {formatKg(totalPesoColeta(c))}
+                          Total da coleta: {formatTon(totalPesoColeta(c))}
                           {c.peso_estimado && " · estimado"}
                           {c.dmr_manual && " · DMR manual"}
                         </div>
