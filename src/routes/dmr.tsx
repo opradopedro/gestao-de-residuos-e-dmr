@@ -16,7 +16,7 @@ import { useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { quarterOf } from "@/lib/quarter";
-import { formatKg, formatDate } from "@/lib/format";
+import { formatTon, formatDate } from "@/lib/format";
 
 export const Route = createFileRoute("/dmr")({
   head: () => ({ meta: [{ title: "DMR — Conferência" }] }),
@@ -353,10 +353,10 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
                       <td className="p-3"><span className={`text-[10px] font-semibold uppercase rounded-full px-2 py-1 border ${status.cls}`}>{status.label}</span></td>
                       <td className="p-3">{g.residuo}</td>
                       <td className="p-3">{g.destinador}</td>
-                      <td className="p-3 text-right tabular-nums">{formatKg(g.internoKg)}</td>
-                      <td className="p-3 text-right tabular-nums">{formatKg(g.dmrKg)}</td>
+                      <td className="p-3 text-right tabular-nums">{formatTon(g.internoKg)}</td>
+                      <td className="p-3 text-right tabular-nums">{formatTon(g.dmrKg)}</td>
                       <td className={"p-3 text-right tabular-nums " + (grave ? "text-destructive font-medium" : leve ? "text-warning-foreground" : "")}>
-                        {g.diff > 0 ? "+" : ""}{formatKg(g.diff)}
+                        {g.diff > 0 ? "+" : ""}{formatTon(g.diff)}
                         {(g.internoKg > 0 || g.dmrKg > 0) && <div className="text-xs text-muted-foreground">{pct > 0 ? "+" : ""}{pct.toFixed(1)}%</div>}
                       </td>
                       <td className="p-3 text-muted-foreground"><ChevronRight className="size-4" /></td>
@@ -380,15 +380,15 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
                 <div className="grid grid-cols-3 gap-3">
                   <div className="rounded-md border p-3">
                     <div className="text-xs text-muted-foreground">Interno</div>
-                    <div className="font-semibold">{formatKg(detail.internoKg)}</div>
+                    <div className="font-semibold">{formatTon(detail.internoKg)}</div>
                   </div>
                   <div className="rounded-md border p-3">
                     <div className="text-xs text-muted-foreground">DMR</div>
-                    <div className="font-semibold">{formatKg(detail.dmrKg)}</div>
+                    <div className="font-semibold">{formatTon(detail.dmrKg)}</div>
                   </div>
                   <div className="rounded-md border p-3">
                     <div className="text-xs text-muted-foreground">Diferença</div>
-                    <div className={`font-semibold ${Math.abs(detail.diff) > 50 ? "text-destructive" : ""}`}>{detail.diff > 0 ? "+" : ""}{formatKg(detail.diff)}</div>
+                    <div className={`font-semibold ${Math.abs(detail.diff) > 50 ? "text-destructive" : ""}`}>{detail.diff > 0 ? "+" : ""}{formatTon(detail.diff)}</div>
                   </div>
                 </div>
 
@@ -410,7 +410,7 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
                         <div key={c.id} className="border rounded-md p-2 flex items-center justify-between">
                           <div>
                             <div className="text-xs">{formatDate(c.data)} · MTR {c.mtr || <span className="text-destructive">—</span>}</div>
-                            <div className="text-xs text-muted-foreground">{formatKg(totalPesoColeta(c))} {c.peso_estimado && <span className="text-warning-foreground">(estimado)</span>}</div>
+                            <div className="text-xs text-muted-foreground">{formatTon(totalPesoColeta(c))} {c.peso_estimado && <span className="text-warning-foreground">(estimado)</span>}</div>
                           </div>
                           <Button asChild size="sm" variant="ghost"><Link to="/coletas/$id" params={{ id: c.id }}>Editar</Link></Button>
                         </div>
@@ -426,7 +426,7 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
                       {detail.dmrLinhas.slice(0, 20).map((l, i) => (
                         <div key={i} className="border rounded-md p-2 flex justify-between">
                           <span>{l.residuo || "—"} · {l.destinador || "—"}</span>
-                          <span className="tabular-nums">{formatKg(Number(l.peso_kg ?? 0))}</span>
+                          <span className="tabular-nums">{formatTon(Number(l.peso_kg ?? 0))}</span>
                         </div>
                       ))}
                       {detail.dmrLinhas.length > 20 && <div className="text-muted-foreground">+ {detail.dmrLinhas.length - 20} mais...</div>}

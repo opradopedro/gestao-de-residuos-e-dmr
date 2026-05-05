@@ -24,7 +24,7 @@ import { AdvancedFilterDialog, SavedFiltersDialog } from "@/components/AdvancedF
 import { aplicarFiltro, type FiltroAvancado } from "@/lib/coletas-filtros";
 import {
   Plus, AlertTriangle, FileWarning, Scale, ArrowUp, ArrowDown,
-  Upload, Trash2, Filter, Bookmark, Pencil,
+  Upload, Trash2, Filter, Bookmark, Eye,
 } from "lucide-react";
 import { formatDate, formatKgPlain } from "@/lib/format";
 import { useMemo, useState } from "react";
@@ -43,15 +43,24 @@ function ColetasList() {
   const periodo = usePeriodoAtivo();
   const qc = useQueryClient();
 
-  const [busca, setBusca] = useState("");
-  const [todasUnidades, setTodasUnidades] = useState(false);
-  const [filtroAvancado, setFiltroAvancado] = useState<FiltroAvancado | null>(null);
+  const SS_KEY = "coletas-list-state";
+  const initial = (() => {
+    try { return JSON.parse(sessionStorage.getItem(SS_KEY) || "{}"); } catch { return {}; }
+  })();
+  const [busca, setBusca] = useState<string>(initial.busca ?? "");
+  const [todasUnidades, setTodasUnidades] = useState<boolean>(initial.todasUnidades ?? false);
+  const [filtroAvancado, setFiltroAvancado] = useState<FiltroAvancado | null>(initial.filtroAvancado ?? null);
   const [advOpen, setAdvOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKey>("data");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sortKey, setSortKey] = useState<SortKey>(initial.sortKey ?? "data");
+  const [sortDir, setSortDir] = useState<SortDir>(initial.sortDir ?? "desc");
   const [importOpen, setImportOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
+  // persist
+  useMemo(() => {
+    try { sessionStorage.setItem(SS_KEY, JSON.stringify({ busca, todasUnidades, filtroAvancado, sortKey, sortDir })); } catch {}
+  }, [busca, todasUnidades, filtroAvancado, sortKey, sortDir]);
 
   const { data: unidades = [] } = useQuery({ queryKey: ["unidades"], queryFn: listUnidades });
   const unidadeNomes = useMemo(() => Object.fromEntries(unidades.map((u) => [u.id, u.nome])), [unidades]);
@@ -228,8 +237,8 @@ function ColetasList() {
                         </td>
                         <td className="p-3 text-right">
                           <div className="flex justify-end gap-1">
-                            <Button asChild size="sm" variant="ghost" title="Editar">
-                              <Link to="/coletas/$id" params={{ id: c.id }}><Pencil className="size-4" /></Link>
+                            <Button asChild size="sm" variant="ghost" title="Visualizar">
+                              <Link to="/coletas/$id" params={{ id: c.id }}><Eye className="size-4" /></Link>
                             </Button>
                             <Button
                               size="sm"
