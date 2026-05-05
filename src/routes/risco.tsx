@@ -178,10 +178,21 @@ function RiscoPage() {
   );
 }
 
+function severidadeTone(severidade: "vermelho" | "laranja" | "amarelo" | "ok") {
+  switch (severidade) {
+    case "vermelho": return "text-destructive border-destructive/40 bg-destructive/5";
+    case "laranja": return "text-orange-600 border-orange-400/40 bg-orange-500/5 dark:text-orange-400";
+    case "amarelo": return "text-warning-foreground border-warning/40 bg-warning/10";
+    case "ok": return "text-success border-success/30 bg-success/5";
+  }
+}
+
 function FatorRisco({ ativa, nivel, icon: Icon, titulo, descricao, link, subtitulo }: { ativa: boolean; nivel: "alto" | "medio" | "baixo"; icon: any; titulo: string; descricao: string; link: string; subtitulo?: string }) {
-  const tone = !ativa ? "text-success border-success/30 bg-success/5"
-    : nivel === "alto" ? "text-destructive border-destructive/30 bg-destructive/5"
-    : "text-warning-foreground border-warning/40 bg-warning/10";
+  const sev: "vermelho" | "laranja" | "amarelo" | "ok" = !ativa ? "ok"
+    : nivel === "alto" ? "vermelho"
+    : nivel === "medio" ? "laranja"
+    : "amarelo";
+  const tone = severidadeTone(sev);
   return (
     <Card className={`border ${tone}`}>
       <CardContent className="p-4 flex items-center gap-4">
@@ -190,6 +201,7 @@ function FatorRisco({ ativa, nivel, icon: Icon, titulo, descricao, link, subtitu
           <div className="font-medium text-foreground">
             {titulo}
             {subtitulo && <span className="text-xs text-muted-foreground font-normal ml-2">· {subtitulo}</span>}
+            {ativa && <span className="text-[10px] uppercase tracking-wider font-semibold ml-2">{sev === "vermelho" ? "crítico" : sev === "laranja" ? "alto" : "atenção"}</span>}
           </div>
           <div className="text-sm text-muted-foreground">{descricao}</div>
         </div>
