@@ -24,7 +24,7 @@ import { AdvancedFilterDialog, SavedFiltersDialog } from "@/components/AdvancedF
 import { aplicarFiltro, type FiltroAvancado } from "@/lib/coletas-filtros";
 import {
   Plus, AlertTriangle, FileWarning, Scale, ArrowUp, ArrowDown,
-  Upload, Trash2, Filter, Bookmark, Pencil,
+  Upload, Trash2, Filter, Bookmark, Eye,
 } from "lucide-react";
 import { formatDate, formatKgPlain } from "@/lib/format";
 import { useMemo, useState } from "react";
