@@ -50,6 +50,30 @@ export async function createUnidade(nome: string) {
   return data;
 }
 
+export async function bulkInsertUnidades(rows: { nome: string }[]) {
+  const valid = rows.filter((r) => r.nome?.trim());
+  if (valid.length === 0) return 0;
+  const { error } = await supabase.from("unidades").insert(valid);
+  if (error) throw error;
+  return valid.length;
+}
+
+export async function bulkInsertTransportadores(rows: { nome: string; cnpj?: string | null }[]) {
+  const valid = rows.filter((r) => r.nome?.trim()).map((r) => ({ nome: r.nome.trim(), cnpj: r.cnpj?.trim() || null }));
+  if (valid.length === 0) return 0;
+  const { error } = await supabase.from("transportadores").insert(valid);
+  if (error) throw error;
+  return valid.length;
+}
+
+export async function bulkInsertDestinadores(rows: { nome: string; cnpj?: string | null }[]) {
+  const valid = rows.filter((r) => r.nome?.trim()).map((r) => ({ nome: r.nome.trim(), cnpj: r.cnpj?.trim() || null }));
+  if (valid.length === 0) return 0;
+  const { error } = await supabase.from("destinadores").insert(valid);
+  if (error) throw error;
+  return valid.length;
+}
+
 export async function deleteUnidade(id: string) {
   const { error } = await supabase.from("unidades").delete().eq("id", id);
   if (error) throw error;
