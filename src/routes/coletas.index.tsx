@@ -228,8 +228,8 @@ function ColetasList() {
                         </td>
                         <td className="p-3 text-right">
                           <div className="flex justify-end gap-1">
-                            <Button asChild size="sm" variant="ghost" title="Editar">
-                              <Link to="/coletas/$id" params={{ id: c.id }}><Pencil className="size-4" /></Link>
+                            <Button asChild size="sm" variant="ghost" title="Visualizar">
+                              <Link to="/coletas/$id" params={{ id: c.id }}><Eye className="size-4" /></Link>
                             </Button>
                             <Button
                               size="sm"
