@@ -35,11 +35,11 @@ function Cadastros() {
       <PageHeader title="Cadastros" description="Gerencie unidades, resíduos, tratamentos, transportadores e destinadores." />
       <Tabs defaultValue="unidades">
         <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="unidades">Unidades</TabsTrigger>
-          <TabsTrigger value="residuos">Tipos de resíduo</TabsTrigger>
-          <TabsTrigger value="tratamentos">Tratamentos</TabsTrigger>
-          <TabsTrigger value="transportadores">Transportadores</TabsTrigger>
-          <TabsTrigger value="destinadores">Destinadores</TabsTrigger>
+          <TabsTrigger value="unidades" className="hover:bg-accent/60 transition-colors">Unidades</TabsTrigger>
+          <TabsTrigger value="residuos" className="hover:bg-accent/60 transition-colors">Tipos de resíduo</TabsTrigger>
+          <TabsTrigger value="tratamentos" className="hover:bg-accent/60 transition-colors">Tratamentos</TabsTrigger>
+          <TabsTrigger value="transportadores" className="hover:bg-accent/60 transition-colors">Transportadores</TabsTrigger>
+          <TabsTrigger value="destinadores" className="hover:bg-accent/60 transition-colors">Destinadores</TabsTrigger>
         </TabsList>
         <TabsContent value="unidades"><UnidadesTab /></TabsContent>
         <TabsContent value="residuos"><ResiduosTab /></TabsContent>
