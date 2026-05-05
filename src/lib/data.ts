@@ -383,7 +383,7 @@ export async function mergeTiposResiduo(manterId: string, removerId: string): Pr
   const { logAction } = await import("@/lib/audit");
   const { data: manter } = await supabase.from("tipos_residuo").select("nome").eq("id", manterId).single();
   const { data: remover } = await supabase.from("tipos_residuo").select("nome").eq("id", removerId).single();
-  const { data: upd } = await supabase.from("coleta_itens").update({ tipo_residuo_id: manterId, tipo_residuo_nome: manter?.nome ?? null }).eq("tipo_residuo_id", removerId).select("id");
+  const { data: upd } = await supabase.from("coleta_itens").update({ tipo_residuo_id: manterId, tipo_residuo_nome: manter?.nome ?? undefined }).eq("tipo_residuo_id", removerId).select("id");
   const n = upd?.length ?? 0;
   // mover vínculos destinador_residuos sem duplicar
   const { data: destManterRows } = await supabase.from("destinador_residuos").select("destinador_id").eq("tipo_residuo_id", manterId);
