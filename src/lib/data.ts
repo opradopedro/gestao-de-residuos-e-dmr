@@ -368,6 +368,53 @@ export async function mergeTransportadores(manterId: string, removerId: string):
   return { coletasAtualizadas: n };
 }
 
+export async function mergeUnidades(manterId: string, removerId: string): Promise<{ coletasAtualizadas: number }> {
+  const { logAction } = await import("@/lib/audit");
+  const { data: manter } = await supabase.from("unidades").select("nome").eq("id", manterId).single();
+  const { data: remover } = await supabase.from("unidades").select("nome").eq("id", removerId).single();
+  const { data: upd } = await supabase.from("coletas").update({ unidade_id: manterId }).eq("unidade_id", removerId).select("id");
+  const n = upd?.length ?? 0;
+  await supabase.from("unidades").delete().eq("id", removerId);
+  await logAction({ tipo: "merge_destinador", descricao: `Merge unidade: "${remover?.nome}" → "${manter?.nome}" (${n} coletas)`, quantidade: n });
+  return { coletasAtualizadas: n };
+}
+
+export async function mergeTiposResiduo(manterId: string, removerId: string): Promise<{ itensAtualizados: number }> {
+  const { logAction } = await import("@/lib/audit");
+  const { data: manter } = await supabase.from("tipos_residuo").select("nome").eq("id", manterId).single();
+  const { data: remover } = await supabase.from("tipos_residuo").select("nome").eq("id", removerId).single();
+  const { data: upd } = await supabase.from("coleta_itens").update({ tipo_residuo_id: manterId, tipo_residuo_nome: manter?.nome ?? null }).eq("tipo_residuo_id", removerId).select("id");
+  const n = upd?.length ?? 0;
+  // mover vínculos destinador_residuos sem duplicar
+  const { data: destManterRows } = await supabase.from("destinador_residuos").select("destinador_id").eq("tipo_residuo_id", manterId);
+  const setDest = new Set((destManterRows ?? []).map((r: any) => r.destinador_id));
+  const { data: destRem } = await supabase.from("destinador_residuos").select("*").eq("tipo_residuo_id", removerId);
+  for (const v of destRem ?? []) {
+    if (!setDest.has((v as any).destinador_id)) {
+      await supabase.from("destinador_residuos").insert({ destinador_id: (v as any).destinador_id, tipo_residuo_id: manterId, tratamento: (v as any).tratamento });
+    }
+  }
+  await supabase.from("destinador_residuos").delete().eq("tipo_residuo_id", removerId);
+  await supabase.from("tipos_residuo").delete().eq("id", removerId);
+  await logAction({ tipo: "merge_residuo" as any, descricao: `Merge resíduo: "${remover?.nome}" → "${manter?.nome}" (${n} itens)`, quantidade: n });
+  return { itensAtualizados: n };
+}
+
+export async function mergeTratamentos(manterId: string, removerId: string): Promise<{ ok: boolean }> {
+  const { logAction } = await import("@/lib/audit");
+  const { data: manter } = await supabase.from("tratamentos").select("nome").eq("id", manterId).single();
+  const { data: remover } = await supabase.from("tratamentos").select("nome").eq("id", removerId).single();
+  // Atualiza nome em coleta_itens.tratamento e tipos_residuo.tratamento_padrao
+  if (remover?.nome && manter?.nome) {
+    await supabase.from("coleta_itens").update({ tratamento: manter.nome }).eq("tratamento", remover.nome);
+    await supabase.from("tipos_residuo").update({ tratamento_padrao: manter.nome }).eq("tratamento_padrao", remover.nome);
+    await supabase.from("destinador_residuos").update({ tratamento: manter.nome }).eq("tratamento", remover.nome);
+  }
+  await supabase.from("tratamentos").delete().eq("id", removerId);
+  await logAction({ tipo: "merge_tratamento" as any, descricao: `Merge tratamento: "${remover?.nome}" → "${manter?.nome}"`, quantidade: 1 });
+  return { ok: true };
+}
+
 export async function getColeta(id: string): Promise<ColetaComItens | null> {
   const { data, error } = await supabase.from("coletas").select("*, itens:coleta_itens(*)").eq("id", id).maybeSingle();
   if (error) throw error;
