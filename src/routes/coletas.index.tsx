@@ -85,8 +85,8 @@ function ColetasList() {
 
   const filtradas = useMemo(() => {
     let arr = coletas;
-    // Filtro de período (sempre aplicado)
-    arr = arr.filter((c) => c.data >= periodo.start && c.data <= periodo.end);
+    // Filtro de período (só quando NÃO está vendo todas as coletas)
+    if (!todasColetas) arr = arr.filter((c) => c.data >= periodo.start && c.data <= periodo.end);
     // Busca livre
     if (busca) {
       const q = busca.toLowerCase();
