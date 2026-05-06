@@ -13,7 +13,7 @@ import {
   type AuditEntry,
   logAction,
 } from "@/lib/audit";
-import { listUnidades, getColeta, deleteColeta, createColeta, type ColetaInput } from "@/lib/data";
+import { listUnidades, getColeta, deleteColeta, createColeta, rollbackMerge, type ColetaInput } from "@/lib/data";
 import { formatDate, formatKgPlain } from "@/lib/format";
 import { toast } from "sonner";
 
@@ -39,10 +39,14 @@ function isSingleColetaEntry(e: AuditEntry): boolean {
   return e.quantidade === 1 && (e.tipo === "coleta_criada" || e.tipo === "coleta_editada" || e.tipo === "coleta_excluida");
 }
 
+function isMergeEntry(e: AuditEntry) {
+  return e.tipo === "merge_destinador" || e.tipo === "merge_transportador" || e.tipo === "merge_unidade" || (e.tipo as any) === "merge_residuo" || (e.tipo as any) === "merge_tratamento";
+}
 function canRollback(e: AuditEntry) {
   if (e.revertido) return false;
   if (e.rollback_disponivel && (e.tipo === "exclusao_em_massa" || e.tipo === "importacao")) return true;
   if (isSingleColetaEntry(e) && e.snapshot) return true;
+  if (isMergeEntry(e) && e.snapshot && e.rollback_disponivel) return true;
   return false;
 }
 
@@ -98,6 +102,12 @@ export function HistoryDialog({
         await markRevertido(entry.id);
         await logAction({ unidade_id: entry.unidade_id, tipo: "rollback", descricao: `Rollback: ${entry.descricao}`, quantidade: 1 });
         return 1;
+      }
+      if (isMergeEntry(entry)) {
+        const n = await rollbackMerge(entry.snapshot);
+        await markRevertido(entry.id);
+        await logAction({ unidade_id: entry.unidade_id, tipo: "rollback", descricao: `Rollback: ${entry.descricao}`, quantidade: n });
+        return n;
       }
       throw new Error("Tipo não suporta rollback");
     },

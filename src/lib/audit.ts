@@ -10,6 +10,9 @@ export type AuditTipo =
   | "importacao"
   | "merge_destinador"
   | "merge_transportador"
+  | "merge_unidade"
+  | "merge_residuo"
+  | "merge_tratamento"
   | "rollback";
 
 export type AuditEntry = {
