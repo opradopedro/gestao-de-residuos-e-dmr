@@ -344,6 +344,19 @@ export async function bulkDeleteColetas(ids: string[], unidade_id: string | null
   return snaps.length;
 }
 
+// ===== Anos com dados =====
+export async function listAnosComColetas(): Promise<number[]> {
+  const { data, error } = await supabase.from("coletas").select("data").order("data", { ascending: false }).limit(5000);
+  if (error) throw error;
+  const anos = new Set<number>();
+  for (const r of data ?? []) {
+    const y = (r as any).data?.slice(0, 4);
+    if (y) anos.add(Number(y));
+  }
+  if (anos.size === 0) anos.add(new Date().getFullYear());
+  return Array.from(anos).sort((a, b) => a - b);
+}
+
 // ===== Merge =====
 export async function mergeDestinadores(manterId: string, removerId: string): Promise<{ coletasAtualizadas: number; vinculosTransferidos: number }> {
   const { logAction } = await import("@/lib/audit");
