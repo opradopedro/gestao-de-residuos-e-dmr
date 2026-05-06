@@ -67,9 +67,9 @@ function ColetasList() {
   const unidadeNomes = useMemo(() => Object.fromEntries(unidades.map((u) => [u.id, u.nome])), [unidades]);
 
   const { data: coletas = [], isLoading } = useQuery({
-    queryKey: todasUnidades ? ["coletas", "all"] : ["coletas", unidade],
-    queryFn: () => (todasUnidades ? listAllColetas() : listColetasByUnidade(unidade!)),
-    enabled: todasUnidades || !!unidade,
+    queryKey: todasColetas ? ["coletas", "all"] : ["coletas", unidade],
+    queryFn: () => (todasColetas ? listAllColetas() : listColetasByUnidade(unidade!)),
+    enabled: todasColetas || !!unidade,
   });
 
   const dups = useMemo(() => findMtrDuplicates(coletas), [coletas]);
@@ -126,7 +126,7 @@ function ColetasList() {
     else { setSortKey(k); setSortDir("asc"); }
   }
 
-  if (!todasUnidades && !unidade) return <NoUnidade />;
+  if (!todasColetas && !unidade) return <NoUnidade />;
 
   const SortHead = ({ k, children, align = "left" }: { k: SortKey; children: React.ReactNode; align?: "left" | "right" }) => (
     <th className={`p-3 font-medium text-${align}`}>
@@ -137,7 +137,7 @@ function ColetasList() {
     </th>
   );
 
-  const colCount = todasUnidades ? 9 : 8;
+  const colCount = todasColetas ? 9 : 8;
 
   return (
     <div className="p-6 max-w-7xl">
@@ -182,7 +182,7 @@ function ColetasList() {
           <Button variant="ghost" size="sm" onClick={() => setFiltroAvancado(null)}>Limpar filtro</Button>
         )}
         <div className="ml-auto flex items-center gap-2 text-sm">
-          <Switch id="todas-un" checked={todasUnidades} onCheckedChange={setTodasUnidades} />
+          <Switch id="todas-un" checked={todasColetas} onCheckedChange={setTodasColetas} />
           <label htmlFor="todas-un" className="cursor-pointer">Ver todas as unidades</label>
         </div>
       </div>
@@ -194,7 +194,7 @@ function ColetasList() {
               <thead className="bg-muted/50 text-muted-foreground">
                 <tr>
                   <SortHead k="data">Data</SortHead>
-                  {todasUnidades && <SortHead k="unidade">Unidade</SortHead>}
+                  {todasColetas && <SortHead k="unidade">Unidade</SortHead>}
                   <SortHead k="residuo">Tipo de resíduo</SortHead>
                   <SortHead k="destinador">Destinador</SortHead>
                   <SortHead k="transportador">Transportador</SortHead>
@@ -222,7 +222,7 @@ function ColetasList() {
                     return (
                       <tr key={c.id} className="border-t border-border hover:bg-muted/30">
                         <td className="p-3">{formatDate(c.data)}</td>
-                        {todasUnidades && <td className="p-3 text-muted-foreground">{unidadeNomes[c.unidade_id] ?? "—"}</td>}
+                        {todasColetas && <td className="p-3 text-muted-foreground">{unidadeNomes[c.unidade_id] ?? "—"}</td>}
                         <td className="p-3">{residuoLabel}</td>
                         <td className="p-3">{c.destinador || <span className="text-muted-foreground">—</span>}</td>
                         <td className="p-3">{c.transportador || <span className="text-muted-foreground">—</span>}</td>
