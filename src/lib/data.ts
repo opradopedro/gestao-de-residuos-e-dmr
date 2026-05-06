@@ -360,17 +360,18 @@ export async function listAnosComColetas(): Promise<number[]> {
 // ===== Merge =====
 export async function mergeDestinadores(manterId: string, removerId: string): Promise<{ coletasAtualizadas: number; vinculosTransferidos: number }> {
   const { logAction } = await import("@/lib/audit");
-  const { data: manter } = await supabase.from("destinadores").select("nome").eq("id", manterId).single();
-  const { data: remover } = await supabase.from("destinadores").select("nome").eq("id", removerId).single();
-  // Transferir coletas
-  const { data: coletasUpd } = await supabase.from("coletas").update({ destinador_id: manterId, destinador: manter?.nome ?? null }).eq("destinador_id", removerId).select("id");
-  const coletasN = coletasUpd?.length ?? 0;
-  // Transferir vínculos resíduo (sem duplicar)
+  const { data: manter } = await supabase.from("destinadores").select("*").eq("id", manterId).single();
+  const { data: remover } = await supabase.from("destinadores").select("*").eq("id", removerId).single();
+  const { data: coletasAfetadas } = await supabase.from("coletas").select("id").eq("destinador_id", removerId);
+  const idsAfetadas = (coletasAfetadas ?? []).map((c: any) => c.id);
+  const { data: vincRemoverFull } = await supabase.from("destinador_residuos").select("*").eq("destinador_id", removerId);
+  if (idsAfetadas.length > 0) {
+    await supabase.from("coletas").update({ destinador_id: manterId, destinador: manter?.nome ?? null }).in("id", idsAfetadas);
+  }
   const { data: vincManter } = await supabase.from("destinador_residuos").select("tipo_residuo_id").eq("destinador_id", manterId);
   const existSet = new Set((vincManter ?? []).map((v: any) => v.tipo_residuo_id));
-  const { data: vincRemover } = await supabase.from("destinador_residuos").select("*").eq("destinador_id", removerId);
   let transferidos = 0;
-  for (const v of vincRemover ?? []) {
+  for (const v of vincRemoverFull ?? []) {
     if (!existSet.has((v as any).tipo_residuo_id)) {
       await supabase.from("destinador_residuos").insert({
         destinador_id: manterId,
@@ -384,45 +385,59 @@ export async function mergeDestinadores(manterId: string, removerId: string): Pr
   await supabase.from("destinadores").delete().eq("id", removerId);
   await logAction({
     tipo: "merge_destinador",
-    descricao: `Merge: "${remover?.nome}" → "${manter?.nome}" (${coletasN} coletas, ${transferidos} vínculos novos)`,
-    quantidade: coletasN,
+    descricao: `Merge: "${remover?.nome}" → "${manter?.nome}" (${idsAfetadas.length} coletas, ${transferidos} vínculos novos)`,
+    quantidade: idsAfetadas.length,
+    snapshot: { kind: "merge_destinador", removido: remover, manterId, vinculos: vincRemoverFull ?? [], coletasAfetadas: idsAfetadas },
+    rollback_disponivel: true,
   });
-  return { coletasAtualizadas: coletasN, vinculosTransferidos: transferidos };
+  return { coletasAtualizadas: idsAfetadas.length, vinculosTransferidos: transferidos };
 }
 
 export async function mergeTransportadores(manterId: string, removerId: string): Promise<{ coletasAtualizadas: number }> {
   const { logAction } = await import("@/lib/audit");
-  const { data: manter } = await supabase.from("transportadores").select("nome").eq("id", manterId).single();
-  const { data: remover } = await supabase.from("transportadores").select("nome").eq("id", removerId).single();
-  const { data: coletasUpd } = await supabase.from("coletas").update({ transportador_id: manterId, transportador: manter?.nome ?? null }).eq("transportador_id", removerId).select("id");
-  const n = coletasUpd?.length ?? 0;
+  const { data: manter } = await supabase.from("transportadores").select("*").eq("id", manterId).single();
+  const { data: remover } = await supabase.from("transportadores").select("*").eq("id", removerId).single();
+  const { data: coletasAfetadas } = await supabase.from("coletas").select("id").eq("transportador_id", removerId);
+  const idsAfetadas = (coletasAfetadas ?? []).map((c: any) => c.id);
+  if (idsAfetadas.length > 0) {
+    await supabase.from("coletas").update({ transportador_id: manterId, transportador: manter?.nome ?? null }).in("id", idsAfetadas);
+  }
   await supabase.from("transportadores").delete().eq("id", removerId);
   await logAction({
     tipo: "merge_transportador",
-    descricao: `Merge: "${remover?.nome}" → "${manter?.nome}" (${n} coletas)`,
-    quantidade: n,
+    descricao: `Merge: "${remover?.nome}" → "${manter?.nome}" (${idsAfetadas.length} coletas)`,
+    quantidade: idsAfetadas.length,
+    snapshot: { kind: "merge_transportador", removido: remover, manterId, coletasAfetadas: idsAfetadas },
+    rollback_disponivel: true,
   });
-  return { coletasAtualizadas: n };
+  return { coletasAtualizadas: idsAfetadas.length };
 }
 
 export async function mergeUnidades(manterId: string, removerId: string): Promise<{ coletasAtualizadas: number }> {
   const { logAction } = await import("@/lib/audit");
-  const { data: manter } = await supabase.from("unidades").select("nome").eq("id", manterId).single();
-  const { data: remover } = await supabase.from("unidades").select("nome").eq("id", removerId).single();
-  const { data: upd } = await supabase.from("coletas").update({ unidade_id: manterId }).eq("unidade_id", removerId).select("id");
-  const n = upd?.length ?? 0;
+  const { data: manter } = await supabase.from("unidades").select("*").eq("id", manterId).single();
+  const { data: remover } = await supabase.from("unidades").select("*").eq("id", removerId).single();
+  const { data: afet } = await supabase.from("coletas").select("id").eq("unidade_id", removerId);
+  const ids = (afet ?? []).map((c: any) => c.id);
+  if (ids.length > 0) await supabase.from("coletas").update({ unidade_id: manterId }).in("id", ids);
   await supabase.from("unidades").delete().eq("id", removerId);
-  await logAction({ tipo: "merge_destinador", descricao: `Merge unidade: "${remover?.nome}" → "${manter?.nome}" (${n} coletas)`, quantidade: n });
-  return { coletasAtualizadas: n };
+  await logAction({
+    tipo: "merge_unidade" as any,
+    descricao: `Merge unidade: "${remover?.nome}" → "${manter?.nome}" (${ids.length} coletas)`,
+    quantidade: ids.length,
+    snapshot: { kind: "merge_unidade", removido: remover, coletasAfetadas: ids },
+    rollback_disponivel: true,
+  });
+  return { coletasAtualizadas: ids.length };
 }
 
 export async function mergeTiposResiduo(manterId: string, removerId: string): Promise<{ itensAtualizados: number }> {
   const { logAction } = await import("@/lib/audit");
-  const { data: manter } = await supabase.from("tipos_residuo").select("nome").eq("id", manterId).single();
-  const { data: remover } = await supabase.from("tipos_residuo").select("nome").eq("id", removerId).single();
-  const { data: upd } = await supabase.from("coleta_itens").update({ tipo_residuo_id: manterId, tipo_residuo_nome: manter?.nome ?? undefined }).eq("tipo_residuo_id", removerId).select("id");
-  const n = upd?.length ?? 0;
-  // mover vínculos destinador_residuos sem duplicar
+  const { data: manter } = await supabase.from("tipos_residuo").select("*").eq("id", manterId).single();
+  const { data: remover } = await supabase.from("tipos_residuo").select("*").eq("id", removerId).single();
+  const { data: afet } = await supabase.from("coleta_itens").select("id").eq("tipo_residuo_id", removerId);
+  const ids = (afet ?? []).map((c: any) => c.id);
+  if (ids.length > 0) await supabase.from("coleta_itens").update({ tipo_residuo_id: manterId, tipo_residuo_nome: manter?.nome ?? undefined }).in("id", ids);
   const { data: destManterRows } = await supabase.from("destinador_residuos").select("destinador_id").eq("tipo_residuo_id", manterId);
   const setDest = new Set((destManterRows ?? []).map((r: any) => r.destinador_id));
   const { data: destRem } = await supabase.from("destinador_residuos").select("*").eq("tipo_residuo_id", removerId);
@@ -433,23 +448,96 @@ export async function mergeTiposResiduo(manterId: string, removerId: string): Pr
   }
   await supabase.from("destinador_residuos").delete().eq("tipo_residuo_id", removerId);
   await supabase.from("tipos_residuo").delete().eq("id", removerId);
-  await logAction({ tipo: "merge_residuo" as any, descricao: `Merge resíduo: "${remover?.nome}" → "${manter?.nome}" (${n} itens)`, quantidade: n });
-  return { itensAtualizados: n };
+  await logAction({
+    tipo: "merge_residuo" as any,
+    descricao: `Merge resíduo: "${remover?.nome}" → "${manter?.nome}" (${ids.length} itens)`,
+    quantidade: ids.length,
+    snapshot: { kind: "merge_residuo", removido: remover, vinculos: destRem ?? [], itensAfetados: ids },
+    rollback_disponivel: true,
+  });
+  return { itensAtualizados: ids.length };
 }
 
 export async function mergeTratamentos(manterId: string, removerId: string): Promise<{ ok: boolean }> {
   const { logAction } = await import("@/lib/audit");
-  const { data: manter } = await supabase.from("tratamentos").select("nome").eq("id", manterId).single();
-  const { data: remover } = await supabase.from("tratamentos").select("nome").eq("id", removerId).single();
-  // Atualiza nome em coleta_itens.tratamento e tipos_residuo.tratamento_padrao
+  const { data: manter } = await supabase.from("tratamentos").select("*").eq("id", manterId).single();
+  const { data: remover } = await supabase.from("tratamentos").select("*").eq("id", removerId).single();
+  let itensIds: string[] = [];
+  let tiposIds: string[] = [];
+  let vincIds: string[] = [];
   if (remover?.nome && manter?.nome) {
-    await supabase.from("coleta_itens").update({ tratamento: manter.nome }).eq("tratamento", remover.nome);
-    await supabase.from("tipos_residuo").update({ tratamento_padrao: manter.nome }).eq("tratamento_padrao", remover.nome);
-    await supabase.from("destinador_residuos").update({ tratamento: manter.nome }).eq("tratamento", remover.nome);
+    const { data: i1 } = await supabase.from("coleta_itens").select("id").eq("tratamento", remover.nome);
+    itensIds = (i1 ?? []).map((r: any) => r.id);
+    const { data: i2 } = await supabase.from("tipos_residuo").select("id").eq("tratamento_padrao", remover.nome);
+    tiposIds = (i2 ?? []).map((r: any) => r.id);
+    const { data: i3 } = await supabase.from("destinador_residuos").select("id").eq("tratamento", remover.nome);
+    vincIds = (i3 ?? []).map((r: any) => r.id);
+    if (itensIds.length > 0) await supabase.from("coleta_itens").update({ tratamento: manter.nome }).in("id", itensIds);
+    if (tiposIds.length > 0) await supabase.from("tipos_residuo").update({ tratamento_padrao: manter.nome }).in("id", tiposIds);
+    if (vincIds.length > 0) await supabase.from("destinador_residuos").update({ tratamento: manter.nome }).in("id", vincIds);
   }
   await supabase.from("tratamentos").delete().eq("id", removerId);
-  await logAction({ tipo: "merge_tratamento" as any, descricao: `Merge tratamento: "${remover?.nome}" → "${manter?.nome}"`, quantidade: 1 });
+  await logAction({
+    tipo: "merge_tratamento" as any,
+    descricao: `Merge tratamento: "${remover?.nome}" → "${manter?.nome}"`,
+    quantidade: 1,
+    snapshot: { kind: "merge_tratamento", removido: remover, manterNome: manter?.nome, itensIds, tiposIds, vincIds },
+    rollback_disponivel: true,
+  });
   return { ok: true };
+}
+
+// ===== Rollback de merges =====
+export async function rollbackMerge(snap: any): Promise<number> {
+  if (!snap || typeof snap !== "object") return 0;
+  const k = snap.kind;
+  if (k === "merge_destinador") {
+    const r = snap.removido;
+    await supabase.from("destinadores").insert({ id: r.id, nome: r.nome, cnpj: r.cnpj });
+    for (const v of snap.vinculos ?? []) {
+      await supabase.from("destinador_residuos").insert({ id: v.id, destinador_id: r.id, tipo_residuo_id: v.tipo_residuo_id, tratamento: v.tratamento });
+    }
+    if ((snap.coletasAfetadas ?? []).length > 0) {
+      await supabase.from("coletas").update({ destinador_id: r.id, destinador: r.nome }).in("id", snap.coletasAfetadas);
+    }
+    return (snap.coletasAfetadas ?? []).length;
+  }
+  if (k === "merge_transportador") {
+    const r = snap.removido;
+    await supabase.from("transportadores").insert({ id: r.id, nome: r.nome, cnpj: r.cnpj });
+    if ((snap.coletasAfetadas ?? []).length > 0) {
+      await supabase.from("coletas").update({ transportador_id: r.id, transportador: r.nome }).in("id", snap.coletasAfetadas);
+    }
+    return (snap.coletasAfetadas ?? []).length;
+  }
+  if (k === "merge_unidade") {
+    const r = snap.removido;
+    await supabase.from("unidades").insert({ id: r.id, nome: r.nome });
+    if ((snap.coletasAfetadas ?? []).length > 0) {
+      await supabase.from("coletas").update({ unidade_id: r.id }).in("id", snap.coletasAfetadas);
+    }
+    return (snap.coletasAfetadas ?? []).length;
+  }
+  if (k === "merge_residuo") {
+    const r = snap.removido;
+    await supabase.from("tipos_residuo").insert({ id: r.id, nome: r.nome, codigo: r.codigo, tratamento_padrao: r.tratamento_padrao });
+    for (const v of snap.vinculos ?? []) {
+      await supabase.from("destinador_residuos").insert({ id: v.id, destinador_id: v.destinador_id, tipo_residuo_id: r.id, tratamento: v.tratamento });
+    }
+    if ((snap.itensAfetados ?? []).length > 0) {
+      await supabase.from("coleta_itens").update({ tipo_residuo_id: r.id, tipo_residuo_nome: r.nome }).in("id", snap.itensAfetados);
+    }
+    return (snap.itensAfetados ?? []).length;
+  }
+  if (k === "merge_tratamento") {
+    const r = snap.removido;
+    await supabase.from("tratamentos").insert({ id: r.id, nome: r.nome, codigo: r.codigo });
+    if ((snap.itensIds ?? []).length > 0) await supabase.from("coleta_itens").update({ tratamento: r.nome }).in("id", snap.itensIds);
+    if ((snap.tiposIds ?? []).length > 0) await supabase.from("tipos_residuo").update({ tratamento_padrao: r.nome }).in("id", snap.tiposIds);
+    if ((snap.vincIds ?? []).length > 0) await supabase.from("destinador_residuos").update({ tratamento: r.nome }).in("id", snap.vincIds);
+    return 1;
+  }
+  return 0;
 }
 
 export async function getColeta(id: string): Promise<ColetaComItens | null> {
