@@ -48,7 +48,7 @@ function ColetasList() {
     try { return JSON.parse(sessionStorage.getItem(SS_KEY) || "{}"); } catch { return {}; }
   })();
   const [busca, setBusca] = useState<string>(initial.busca ?? "");
-  const [todasUnidades, setTodasUnidades] = useState<boolean>(initial.todasUnidades ?? false);
+  const [todasColetas, setTodasColetas] = useState<boolean>(initial.todasColetas ?? false);
   const [filtroAvancado, setFiltroAvancado] = useState<FiltroAvancado | null>(initial.filtroAvancado ?? null);
   const [advOpen, setAdvOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
@@ -56,11 +56,12 @@ function ColetasList() {
   const [sortDir, setSortDir] = useState<SortDir>(initial.sortDir ?? "desc");
   const [importOpen, setImportOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [viewId, setViewId] = useState<string | null>(null);
 
   // persist
   useMemo(() => {
-    try { sessionStorage.setItem(SS_KEY, JSON.stringify({ busca, todasUnidades, filtroAvancado, sortKey, sortDir })); } catch {}
-  }, [busca, todasUnidades, filtroAvancado, sortKey, sortDir]);
+    try { sessionStorage.setItem(SS_KEY, JSON.stringify({ busca, todasColetas, filtroAvancado, sortKey, sortDir })); } catch {}
+  }, [busca, todasColetas, filtroAvancado, sortKey, sortDir]);
 
   const { data: unidades = [] } = useQuery({ queryKey: ["unidades"], queryFn: listUnidades });
   const unidadeNomes = useMemo(() => Object.fromEntries(unidades.map((u) => [u.id, u.nome])), [unidades]);
