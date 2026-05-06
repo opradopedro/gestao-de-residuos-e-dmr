@@ -103,6 +103,12 @@ export function HistoryDialog({
         await logAction({ unidade_id: entry.unidade_id, tipo: "rollback", descricao: `Rollback: ${entry.descricao}`, quantidade: 1 });
         return 1;
       }
+      if (isMergeEntry(entry)) {
+        const n = await rollbackMerge(entry.snapshot);
+        await markRevertido(entry.id);
+        await logAction({ unidade_id: entry.unidade_id, tipo: "rollback", descricao: `Rollback: ${entry.descricao}`, quantidade: n });
+        return n;
+      }
       throw new Error("Tipo não suporta rollback");
     },
     onSuccess: (n) => {
