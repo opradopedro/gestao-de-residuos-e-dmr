@@ -39,10 +39,14 @@ function isSingleColetaEntry(e: AuditEntry): boolean {
   return e.quantidade === 1 && (e.tipo === "coleta_criada" || e.tipo === "coleta_editada" || e.tipo === "coleta_excluida");
 }
 
+function isMergeEntry(e: AuditEntry) {
+  return e.tipo === "merge_destinador" || e.tipo === "merge_transportador" || e.tipo === "merge_unidade" || (e.tipo as any) === "merge_residuo" || (e.tipo as any) === "merge_tratamento";
+}
 function canRollback(e: AuditEntry) {
   if (e.revertido) return false;
   if (e.rollback_disponivel && (e.tipo === "exclusao_em_massa" || e.tipo === "importacao")) return true;
   if (isSingleColetaEntry(e) && e.snapshot) return true;
+  if (isMergeEntry(e) && e.snapshot && e.rollback_disponivel) return true;
   return false;
 }
 
