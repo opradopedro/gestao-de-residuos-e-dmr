@@ -184,7 +184,7 @@ function ResiduosTab() {
           ))}
         </div>
         {add && <ResiduoEditDialog tipo={null} onClose={() => setAdd(false)} />}
-        <ResiduoEditDialog tipo={edit} onClose={() => setEdit(null)} />
+        {edit && <ResiduoEditDialog tipo={edit} onClose={() => setEdit(null)} />}
         <MergeDialog open={merge} onOpenChange={setMerge} tipo="residuo" itens={tipos.map((t) => ({ id: t.id, nome: t.nome }))} />
         <EntityImportDialog
           open={imp} onOpenChange={setImp} title="Tipos de resíduo"
@@ -219,11 +219,8 @@ function ResiduoEditDialog({ tipo, onClose }: { tipo: TipoResiduo | null; onClos
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["tipos_residuo"] }); toast.success(isEdit ? "Atualizado" : "Criado"); onClose(); },
     onError: (e: any) => toast.error(e.message),
   });
-  // Render: open when tipo exists OR caller forced (handled by render path)
-  const open = isEdit || (tipo === null && nome === "" && codigo === "" && trat === "" && false); // controlled via outer
-  // To keep open always when called for "add", we need explicit prop; simpler: only render when caller decides.
   return (
-    <Dialog open={tipo !== undefined ? (isEdit ? true : true) : false} onOpenChange={(o) => { void open; if (!o) onClose(); }}>
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader><DialogTitle>{isEdit ? "Editar tipo de resíduo" : "Novo tipo de resíduo"}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
