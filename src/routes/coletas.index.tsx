@@ -21,6 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { ColetaImportWizard } from "@/components/ColetaImportWizard";
 import { BulkDeleteDialog } from "@/components/BulkDeleteDialog";
 import { AdvancedFilterDialog, SavedFiltersDialog } from "@/components/AdvancedFilterDialog";
+import { ColetaViewDialog } from "@/components/ColetaViewDialog";
 import { aplicarFiltro, type FiltroAvancado } from "@/lib/coletas-filtros";
 import {
   Plus, AlertTriangle, FileWarning, Scale, ArrowUp, ArrowDown,
@@ -182,8 +183,8 @@ function ColetasList() {
           <Button variant="ghost" size="sm" onClick={() => setFiltroAvancado(null)}>Limpar filtro</Button>
         )}
         <div className="ml-auto flex items-center gap-2 text-sm">
-          <Switch id="todas-un" checked={todasColetas} onCheckedChange={setTodasColetas} />
-          <label htmlFor="todas-un" className="cursor-pointer">Ver todas as unidades</label>
+          <Switch id="todas-col" checked={todasColetas} onCheckedChange={setTodasColetas} />
+          <label htmlFor="todas-col" className="cursor-pointer">Ver todas as coletas (todos os períodos e unidades)</label>
         </div>
       </div>
 
@@ -238,8 +239,8 @@ function ColetasList() {
                         </td>
                         <td className="p-3 text-right">
                           <div className="flex justify-end gap-1">
-                            <Button asChild size="sm" variant="ghost" title="Visualizar">
-                              <Link to="/coletas/$id" params={{ id: c.id }}><Eye className="size-4" /></Link>
+                            <Button size="sm" variant="ghost" title="Visualizar" onClick={() => setViewId(c.id)}>
+                              <Eye className="size-4" />
                             </Button>
                             <Button
                               size="sm"
@@ -269,6 +270,7 @@ function ColetasList() {
       <BulkDeleteDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen} coletas={coletas} unidadeId={unidade} totalGeral={coletas.length} />
       <AdvancedFilterDialog open={advOpen} onOpenChange={setAdvOpen} filtro={filtroAvancado} onApply={setFiltroAvancado} />
       <SavedFiltersDialog open={savedOpen} onOpenChange={setSavedOpen} onPick={setFiltroAvancado} />
+      <ColetaViewDialog id={viewId} onClose={() => setViewId(null)} />
     </div>
   );
 }

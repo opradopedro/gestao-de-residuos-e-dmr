@@ -1,13 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  listUnidades, createUnidade, updateUnidade, deleteUnidade,
+  listUnidades, createUnidade, updateUnidade, deleteUnidade, bulkInsertUnidades,
   listTiposResiduo, upsertTipoResiduo, deleteTipoResiduo, bulkInsertTiposResiduo,
   listTratamentos, upsertTratamento, deleteTratamento, bulkInsertTratamentos,
-  listTransportadores, createTransportador, updateTransportador, deleteTransportador,
-  listDestinadores, createDestinador, updateDestinador, deleteDestinador,
+  listTransportadores, createTransportador, updateTransportador, deleteTransportador, bulkInsertTransportadores,
+  listDestinadores, createDestinador, updateDestinador, deleteDestinador, bulkInsertDestinadores,
   listDestinadorResiduos, setDestinadorResiduos,
-  mergeDestinadores, mergeTransportadores,
+  mergeDestinadores, mergeTransportadores, mergeUnidades, mergeTiposResiduo, mergeTratamentos,
   type TipoResiduo, type Tratamento, type Transportador, type Destinador, type Unidade,
 } from "@/lib/data";
 import { PageHeader } from "@/components/NoUnidade";
@@ -20,9 +20,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2, Plus, Upload, Pencil, Merge } from "lucide-react";
-import { useRef, useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
-import { parseCsv } from "@/lib/csv";
+import { EntityImportDialog } from "@/components/EntityImportDialog";
 
 export const Route = createFileRoute("/cadastros")({
   head: () => ({ meta: [{ title: "Cadastros — DMR" }] }),
@@ -51,17 +51,27 @@ function Cadastros() {
   );
 }
 
+// ============== Toolbar padronizada ==============
+function Toolbar({ onAdd, onMerge, onImport, mergeDisabled }: {
+  onAdd: () => void; onMerge: () => void; onImport: () => void; mergeDisabled?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+      <Button variant="outline" size="sm" onClick={onImport}><Upload className="size-4 mr-1" /> Importar</Button>
+      <Button variant="outline" size="sm" onClick={onMerge} disabled={mergeDisabled}><Merge className="size-4 mr-1" /> Unificar</Button>
+      <Button size="sm" onClick={onAdd}><Plus className="size-4 mr-1" /> Adicionar</Button>
+    </div>
+  );
+}
+
 // ============ Unidades ============
 function UnidadesTab() {
   const qc = useQueryClient();
   const { data: unidades = [] } = useQuery({ queryKey: ["unidades"], queryFn: listUnidades });
-  const [nome, setNome] = useState("");
   const [edit, setEdit] = useState<Unidade | null>(null);
-  const mutAdd = useMutation({
-    mutationFn: () => createUnidade(nome.trim()),
-    onSuccess: () => { setNome(""); qc.invalidateQueries({ queryKey: ["unidades"] }); toast.success("Unidade criada"); },
-    onError: (e: any) => toast.error(e.message),
-  });
+  const [add, setAdd] = useState(false);
+  const [merge, setMerge] = useState(false);
+  const [imp, setImp] = useState(false);
   const mutDel = useMutation({
     mutationFn: (id: string) => deleteUnidade(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["unidades"] }); toast.success("Unidade removida"); },
@@ -70,29 +80,52 @@ function UnidadesTab() {
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
-        <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (nome.trim()) mutAdd.mutate(); }}>
-          <div className="flex-1">
-            <Label className="text-xs">Nova unidade</Label>
-            <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Hospital Central" />
-          </div>
-          <Button type="submit" className="self-end" disabled={!nome.trim() || mutAdd.isPending}><Plus className="size-4 mr-1" />Adicionar</Button>
-        </form>
+        <Toolbar onAdd={() => setAdd(true)} onMerge={() => setMerge(true)} onImport={() => setImp(true)} mergeDisabled={unidades.length < 2} />
         <div className="divide-y border rounded-md">
           {unidades.length === 0 ? <div className="p-4 text-sm text-muted-foreground">Nenhuma unidade.</div> : unidades.map((u) => (
             <div key={u.id} className="flex items-center justify-between p-3">
               <span>{u.nome}</span>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" onClick={() => setEdit(u)}><Pencil className="size-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => { if (confirm(`Remover ${u.nome}? Todas as coletas dela serão excluídas.`)) mutDel.mutate(u.id); }}>
+                <Button variant="ghost" size="icon" onClick={() => { if (confirm(`Remover ${u.nome}?`)) mutDel.mutate(u.id); }}>
                   <Trash2 className="size-4 text-destructive" />
                 </Button>
               </div>
             </div>
           ))}
         </div>
+        {add && <UnidadeAddDialog onClose={() => setAdd(false)} />}
         <UnidadeEditDialog unidade={edit} onClose={() => setEdit(null)} />
+        <MergeDialog open={merge} onOpenChange={setMerge} tipo="unidade" itens={unidades.map((u) => ({ id: u.id, nome: u.nome }))} />
+        <EntityImportDialog
+          open={imp} onOpenChange={setImp} title="Unidades"
+          fields={[{ key: "nome", label: "Nome", required: true }]}
+          onImport={async (rows) => { await bulkInsertUnidades(rows.map((r) => ({ nome: r.nome }))); qc.invalidateQueries({ queryKey: ["unidades"] }); }}
+        />
       </CardContent>
     </Card>
+  );
+}
+
+function UnidadeAddDialog({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const [nome, setNome] = useState("");
+  const mut = useMutation({
+    mutationFn: () => createUnidade(nome.trim()),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["unidades"] }); toast.success("Unidade criada"); onClose(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>Nova unidade</DialogTitle></DialogHeader>
+        <div><Label className="text-xs">Nome</Label><Input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} /></div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button disabled={!nome.trim() || mut.isPending} onClick={() => mut.mutate()}>Salvar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -119,73 +152,24 @@ function UnidadeEditDialog({ unidade, onClose }: { unidade: Unidade | null; onCl
   );
 }
 
-// ============ CSV uploader ============
-function CsvUploader({ onParsed, hint }: { onParsed: (rows: Record<string, string>[]) => void; hint: string }) {
-  const ref = useRef<HTMLInputElement>(null);
-  return (
-    <div className="rounded-md border bg-muted/30 p-3 flex items-center justify-between gap-3">
-      <div className="text-xs text-muted-foreground">{hint}</div>
-      <div>
-        <input
-          ref={ref} type="file" accept=".csv,text/csv" className="hidden"
-          onChange={async (e) => {
-            const f = e.target.files?.[0]; if (!f) return;
-            const text = await f.text();
-            try {
-              const rows = parseCsv(text);
-              if (rows.length === 0) return toast.error("CSV vazio");
-              onParsed(rows);
-            } catch (err: any) { toast.error("Erro lendo CSV: " + err.message); }
-            if (ref.current) ref.current.value = "";
-          }}
-        />
-        <Button type="button" variant="outline" onClick={() => ref.current?.click()}>
-          <Upload className="size-4 mr-1" /> Importar CSV
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 // ============ Tipos de resíduo ============
 function ResiduosTab() {
   const qc = useQueryClient();
   const { data: tipos = [] } = useQuery({ queryKey: ["tipos_residuo"], queryFn: listTiposResiduo });
-  const [nome, setNome] = useState("");
-  const [codigo, setCodigo] = useState("");
-  const [trat, setTrat] = useState("");
   const [edit, setEdit] = useState<TipoResiduo | null>(null);
-  const mutAdd = useMutation({
-    mutationFn: () => upsertTipoResiduo({ nome: nome.trim(), tratamento_padrao: trat.trim(), codigo: codigo.trim() || null }),
-    onSuccess: () => { setNome(""); setCodigo(""); setTrat(""); qc.invalidateQueries({ queryKey: ["tipos_residuo"] }); toast.success("Adicionado"); },
-    onError: (e: any) => toast.error(e.message),
-  });
+  const [add, setAdd] = useState(false);
+  const [merge, setMerge] = useState(false);
+  const [imp, setImp] = useState(false);
   const mutDel = useMutation({
     mutationFn: (id: string) => deleteTipoResiduo(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["tipos_residuo"] }); },
   });
-  const mutBulk = useMutation({
-    mutationFn: (rows: Record<string, string>[]) =>
-      bulkInsertTiposResiduo(rows.map((r) => ({
-        nome: r.nome ?? r.name ?? "",
-        codigo: r.codigo ?? r.code ?? null,
-        tratamento_padrao: r.tratamento ?? r.tratamento_padrao ?? r.treatment ?? null,
-      }))),
-    onSuccess: (n) => { qc.invalidateQueries({ queryKey: ["tipos_residuo"] }); toast.success(`${n} resíduo(s) importado(s)`); },
-    onError: (e: any) => toast.error(e.message),
-  });
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
-        <form className="grid gap-2 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); if (nome.trim() && trat.trim()) mutAdd.mutate(); }}>
-          <div><Label className="text-xs">Nome do resíduo</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-          <div><Label className="text-xs">Código (opcional)</Label><Input value={codigo} onChange={(e) => setCodigo(e.target.value)} /></div>
-          <div><Label className="text-xs">Tratamento padrão</Label><Input value={trat} onChange={(e) => setTrat(e.target.value)} /></div>
-          <Button type="submit" className="self-end" disabled={!nome.trim() || !trat.trim()}><Plus className="size-4 mr-1" />Adicionar</Button>
-        </form>
-        <CsvUploader hint="CSV com colunas: nome, codigo (opcional), tratamento (opcional)" onParsed={(rows) => mutBulk.mutate(rows)} />
+        <Toolbar onAdd={() => setAdd(true)} onMerge={() => setMerge(true)} onImport={() => setImp(true)} mergeDisabled={tipos.length < 2} />
         <div className="border rounded-md divide-y">
-          {tipos.map((t) => (
+          {tipos.length === 0 ? <div className="p-4 text-sm text-muted-foreground">Nenhum resíduo.</div> : tipos.map((t) => (
             <div key={t.id} className="flex items-center justify-between p-3">
               <div>
                 <span className="font-medium">{t.nome}</span>
@@ -199,7 +183,21 @@ function ResiduosTab() {
             </div>
           ))}
         </div>
-        <ResiduoEditDialog tipo={edit} onClose={() => setEdit(null)} />
+        {add && <ResiduoEditDialog tipo={null} onClose={() => setAdd(false)} />}
+        {edit && <ResiduoEditDialog tipo={edit} onClose={() => setEdit(null)} />}
+        <MergeDialog open={merge} onOpenChange={setMerge} tipo="residuo" itens={tipos.map((t) => ({ id: t.id, nome: t.nome }))} />
+        <EntityImportDialog
+          open={imp} onOpenChange={setImp} title="Tipos de resíduo"
+          fields={[
+            { key: "nome", label: "Nome", required: true },
+            { key: "codigo", label: "Código (IBAMA)" },
+            { key: "tratamento_padrao", label: "Tratamento padrão" },
+          ]}
+          onImport={async (rows) => {
+            await bulkInsertTiposResiduo(rows.map((r) => ({ nome: r.nome, codigo: r.codigo || null, tratamento_padrao: r.tratamento_padrao || null })));
+            qc.invalidateQueries({ queryKey: ["tipos_residuo"] });
+          }}
+        />
       </CardContent>
     </Card>
   );
@@ -207,6 +205,7 @@ function ResiduosTab() {
 
 function ResiduoEditDialog({ tipo, onClose }: { tipo: TipoResiduo | null; onClose: () => void }) {
   const qc = useQueryClient();
+  const isEdit = !!tipo;
   const [nome, setNome] = useState("");
   const [codigo, setCodigo] = useState("");
   const [trat, setTrat] = useState("");
@@ -216,22 +215,22 @@ function ResiduoEditDialog({ tipo, onClose }: { tipo: TipoResiduo | null; onClos
     setTrat(tipo?.tratamento_padrao ?? "");
   }, [tipo]);
   const mut = useMutation({
-    mutationFn: () => upsertTipoResiduo({ id: tipo!.id, nome: nome.trim(), tratamento_padrao: trat.trim(), codigo: codigo.trim() || null }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tipos_residuo"] }); toast.success("Atualizado"); onClose(); },
+    mutationFn: () => upsertTipoResiduo({ id: tipo?.id, nome: nome.trim(), tratamento_padrao: trat.trim() || "Reciclagem", codigo: codigo.trim() || null }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tipos_residuo"] }); toast.success(isEdit ? "Atualizado" : "Criado"); onClose(); },
     onError: (e: any) => toast.error(e.message),
   });
   return (
-    <Dialog open={!!tipo} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-lg">
-        <DialogHeader><DialogTitle>Editar tipo de resíduo</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{isEdit ? "Editar tipo de resíduo" : "Novo tipo de resíduo"}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
           <div><Label className="text-xs">Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
           <div><Label className="text-xs">Código (IBAMA)</Label><Input value={codigo} onChange={(e) => setCodigo(e.target.value)} /></div>
-          <div><Label className="text-xs">Tratamento padrão</Label><Input value={trat} onChange={(e) => setTrat(e.target.value)} /></div>
+          <div><Label className="text-xs">Tratamento padrão</Label><Input value={trat} onChange={(e) => setTrat(e.target.value)} placeholder="Ex.: Reciclagem" /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button disabled={!nome.trim() || !trat.trim() || mut.isPending} onClick={() => mut.mutate()}>Salvar</Button>
+          <Button disabled={!nome.trim() || mut.isPending} onClick={() => mut.mutate()}>Salvar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -242,33 +241,18 @@ function ResiduoEditDialog({ tipo, onClose }: { tipo: TipoResiduo | null; onClos
 function TratamentosTab() {
   const qc = useQueryClient();
   const { data: tratamentos = [] } = useQuery({ queryKey: ["tratamentos"], queryFn: listTratamentos });
-  const [nome, setNome] = useState("");
-  const [codigo, setCodigo] = useState("");
   const [edit, setEdit] = useState<Tratamento | null>(null);
-  const mutAdd = useMutation({
-    mutationFn: () => upsertTratamento({ nome: nome.trim(), codigo: codigo.trim() || null }),
-    onSuccess: () => { setNome(""); setCodigo(""); qc.invalidateQueries({ queryKey: ["tratamentos"] }); toast.success("Adicionado"); },
-    onError: (e: any) => toast.error(e.message),
-  });
+  const [add, setAdd] = useState(false);
+  const [merge, setMerge] = useState(false);
+  const [imp, setImp] = useState(false);
   const mutDel = useMutation({
     mutationFn: (id: string) => deleteTratamento(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["tratamentos"] }); },
   });
-  const mutBulk = useMutation({
-    mutationFn: (rows: Record<string, string>[]) =>
-      bulkInsertTratamentos(rows.map((r) => ({ nome: r.nome ?? r.name ?? "", codigo: r.codigo ?? r.code ?? null }))),
-    onSuccess: (n) => { qc.invalidateQueries({ queryKey: ["tratamentos"] }); toast.success(`${n} tratamento(s) importado(s)`); },
-    onError: (e: any) => toast.error(e.message),
-  });
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
-        <form className="grid gap-2 md:grid-cols-3" onSubmit={(e) => { e.preventDefault(); if (nome.trim()) mutAdd.mutate(); }}>
-          <div><Label className="text-xs">Nome do tratamento</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Reciclagem" /></div>
-          <div><Label className="text-xs">Código (opcional)</Label><Input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Ex.: REC" /></div>
-          <Button type="submit" className="self-end" disabled={!nome.trim()}><Plus className="size-4 mr-1" />Adicionar</Button>
-        </form>
-        <CsvUploader hint="CSV com colunas: nome, codigo (opcional)" onParsed={(rows) => mutBulk.mutate(rows)} />
+        <Toolbar onAdd={() => setAdd(true)} onMerge={() => setMerge(true)} onImport={() => setImp(true)} mergeDisabled={tratamentos.length < 2} />
         <div className="border rounded-md divide-y">
           {tratamentos.length === 0 ? <div className="p-4 text-sm text-muted-foreground">Nenhum tratamento.</div> : tratamentos.map((t) => (
             <div key={t.id} className="flex items-center justify-between p-3">
@@ -283,7 +267,14 @@ function TratamentosTab() {
             </div>
           ))}
         </div>
-        <TratamentoEditDialog tratamento={edit} onClose={() => setEdit(null)} />
+        {add && <TratamentoEditDialog tratamento={null} onClose={() => setAdd(false)} />}
+        {edit && <TratamentoEditDialog tratamento={edit} onClose={() => setEdit(null)} />}
+        <MergeDialog open={merge} onOpenChange={setMerge} tipo="tratamento" itens={tratamentos.map((t) => ({ id: t.id, nome: t.nome }))} />
+        <EntityImportDialog
+          open={imp} onOpenChange={setImp} title="Tratamentos"
+          fields={[{ key: "nome", label: "Nome", required: true }, { key: "codigo", label: "Código" }]}
+          onImport={async (rows) => { await bulkInsertTratamentos(rows.map((r) => ({ nome: r.nome, codigo: r.codigo || null }))); qc.invalidateQueries({ queryKey: ["tratamentos"] }); }}
+        />
       </CardContent>
     </Card>
   );
@@ -291,20 +282,19 @@ function TratamentosTab() {
 
 function TratamentoEditDialog({ tratamento, onClose }: { tratamento: Tratamento | null; onClose: () => void }) {
   const qc = useQueryClient();
-  const [nome, setNome] = useState("");
-  const [codigo, setCodigo] = useState("");
-  useEffect(() => { setNome(tratamento?.nome ?? ""); setCodigo(tratamento?.codigo ?? ""); }, [tratamento]);
+  const [nome, setNome] = useState(tratamento?.nome ?? "");
+  const [codigo, setCodigo] = useState(tratamento?.codigo ?? "");
   const mut = useMutation({
-    mutationFn: () => upsertTratamento({ id: tratamento!.id, nome: nome.trim(), codigo: codigo.trim() || null }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tratamentos"] }); toast.success("Atualizado"); onClose(); },
+    mutationFn: () => upsertTratamento({ id: tratamento?.id, nome: nome.trim(), codigo: codigo.trim() || null }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tratamentos"] }); toast.success("Salvo"); onClose(); },
     onError: (e: any) => toast.error(e.message),
   });
   return (
-    <Dialog open={!!tratamento} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Editar tratamento</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{tratamento ? "Editar tratamento" : "Novo tratamento"}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
-          <div><Label className="text-xs">Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
+          <div><Label className="text-xs">Nome</Label><Input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} /></div>
           <div><Label className="text-xs">Código</Label><Input value={codigo} onChange={(e) => setCodigo(e.target.value)} /></div>
         </div>
         <DialogFooter>
@@ -320,15 +310,10 @@ function TratamentoEditDialog({ tratamento, onClose }: { tratamento: Tratamento 
 function TransportadoresTab() {
   const qc = useQueryClient();
   const { data: lista = [] } = useQuery({ queryKey: ["transportadores"], queryFn: listTransportadores });
-  const [nome, setNome] = useState("");
-  const [cnpj, setCnpj] = useState("");
   const [edit, setEdit] = useState<Transportador | null>(null);
-  const [mergeOpen, setMergeOpen] = useState(false);
-  const mutAdd = useMutation({
-    mutationFn: () => createTransportador({ nome: nome.trim(), cnpj: cnpj.trim() || null }),
-    onSuccess: () => { setNome(""); setCnpj(""); qc.invalidateQueries({ queryKey: ["transportadores"] }); toast.success("Adicionado"); },
-    onError: (e: any) => toast.error(e.message),
-  });
+  const [add, setAdd] = useState(false);
+  const [merge, setMerge] = useState(false);
+  const [imp, setImp] = useState(false);
   const mutDel = useMutation({
     mutationFn: (id: string) => deleteTransportador(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["transportadores"] }); },
@@ -337,16 +322,7 @@ function TransportadoresTab() {
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
-        <div className="flex justify-end">
-          <Button variant="outline" size="sm" onClick={() => setMergeOpen(true)} disabled={lista.length < 2}>
-            <Merge className="size-4 mr-1" /> Unificar duplicados
-          </Button>
-        </div>
-        <form className="grid gap-2 md:grid-cols-3" onSubmit={(e) => { e.preventDefault(); if (nome.trim()) mutAdd.mutate(); }}>
-          <div><Label className="text-xs">Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-          <div><Label className="text-xs">CNPJ (opcional)</Label><Input value={cnpj} onChange={(e) => setCnpj(e.target.value)} /></div>
-          <Button type="submit" className="self-end" disabled={!nome.trim()}><Plus className="size-4 mr-1" />Adicionar</Button>
-        </form>
+        <Toolbar onAdd={() => setAdd(true)} onMerge={() => setMerge(true)} onImport={() => setImp(true)} mergeDisabled={lista.length < 2} />
         <div className="border rounded-md divide-y">
           {lista.length === 0 ? <div className="p-4 text-sm text-muted-foreground">Nenhum transportador.</div> : lista.map((t) => (
             <div key={t.id} className="flex items-center justify-between p-3">
@@ -361,33 +337,36 @@ function TransportadoresTab() {
             </div>
           ))}
         </div>
-        <TransportadorEditDialog transportador={edit} onClose={() => setEdit(null)} />
-        <MergeDialog
-          open={mergeOpen} onOpenChange={setMergeOpen}
-          tipo="transportador"
-          itens={lista.map((t) => ({ id: t.id, nome: t.nome }))}
+        {add && <TransportadorDialog mode="create" onClose={() => setAdd(false)} />}
+        {edit && <TransportadorDialog mode="edit" transportador={edit} onClose={() => setEdit(null)} />}
+        <MergeDialog open={merge} onOpenChange={setMerge} tipo="transportador" itens={lista.map((t) => ({ id: t.id, nome: t.nome }))} />
+        <EntityImportDialog
+          open={imp} onOpenChange={setImp} title="Transportadores"
+          fields={[{ key: "nome", label: "Nome", required: true }, { key: "cnpj", label: "CNPJ" }]}
+          onImport={async (rows) => { await bulkInsertTransportadores(rows.map((r) => ({ nome: r.nome, cnpj: r.cnpj || null }))); qc.invalidateQueries({ queryKey: ["transportadores"] }); }}
         />
       </CardContent>
     </Card>
   );
 }
 
-function TransportadorEditDialog({ transportador, onClose }: { transportador: Transportador | null; onClose: () => void }) {
+function TransportadorDialog({ mode, transportador, onClose }: { mode: "create" | "edit"; transportador?: Transportador; onClose: () => void }) {
   const qc = useQueryClient();
-  const [nome, setNome] = useState("");
-  const [cnpj, setCnpj] = useState("");
-  useEffect(() => { setNome(transportador?.nome ?? ""); setCnpj(transportador?.cnpj ?? ""); }, [transportador]);
+  const [nome, setNome] = useState(transportador?.nome ?? "");
+  const [cnpj, setCnpj] = useState(transportador?.cnpj ?? "");
   const mut = useMutation({
-    mutationFn: () => updateTransportador(transportador!.id, { nome: nome.trim(), cnpj: cnpj.trim() || null }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["transportadores"] }); toast.success("Atualizado"); onClose(); },
+    mutationFn: () => mode === "create"
+      ? createTransportador({ nome: nome.trim(), cnpj: cnpj.trim() || null })
+      : updateTransportador(transportador!.id, { nome: nome.trim(), cnpj: cnpj.trim() || null }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["transportadores"] }); toast.success("Salvo"); onClose(); },
     onError: (e: any) => toast.error(e.message),
   });
   return (
-    <Dialog open={!!transportador} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Editar transportador</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{mode === "create" ? "Novo transportador" : "Editar transportador"}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
-          <div><Label className="text-xs">Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
+          <div><Label className="text-xs">Nome</Label><Input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} /></div>
           <div><Label className="text-xs">CNPJ</Label><Input value={cnpj} onChange={(e) => setCnpj(e.target.value)} /></div>
         </div>
         <DialogFooter>
@@ -405,7 +384,8 @@ function DestinadoresTab() {
   const { data: lista = [] } = useQuery({ queryKey: ["destinadores"], queryFn: listDestinadores });
   const [add, setAdd] = useState(false);
   const [edit, setEdit] = useState<Destinador | null>(null);
-  const [mergeOpen, setMergeOpen] = useState(false);
+  const [merge, setMerge] = useState(false);
+  const [imp, setImp] = useState(false);
   const mutDel = useMutation({
     mutationFn: (id: string) => deleteDestinador(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["destinadores"] }); toast.success("Removido"); },
@@ -414,12 +394,7 @@ function DestinadoresTab() {
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={() => setMergeOpen(true)} disabled={lista.length < 2}>
-            <Merge className="size-4 mr-1" /> Unificar duplicados
-          </Button>
-          <Button onClick={() => setAdd(true)}><Plus className="size-4 mr-1" />Adicionar destinador</Button>
-        </div>
+        <Toolbar onAdd={() => setAdd(true)} onMerge={() => setMerge(true)} onImport={() => setImp(true)} mergeDisabled={lista.length < 2} />
         <div className="border rounded-md divide-y">
           {lista.length === 0 ? <div className="p-4 text-sm text-muted-foreground">Nenhum destinador.</div> : lista.map((d) => (
             <div key={d.id} className="flex items-center justify-between p-3">
@@ -436,33 +411,38 @@ function DestinadoresTab() {
         </div>
         {add && <DestinadorFullDialog mode="create" onClose={() => setAdd(false)} />}
         {edit && <DestinadorFullDialog mode="edit" destinador={edit} onClose={() => setEdit(null)} />}
-        <MergeDialog
-          open={mergeOpen} onOpenChange={setMergeOpen}
-          tipo="destinador"
-          itens={lista.map((d) => ({ id: d.id, nome: d.nome }))}
+        <MergeDialog open={merge} onOpenChange={setMerge} tipo="destinador" itens={lista.map((d) => ({ id: d.id, nome: d.nome }))} />
+        <EntityImportDialog
+          open={imp} onOpenChange={setImp} title="Destinadores"
+          fields={[{ key: "nome", label: "Nome", required: true }, { key: "cnpj", label: "CNPJ" }]}
+          onImport={async (rows) => { await bulkInsertDestinadores(rows.map((r) => ({ nome: r.nome, cnpj: r.cnpj || null }))); qc.invalidateQueries({ queryKey: ["destinadores"] }); }}
         />
       </CardContent>
     </Card>
   );
 }
 
-// ============ Merge dialog (transportador / destinador) ============
+// ============ Merge dialog (genérico) ============
 function MergeDialog({ open, onOpenChange, tipo, itens }: {
   open: boolean; onOpenChange: (v: boolean) => void;
-  tipo: "destinador" | "transportador";
+  tipo: "destinador" | "transportador" | "unidade" | "residuo" | "tratamento";
   itens: { id: string; nome: string }[];
 }) {
   const qc = useQueryClient();
   const [manterId, setManterId] = useState("");
   const [removerId, setRemoverId] = useState("");
   useEffect(() => { if (!open) { setManterId(""); setRemoverId(""); } }, [open]);
-  const mut = useMutation({
-    mutationFn: () => tipo === "destinador" ? mergeDestinadores(manterId, removerId) : mergeTransportadores(manterId, removerId),
-    onSuccess: (r: any) => {
-      toast.success(`Unificação concluída: ${r.coletasAtualizadas ?? 0} coleta(s) transferida(s)`);
-      qc.invalidateQueries({ queryKey: [tipo === "destinador" ? "destinadores" : "transportadores"] });
-      qc.invalidateQueries({ queryKey: ["coletas"] });
-      qc.invalidateQueries({ queryKey: ["audit_log"] });
+  const mut = useMutation<any, Error, void>({
+    mutationFn: async () => {
+      if (tipo === "destinador") return mergeDestinadores(manterId, removerId);
+      if (tipo === "transportador") return mergeTransportadores(manterId, removerId);
+      if (tipo === "unidade") return mergeUnidades(manterId, removerId);
+      if (tipo === "residuo") return mergeTiposResiduo(manterId, removerId);
+      return mergeTratamentos(manterId, removerId);
+    },
+    onSuccess: () => {
+      toast.success("Unificação concluída (pode ser revertida em Histórico)");
+      qc.invalidateQueries();
       onOpenChange(false);
     },
     onError: (e: any) => toast.error("Erro: " + e.message),
@@ -472,40 +452,30 @@ function MergeDialog({ open, onOpenChange, tipo, itens }: {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Merge className="size-5" /> Unificar {tipo === "destinador" ? "destinadores" : "transportadores"}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Merge className="size-5" /> Unificar duplicados</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div className="text-sm text-muted-foreground">
-            Selecione o registro <strong>correto</strong> (que será mantido) e o registro <strong>duplicado</strong> (será removido). Todas as coletas e vínculos serão transferidos sem duplicar.
+            Selecione o registro <strong>correto</strong> (mantido) e o <strong>duplicado</strong> (removido). Tudo será transferido sem duplicar. Esta ação pode ser revertida no Histórico.
           </div>
           <div>
-            <Label className="text-xs">Manter (correto)</Label>
+            <Label className="text-xs">Manter</Label>
             <Select value={manterId} onValueChange={setManterId}>
               <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
-              <SelectContent>
-                {itens.map((i) => <SelectItem key={i.id} value={i.id}>{i.nome}</SelectItem>)}
-              </SelectContent>
+              <SelectContent>{itens.map((i) => <SelectItem key={i.id} value={i.id}>{i.nome}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div>
-            <Label className="text-xs">Remover (duplicado)</Label>
+            <Label className="text-xs">Remover</Label>
             <Select value={removerId} onValueChange={setRemoverId}>
               <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
-              <SelectContent>
-                {itens.filter((i) => i.id !== manterId).map((i) => <SelectItem key={i.id} value={i.id}>{i.nome}</SelectItem>)}
-              </SelectContent>
+              <SelectContent>{itens.filter((i) => i.id !== manterId).map((i) => <SelectItem key={i.id} value={i.id}>{i.nome}</SelectItem>)}</SelectContent>
             </Select>
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button disabled={!valid || mut.isPending} onClick={() => {
-            const m = itens.find((i) => i.id === manterId)?.nome;
-            const r = itens.find((i) => i.id === removerId)?.nome;
-            if (confirm(`Unificar "${r}" → "${m}"? Esta ação não pode ser desfeita.`)) mut.mutate();
-          }}>
-            {mut.isPending ? "Unificando…" : "Confirmar unificação"}
-          </Button>
+          <Button disabled={!valid || mut.isPending} onClick={() => mut.mutate()}>{mut.isPending ? "Unificando…" : "Confirmar"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -517,7 +487,6 @@ function DestinadorFullDialog({ mode, destinador, onClose }: { mode: "create" | 
   const [nome, setNome] = useState(destinador?.nome ?? "");
   const [cnpj, setCnpj] = useState(destinador?.cnpj ?? "");
   const [busca, setBusca] = useState("");
-  // Map tipo_residuo_id -> { selected, tratamento }
   const [vinculos, setVinculos] = useState<Record<string, { selected: boolean; tratamento: string }>>({});
   const [quickResiduo, setQuickResiduo] = useState<string | null>(null);
   const [ready, setReady] = useState(mode === "create");
@@ -529,7 +498,6 @@ function DestinadorFullDialog({ mode, destinador, onClose }: { mode: "create" | 
     enabled: mode === "edit" && !!destinador,
   });
 
-  // Carregar vínculos só uma vez quando dados chegarem (modo edit), ou inicializar todos não-selecionados (modo create).
   useEffect(() => {
     if (mode === "create") {
       const map: Record<string, { selected: boolean; tratamento: string }> = {};
@@ -547,7 +515,7 @@ function DestinadorFullDialog({ mode, destinador, onClose }: { mode: "create" | 
       setVinculos(map);
       setReady(true);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, tipos.length, loadingVinc, vinculosAtuais.length]);
 
   const filtrados = useMemo(() => {
@@ -600,12 +568,7 @@ function DestinadorFullDialog({ mode, destinador, onClose }: { mode: "create" | 
               <Label className="text-xs">Resíduos aceitos por este destinador</Label>
               <span className="text-xs text-muted-foreground">{totalSelecionados} selecionado(s)</span>
             </div>
-            <Input
-              placeholder="Buscar resíduo..."
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              className="mb-2"
-            />
+            <Input placeholder="Buscar resíduo..." value={busca} onChange={(e) => setBusca(e.target.value)} className="mb-2" />
             <div className="border rounded-md max-h-72 overflow-y-auto divide-y">
               {!ready ? (
                 <div className="p-3 text-sm text-muted-foreground">Carregando...</div>
@@ -636,16 +599,9 @@ function DestinadorFullDialog({ mode, destinador, onClose }: { mode: "create" | 
                     );
                   })}
                   {busca.trim() && !matchExato && (
-                    <button
-                      type="button"
-                      onClick={() => setQuickResiduo(busca.trim())}
-                      className="w-full text-left p-2 text-sm text-primary hover:bg-accent/50"
-                    >
+                    <button type="button" onClick={() => setQuickResiduo(busca.trim())} className="w-full text-left p-2 text-sm text-primary hover:bg-accent/50">
                       <Plus className="size-3.5 inline mr-1" />Adicionar "{busca.trim()}"
                     </button>
-                  )}
-                  {filtrados.length === 0 && !busca.trim() && (
-                    <div className="p-3 text-xs text-muted-foreground">Nenhum resíduo cadastrado.</div>
                   )}
                 </>
               )}
@@ -665,7 +621,6 @@ function DestinadorFullDialog({ mode, destinador, onClose }: { mode: "create" | 
           defaultName={quickResiduo}
           onClose={() => setQuickResiduo(null)}
           onCreated={(t) => {
-            // Insere já selecionado
             setVinculos((p) => ({ ...p, [t.id]: { selected: true, tratamento: t.tratamento_padrao } }));
             setBusca("");
             setQuickResiduo(null);
