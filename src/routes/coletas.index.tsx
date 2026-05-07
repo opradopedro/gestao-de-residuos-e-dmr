@@ -21,6 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { ColetaImportWizard } from "@/components/ColetaImportWizard";
 import { BulkDeleteDialog } from "@/components/BulkDeleteDialog";
 import { AdvancedFilterDialog, SavedFiltersDialog } from "@/components/AdvancedFilterDialog";
+import { ColetaViewDialog } from "@/components/ColetaViewDialog";
 import { aplicarFiltro, type FiltroAvancado } from "@/lib/coletas-filtros";
 import {
   Plus, AlertTriangle, FileWarning, Scale, ArrowUp, ArrowDown,
