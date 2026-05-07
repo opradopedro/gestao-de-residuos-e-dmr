@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Recycle, LayoutDashboard, ClipboardList, AlertTriangle, BarChart3, FileSpreadsheet, Settings, Plus, ShieldAlert, Calendar, History } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { listUnidades, listColetasByUnidade, totalPesoColeta, isPendenciaSemMtr, isPendenciaSemPeso, findMtrDuplicates } from "@/lib/data";
+import { listUnidades, listColetasByUnidade, totalPesoColeta, isPendenciaSemMtr, isPendenciaSemPeso, findMtrDuplicates, listAnosComColetas } from "@/lib/data";
 import { useUnidadeAtiva, setUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo, setPeriodoAtivo } from "@/hooks/use-periodo";
 import { useEffect, useMemo, useState } from "react";
@@ -39,6 +39,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const unidadeAtiva = useUnidadeAtiva();
   const periodo = usePeriodoAtivo();
   const { data: unidades = [] } = useQuery({ queryKey: ["unidades"], queryFn: listUnidades });
+  const { data: anosDisponiveis = [] } = useQuery({ queryKey: ["anos-coletas"], queryFn: listAnosComColetas });
+  const ANOS = useMemo(() => {
+    const y = new Date().getFullYear();
+    const set = new Set<number>(anosDisponiveis);
+    set.add(y);
+    return Array.from(set).sort((a, b) => a - b);
+  }, [anosDisponiveis]);
   const { data: coletas = [] } = useQuery({
     queryKey: ["coletas", unidadeAtiva],
     queryFn: () => listColetasByUnidade(unidadeAtiva!),
