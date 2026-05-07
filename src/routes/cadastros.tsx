@@ -435,8 +435,8 @@ function MergeDialog({ open, onOpenChange, tipo, itens }: {
   const [manterId, setManterId] = useState("");
   const [removerId, setRemoverId] = useState("");
   useEffect(() => { if (!open) { setManterId(""); setRemoverId(""); } }, [open]);
-  const mut = useMutation({
-    mutationFn: () => {
+  const mut = useMutation<any, Error, void>({
+    mutationFn: async () => {
       if (tipo === "destinador") return mergeDestinadores(manterId, removerId);
       if (tipo === "transportador") return mergeTransportadores(manterId, removerId);
       if (tipo === "unidade") return mergeUnidades(manterId, removerId);
