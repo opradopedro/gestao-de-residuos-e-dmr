@@ -22,10 +22,6 @@ const NAV: NavItem[] = [
   { to: "/cadastros", label: "Cadastros", icon: Settings },
 ];
 
-const ANOS = (() => {
-  const y = new Date().getFullYear();
-  return [y - 2, y - 1, y, y + 1];
-})();
 const TRIS: { v: 1 | 2 | 3 | 4; l: string }[] = [
   { v: 1, l: "1º Tri (Jan-Mar)" },
   { v: 2, l: "2º Tri (Abr-Jun)" },
