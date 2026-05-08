@@ -27,6 +27,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Upload, ArrowLeft, ArrowRight, FileSpreadsheet, AlertTriangle, CheckCircle2, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { QuickResiduoDialog } from "@/components/QuickResiduoDialog";
+import { QuickEntityDialog } from "@/components/QuickEntityDialog";
+import { QuickTratamentoDialog } from "@/components/QuickTratamentoDialog";
+
+const ESTIMADO_RX = /est[ií]m[ao]?d?[ao]?s?/i;
+const DMR_MTR_RX = /^\s*d[mr]{2}\s*$|incluir.*dmr/i;
 
 type Step = "file" | "config" | "unidade" | "review" | "conflicts" | "missing" | "final" | "running";
 
@@ -52,9 +58,11 @@ type ParsedRow = {
   destinador: string;
   transportador: string;
   observacoes: string;
+  peso_estimado: boolean;
+  dmr_manual: boolean;
 };
 
-type ConflictAction = "manter" | "substituir" | "ignorar";
+type ConflictAction = "substituir" | "ignorar";
 
 export function ColetaImportWizard({
   open,
@@ -78,6 +86,7 @@ export function ColetaImportWizard({
   const [conflictActions, setConflictActions] = useState<Record<string, ConflictAction>>({});
   const [missingMap, setMissingMap] = useState<Record<string, string>>({}); // key "tipo:nome" -> id ou "__new__"
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [cadastroQueue, setCadastroQueue] = useState<{ cat: "residuo" | "tratamento" | "destinador" | "transportador"; nomes: string[]; index: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: unidades = [] } = useQuery({ queryKey: ["unidades"], queryFn: listUnidades });
@@ -153,20 +162,27 @@ export function ColetaImportWizard({
       const destinador = colMap.destinador ? String(get(colMap.destinador) ?? "").trim() : "";
       const transportador = colMap.transportador ? String(get(colMap.transportador) ?? "").trim() : "";
       const observacoes = colMap.observacoes ? String(get(colMap.observacoes) ?? "").trim() : "";
+      const peso_estimado = ESTIMADO_RX.test(observacoes);
+      const dmr_manual = DMR_MTR_RX.test(mtr);
+      const mtrFinal = dmr_manual ? "" : mtr;
       // skip empty rows
       if (!residuo && !mtr && peso === 0 && !destinador) continue;
-      out.push({ idx: i + 1, data: dataStr, mtr, residuo, peso, tratamento, destinador, transportador, observacoes });
+      out.push({ idx: i + 1, data: dataStr, mtr: mtrFinal, residuo, peso, tratamento, destinador, transportador, observacoes, peso_estimado, dmr_manual });
     }
     return out;
   }, [matrix, startRow, headerRow, colMap]);
 
-  // Group by MTR; if no MTR, by data+destinador
+  // Group: with MTR -> by mtr; dmr_manual or no MTR -> by data+destinador+transportador (still grouped if all three match)
   const grupos = useMemo(() => {
-    const map = new Map<string, { key: string; mtr: string; rows: ParsedRow[] }>();
+    const map = new Map<string, { key: string; mtr: string; dmr_manual: boolean; rows: ParsedRow[] }>();
     for (const r of parsedRows) {
-      const key = r.mtr ? `mtr:${r.mtr}` : `nm:${r.data}|${r.destinador.toLowerCase()}|${r.idx}`;
-      if (!map.has(key)) map.set(key, { key, mtr: r.mtr, rows: [] });
-      map.get(key)!.rows.push(r);
+      const key = r.mtr
+        ? `mtr:${r.mtr}`
+        : `nm:${r.data}|${r.destinador.toLowerCase()}|${r.transportador.toLowerCase()}`;
+      if (!map.has(key)) map.set(key, { key, mtr: r.mtr, dmr_manual: r.dmr_manual, rows: [] });
+      const g = map.get(key)!;
+      g.rows.push(r);
+      if (r.dmr_manual) g.dmr_manual = true;
     }
     return Array.from(map.values());
   }, [parsedRows]);
@@ -174,9 +190,26 @@ export function ColetaImportWizard({
   const conflitos = useMemo(() => {
     const exMap = new Map<string, ColetaComItens>();
     for (const c of coletasUnidade) if (c.mtr) exMap.set(c.mtr, c);
-    return grupos
-      .filter((g) => g.mtr && exMap.has(g.mtr))
-      .map((g) => ({ grupo: g, existente: exMap.get(g.mtr)! }));
+
+    // Sem MTR: detectar duplicata por (data + resíduos + destinador + transportador + tratamento + peso)
+    const noMtrFingerprint = (c: ColetaComItens) => {
+      const its = (c.itens ?? []).map((it) => `${(it.tipo_residuo_nome ?? "").toLowerCase()}|${(it.tratamento ?? "").toLowerCase()}|${Number(it.peso_kg) || 0}`).sort().join("#");
+      return `${c.data}|${(c.destinador ?? "").toLowerCase()}|${(c.transportador ?? "").toLowerCase()}|${its}`;
+    };
+    const exNoMtr = new Map<string, ColetaComItens>();
+    for (const c of coletasUnidade) if (!c.mtr) exNoMtr.set(noMtrFingerprint(c), c);
+
+    const out: { grupo: typeof grupos[number]; existente: ColetaComItens; razao: "mtr" | "fingerprint" }[] = [];
+    for (const g of grupos) {
+      if (g.mtr && exMap.has(g.mtr)) { out.push({ grupo: g, existente: exMap.get(g.mtr)!, razao: "mtr" }); continue; }
+      if (!g.mtr) {
+        const r0 = g.rows[0];
+        const its = g.rows.map((r) => `${r.residuo.toLowerCase()}|${r.tratamento.toLowerCase()}|${r.peso}`).sort().join("#");
+        const fp = `${r0.data}|${r0.destinador.toLowerCase()}|${r0.transportador.toLowerCase()}|${its}`;
+        if (exNoMtr.has(fp)) out.push({ grupo: g, existente: exNoMtr.get(fp)!, razao: "fingerprint" });
+      }
+    }
+    return out;
   }, [grupos, coletasUnidade]);
 
   const missingItems = useMemo(() => {
@@ -252,7 +285,7 @@ export function ColetaImportWizard({
     } else if (step === "review") {
       if (conflitos.length > 0) {
         const init: Record<string, ConflictAction> = {};
-        for (const c of conflitos) if (!conflictActions[c.grupo.key]) init[c.grupo.key] = "manter";
+        for (const c of conflitos) if (!conflictActions[c.grupo.key]) init[c.grupo.key] = "ignorar";
         setConflictActions((prev) => ({ ...init, ...prev }));
         setStep("conflicts");
       } else if (hasMissing()) setStep("missing");
@@ -290,10 +323,12 @@ export function ColetaImportWizard({
       grupos: grupos.map((g) => ({
         key: g.key,
         mtr: g.mtr,
+        dmr_manual: g.dmr_manual,
         rows: g.rows.map((r) => ({
           data: r.data, mtr: r.mtr, residuo: r.residuo, peso: r.peso,
           tratamento: r.tratamento, destinador: r.destinador,
           transportador: r.transportador, observacoes: r.observacoes,
+          peso_estimado: r.peso_estimado, dmr_manual: r.dmr_manual,
         })),
       })),
       conflictActions,
@@ -316,11 +351,10 @@ export function ColetaImportWizard({
   // Final summary numbers
   const finalSummary = useMemo(() => {
     let criadas = 0, atualizadas = 0, ignoradas = 0;
-    const exMap = new Map<string, ColetaComItens>();
-    for (const c of coletasUnidade) if (c.mtr) exMap.set(c.mtr, c);
+    const conflictKeys = new Set(conflitos.map((c) => c.grupo.key));
     for (const g of grupos) {
-      if (g.mtr && exMap.has(g.mtr)) {
-        const a = conflictActions[g.key] ?? "manter";
+      if (conflictKeys.has(g.key)) {
+        const a = conflictActions[g.key] ?? "ignorar";
         if (a === "substituir") atualizadas++;
         else ignoradas++;
       } else {
@@ -328,7 +362,7 @@ export function ColetaImportWizard({
       }
     }
     return { criadas, atualizadas, ignoradas };
-  }, [grupos, coletasUnidade, conflictActions]);
+  }, [grupos, conflitos, conflictActions]);
 
   const stepLabels: Record<Step, string> = {
     file: "1. Arquivo",
@@ -494,7 +528,7 @@ export function ColetaImportWizard({
 
         {step === "conflicts" && (
           <div className="space-y-3">
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
               <Button size="sm" variant="outline" onClick={() => {
                 const m: Record<string, ConflictAction> = {};
                 conflitos.forEach((c) => m[c.grupo.key] = "substituir");
@@ -502,9 +536,14 @@ export function ColetaImportWizard({
               }}>Substituir todos</Button>
               <Button size="sm" variant="outline" onClick={() => {
                 const m: Record<string, ConflictAction> = {};
-                conflitos.forEach((c) => m[c.grupo.key] = "manter");
+                conflitos.forEach((c) => m[c.grupo.key] = "ignorar");
                 setConflictActions((p) => ({ ...p, ...m }));
-              }}>Manter todos</Button>
+              }}>Ignorar todos</Button>
+              <BulkConditionBar conflitos={conflitos} onApply={(action, predicate) => {
+                const m: Record<string, ConflictAction> = {};
+                conflitos.forEach((c) => { if (predicate(c)) m[c.grupo.key] = action; });
+                setConflictActions((p) => ({ ...p, ...m }));
+              }} />
             </div>
             <div className="border rounded max-h-[55vh] overflow-auto">
               <table className="w-full text-xs">
@@ -531,12 +570,11 @@ export function ColetaImportWizard({
                           <div className="text-muted-foreground">{grupo.rows.map((r) => `${r.residuo} (${r.peso}kg)`).join(", ")}</div>
                         </td>
                         <td className="p-2">
-                          <Select value={conflictActions[grupo.key] ?? "manter"} onValueChange={(v) => setConflictActions((p) => ({ ...p, [grupo.key]: v as ConflictAction }))}>
+                          <Select value={conflictActions[grupo.key] ?? "ignorar"} onValueChange={(v) => setConflictActions((p) => ({ ...p, [grupo.key]: v as ConflictAction }))}>
                             <SelectTrigger className="h-8 w-36"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="manter">Manter existente</SelectItem>
                               <SelectItem value="substituir">Substituir</SelectItem>
-                              <SelectItem value="ignorar">Ignorar linha</SelectItem>
+                              <SelectItem value="ignorar">Ignorar</SelectItem>
                             </SelectContent>
                           </Select>
                         </td>
@@ -552,15 +590,48 @@ export function ColetaImportWizard({
         {step === "missing" && (
           <div className="space-y-4 max-h-[65vh] overflow-auto">
             <MissingSection title="Resíduos não cadastrados" cat="residuo" items={missingItems.residuos}
-              options={tipos.map((t) => ({ id: t.id, nome: t.nome }))} value={missingMap} onChange={setMissingMap} />
+              options={tipos.map((t) => ({ id: t.id, nome: t.nome }))} value={missingMap} onChange={setMissingMap}
+              onCadastrar={(cat, nomes) => setCadastroQueue({ cat, nomes, index: 0 })} />
             <MissingSection title="Tratamentos não cadastrados" cat="tratamento" items={missingItems.tratamentos}
-              options={trats.map((t) => ({ id: t.id, nome: t.nome }))} value={missingMap} onChange={setMissingMap} />
+              options={trats.map((t) => ({ id: t.id, nome: t.nome }))} value={missingMap} onChange={setMissingMap}
+              onCadastrar={(cat, nomes) => setCadastroQueue({ cat, nomes, index: 0 })} />
             <MissingSection title="Destinadores não cadastrados" cat="destinador" items={missingItems.destinadores}
-              options={destinadores.map((d) => ({ id: d.id, nome: d.nome }))} value={missingMap} onChange={setMissingMap} />
+              options={destinadores.map((d) => ({ id: d.id, nome: d.nome }))} value={missingMap} onChange={setMissingMap}
+              onCadastrar={(cat, nomes) => setCadastroQueue({ cat, nomes, index: 0 })} />
             <MissingSection title="Transportadores não cadastrados" cat="transportador" items={missingItems.transportadores}
-              options={transportadores.map((t) => ({ id: t.id, nome: t.nome }))} value={missingMap} onChange={setMissingMap} />
+              options={transportadores.map((t) => ({ id: t.id, nome: t.nome }))} value={missingMap} onChange={setMissingMap}
+              onCadastrar={(cat, nomes) => setCadastroQueue({ cat, nomes, index: 0 })} />
           </div>
         )}
+
+        {cadastroQueue && (() => {
+          const { cat, nomes, index } = cadastroQueue;
+          const nomeAtual = nomes[index];
+          const total = nomes.length;
+          const advance = (createdId: string) => {
+            const key = `${cat}:${nomeAtual.toLowerCase()}`;
+            setMissingMap((m) => ({ ...m, [key]: createdId }));
+            qc.invalidateQueries();
+            if (index + 1 < total) setCadastroQueue({ cat, nomes, index: index + 1 });
+            else setCadastroQueue(null);
+          };
+          const close = () => setCadastroQueue(null);
+          const counter = total > 1 ? ` (${index + 1}/${total})` : "";
+          if (cat === "residuo") {
+            return <QuickResiduoDialog open onOpenChange={(o) => { if (!o) close(); }} defaultName={nomeAtual + ""} onCreated={(t) => advance(t.id)} key={`r-${index}`} />;
+          }
+          if (cat === "tratamento") {
+            return <QuickTratamentoDialog open onOpenChange={(o) => { if (!o) close(); }} defaultName={nomeAtual} onCreated={(t) => advance(t.id)} key={`t-${index}`} />;
+          }
+          if (cat === "destinador") {
+            return <QuickEntityDialog kind="destinador" open onOpenChange={(o) => { if (!o) close(); }} defaultName={nomeAtual} onCreated={(d) => advance(d.id)} key={`d-${index}`} />;
+          }
+          return <QuickEntityDialog kind="transportador" open onOpenChange={(o) => { if (!o) close(); }} defaultName={nomeAtual} onCreated={(d) => advance(d.id)} key={`tr-${index}`} />;
+          // counter is informational; shown via dialog title prefix isn't possible without modifying dialogs
+          // (kept simple: badge in MissingSection already shows remaining count)
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          counter;
+        })()}
 
         {step === "final" && (
           <div className="space-y-4">
@@ -615,18 +686,29 @@ function SummaryCard({ label, value, accent }: { label: string; value: number; a
   );
 }
 
-function MissingSection({ title, cat, items, options, value, onChange }: {
+type Cat = "residuo" | "tratamento" | "destinador" | "transportador";
+
+function MissingSection({ title, cat, items, options, value, onChange, onCadastrar }: {
   title: string;
-  cat: "residuo" | "tratamento" | "destinador" | "transportador";
+  cat: Cat;
   items: string[];
   options: { id: string; nome: string }[];
   value: Record<string, string>;
   onChange: (v: Record<string, string>) => void;
+  onCadastrar: (cat: Cat, nomes: string[]) => void;
 }) {
   if (items.length === 0) return null;
+  const novos = items.filter((n) => (value[`${cat}:${n.toLowerCase()}`] ?? "__new__") === "__new__");
   return (
     <div>
-      <div className="text-sm font-medium mb-1">{title} <Badge variant="outline" className="ml-1">{items.length}</Badge></div>
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-sm font-medium">{title} <Badge variant="outline" className="ml-1">{items.length}</Badge></div>
+        {novos.length > 0 && (
+          <Button size="sm" variant="outline" onClick={() => onCadastrar(cat, novos)}>
+            <Plus className="size-3 mr-1" /> Cadastrar agora ({novos.length})
+          </Button>
+        )}
+      </div>
       <div className="border rounded">
         {items.map((nome) => {
           const key = `${cat}:${nome.toLowerCase()}`;
@@ -645,6 +727,74 @@ function MissingSection({ title, cat, items, options, value, onChange }: {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+type BulkField = "data" | "destinador" | "transportador" | "residuo" | "peso";
+type BulkOp = "igual" | "contem" | "comeca" | "maior" | "menor";
+
+function BulkConditionBar({ conflitos, onApply }: {
+  conflitos: Array<{ grupo: { rows: ParsedRow[]; mtr: string; key: string }; existente: ColetaComItens }>;
+  onApply: (action: ConflictAction, predicate: (c: { grupo: { rows: ParsedRow[]; mtr: string; key: string }; existente: ColetaComItens }) => boolean) => void;
+}) {
+  const [action, setAction] = useState<ConflictAction>("substituir");
+  const [field, setField] = useState<BulkField>("destinador");
+  const [op, setOp] = useState<BulkOp>("contem");
+  const [val, setVal] = useState("");
+
+  const get = (c: { grupo: { rows: ParsedRow[] } }): string | number => {
+    const r = c.grupo.rows[0];
+    if (field === "data") return r.data;
+    if (field === "destinador") return r.destinador;
+    if (field === "transportador") return r.transportador;
+    if (field === "residuo") return c.grupo.rows.map((x) => x.residuo).join(" | ");
+    return c.grupo.rows.reduce((a, b) => a + b.peso, 0);
+  };
+  const compare = (raw: string | number): boolean => {
+    const v = String(raw ?? "").toLowerCase();
+    const t = val.toLowerCase();
+    if (op === "igual") return v === t;
+    if (op === "contem") return v.includes(t);
+    if (op === "comeca") return v.startsWith(t);
+    if (op === "maior") return Number(raw) > Number(val);
+    if (op === "menor") return Number(raw) < Number(val);
+    return false;
+  };
+
+  return (
+    <div className="flex flex-wrap gap-1 items-center text-xs border rounded px-2 py-1">
+      <span className="text-muted-foreground">Aplicar</span>
+      <Select value={action} onValueChange={(v) => setAction(v as ConflictAction)}>
+        <SelectTrigger className="h-7 w-28"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="substituir">Substituir</SelectItem>
+          <SelectItem value="ignorar">Ignorar</SelectItem>
+        </SelectContent>
+      </Select>
+      <span className="text-muted-foreground">onde</span>
+      <Select value={field} onValueChange={(v) => setField(v as BulkField)}>
+        <SelectTrigger className="h-7 w-32"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="data">Data</SelectItem>
+          <SelectItem value="destinador">Destinador</SelectItem>
+          <SelectItem value="transportador">Transportador</SelectItem>
+          <SelectItem value="residuo">Resíduo</SelectItem>
+          <SelectItem value="peso">Peso (kg)</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select value={op} onValueChange={(v) => setOp(v as BulkOp)}>
+        <SelectTrigger className="h-7 w-28"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="igual">igual a</SelectItem>
+          <SelectItem value="contem">contém</SelectItem>
+          <SelectItem value="comeca">começa com</SelectItem>
+          <SelectItem value="maior">maior que</SelectItem>
+          <SelectItem value="menor">menor que</SelectItem>
+        </SelectContent>
+      </Select>
+      <Input className="h-7 w-32" value={val} onChange={(e) => setVal(e.target.value)} placeholder="valor" />
+      <Button size="sm" variant="secondary" className="h-7" onClick={() => onApply(action, (c) => compare(get(c)))}>Aplicar</Button>
     </div>
   );
 }

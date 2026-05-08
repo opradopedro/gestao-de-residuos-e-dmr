@@ -125,6 +125,7 @@ export type ImportJobInput = {
   grupos: Array<{
     key: string;
     mtr: string;
+    dmr_manual?: boolean;
     rows: Array<{
       data: string;
       mtr: string;
@@ -134,6 +135,8 @@ export type ImportJobInput = {
       destinador: string;
       transportador: string;
       observacoes: string;
+      peso_estimado?: boolean;
+      dmr_manual?: boolean;
     }>;
   }>;
   conflictActions: Record<string, "manter" | "substituir" | "ignorar">;
@@ -280,8 +283,8 @@ async function runJob(input: ImportJobInput) {
       transportador_id: transObj?.id ?? null,
       destinador_id: destObj?.id ?? null,
       mtr: g.mtr || null,
-      peso_estimado: false,
-      dmr_manual: false,
+      peso_estimado: g.rows.some((r) => r.peso_estimado),
+      dmr_manual: !!g.dmr_manual || g.rows.some((r) => r.dmr_manual),
       observacoes: g.rows.map((r) => r.observacoes).filter(Boolean).join(" | ") || null,
       itens,
     };
