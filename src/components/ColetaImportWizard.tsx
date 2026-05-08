@@ -322,10 +322,12 @@ export function ColetaImportWizard({
       grupos: grupos.map((g) => ({
         key: g.key,
         mtr: g.mtr,
+        dmr_manual: g.dmr_manual,
         rows: g.rows.map((r) => ({
           data: r.data, mtr: r.mtr, residuo: r.residuo, peso: r.peso,
           tratamento: r.tratamento, destinador: r.destinador,
           transportador: r.transportador, observacoes: r.observacoes,
+          peso_estimado: r.peso_estimado, dmr_manual: r.dmr_manual,
         })),
       })),
       conflictActions,
