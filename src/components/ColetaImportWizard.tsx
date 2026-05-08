@@ -348,11 +348,10 @@ export function ColetaImportWizard({
   // Final summary numbers
   const finalSummary = useMemo(() => {
     let criadas = 0, atualizadas = 0, ignoradas = 0;
-    const exMap = new Map<string, ColetaComItens>();
-    for (const c of coletasUnidade) if (c.mtr) exMap.set(c.mtr, c);
+    const conflictKeys = new Set(conflitos.map((c) => c.grupo.key));
     for (const g of grupos) {
-      if (g.mtr && exMap.has(g.mtr)) {
-        const a = conflictActions[g.key] ?? "manter";
+      if (conflictKeys.has(g.key)) {
+        const a = conflictActions[g.key] ?? "ignorar";
         if (a === "substituir") atualizadas++;
         else ignoradas++;
       } else {
@@ -360,7 +359,7 @@ export function ColetaImportWizard({
       }
     }
     return { criadas, atualizadas, ignoradas };
-  }, [grupos, coletasUnidade, conflictActions]);
+  }, [grupos, conflitos, conflictActions]);
 
   const stepLabels: Record<Step, string> = {
     file: "1. Arquivo",
