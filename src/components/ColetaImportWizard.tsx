@@ -27,6 +27,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Upload, ArrowLeft, ArrowRight, FileSpreadsheet, AlertTriangle, CheckCircle2, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { QuickResiduoDialog } from "@/components/QuickResiduoDialog";
+import { QuickEntityDialog } from "@/components/QuickEntityDialog";
+import { QuickTratamentoDialog } from "@/components/QuickTratamentoDialog";
+
+const ESTIMADO_RX = /est[ií]m[ao]?d?[ao]?s?/i;
+const DMR_MTR_RX = /^\s*d[mr]{2}\s*$|incluir.*dmr/i;
 
 type Step = "file" | "config" | "unidade" | "review" | "conflicts" | "missing" | "final" | "running";
 
