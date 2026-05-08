@@ -509,7 +509,7 @@ export function ColetaImportWizard({
 
         {step === "conflicts" && (
           <div className="space-y-3">
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
               <Button size="sm" variant="outline" onClick={() => {
                 const m: Record<string, ConflictAction> = {};
                 conflitos.forEach((c) => m[c.grupo.key] = "substituir");
@@ -517,9 +517,14 @@ export function ColetaImportWizard({
               }}>Substituir todos</Button>
               <Button size="sm" variant="outline" onClick={() => {
                 const m: Record<string, ConflictAction> = {};
-                conflitos.forEach((c) => m[c.grupo.key] = "manter");
+                conflitos.forEach((c) => m[c.grupo.key] = "ignorar");
                 setConflictActions((p) => ({ ...p, ...m }));
-              }}>Manter todos</Button>
+              }}>Ignorar todos</Button>
+              <BulkConditionBar conflitos={conflitos} onApply={(action, predicate) => {
+                const m: Record<string, ConflictAction> = {};
+                conflitos.forEach((c) => { if (predicate(c)) m[c.grupo.key] = action; });
+                setConflictActions((p) => ({ ...p, ...m }));
+              }} />
             </div>
             <div className="border rounded max-h-[55vh] overflow-auto">
               <table className="w-full text-xs">
@@ -546,12 +551,11 @@ export function ColetaImportWizard({
                           <div className="text-muted-foreground">{grupo.rows.map((r) => `${r.residuo} (${r.peso}kg)`).join(", ")}</div>
                         </td>
                         <td className="p-2">
-                          <Select value={conflictActions[grupo.key] ?? "manter"} onValueChange={(v) => setConflictActions((p) => ({ ...p, [grupo.key]: v as ConflictAction }))}>
+                          <Select value={conflictActions[grupo.key] ?? "ignorar"} onValueChange={(v) => setConflictActions((p) => ({ ...p, [grupo.key]: v as ConflictAction }))}>
                             <SelectTrigger className="h-8 w-36"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="manter">Manter existente</SelectItem>
                               <SelectItem value="substituir">Substituir</SelectItem>
-                              <SelectItem value="ignorar">Ignorar linha</SelectItem>
+                              <SelectItem value="ignorar">Ignorar</SelectItem>
                             </SelectContent>
                           </Select>
                         </td>
