@@ -283,8 +283,8 @@ async function runJob(input: ImportJobInput) {
       transportador_id: transObj?.id ?? null,
       destinador_id: destObj?.id ?? null,
       mtr: g.mtr || null,
-      peso_estimado: false,
-      dmr_manual: false,
+      peso_estimado: g.rows.some((r) => r.peso_estimado),
+      dmr_manual: !!g.dmr_manual || g.rows.some((r) => r.dmr_manual),
       observacoes: g.rows.map((r) => r.observacoes).filter(Boolean).join(" | ") || null,
       itens,
     };
