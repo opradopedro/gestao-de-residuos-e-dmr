@@ -191,6 +191,10 @@ export async function listDestinadores(): Promise<Destinador[]> {
   return (data ?? []) as any;
 }
 export async function createDestinador(input: { nome: string; cnpj?: string | null }): Promise<Destinador> {
+  if (input.cnpj) {
+    const dup = await findDestinadorByCnpj(input.cnpj);
+    if (dup) { const e: any = new Error(`CNPJ já cadastrado para "${dup.nome}"`); e.code = "DUP_CNPJ"; e.existing = dup; throw e; }
+  }
   const { data, error } = await supabase.from("destinadores").insert({ nome: input.nome, cnpj: input.cnpj ?? null }).select().single();
   if (error) throw error;
   return data as any;
