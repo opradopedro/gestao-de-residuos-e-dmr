@@ -652,18 +652,29 @@ function SummaryCard({ label, value, accent }: { label: string; value: number; a
   );
 }
 
-function MissingSection({ title, cat, items, options, value, onChange }: {
+type Cat = "residuo" | "tratamento" | "destinador" | "transportador";
+
+function MissingSection({ title, cat, items, options, value, onChange, onCadastrar }: {
   title: string;
-  cat: "residuo" | "tratamento" | "destinador" | "transportador";
+  cat: Cat;
   items: string[];
   options: { id: string; nome: string }[];
   value: Record<string, string>;
   onChange: (v: Record<string, string>) => void;
+  onCadastrar: (cat: Cat, nomes: string[]) => void;
 }) {
   if (items.length === 0) return null;
+  const novos = items.filter((n) => (value[`${cat}:${n.toLowerCase()}`] ?? "__new__") === "__new__");
   return (
     <div>
-      <div className="text-sm font-medium mb-1">{title} <Badge variant="outline" className="ml-1">{items.length}</Badge></div>
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-sm font-medium">{title} <Badge variant="outline" className="ml-1">{items.length}</Badge></div>
+        {novos.length > 0 && (
+          <Button size="sm" variant="outline" onClick={() => onCadastrar(cat, novos)}>
+            <Plus className="size-3 mr-1" /> Cadastrar agora ({novos.length})
+          </Button>
+        )}
+      </div>
       <div className="border rounded">
         {items.map((nome) => {
           const key = `${cat}:${nome.toLowerCase()}`;
@@ -682,6 +693,74 @@ function MissingSection({ title, cat, items, options, value, onChange }: {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+type BulkField = "data" | "destinador" | "transportador" | "residuo" | "peso";
+type BulkOp = "igual" | "contem" | "comeca" | "maior" | "menor";
+
+function BulkConditionBar({ conflitos, onApply }: {
+  conflitos: Array<{ grupo: { rows: ParsedRow[]; mtr: string; key: string }; existente: ColetaComItens }>;
+  onApply: (action: ConflictAction, predicate: (c: { grupo: { rows: ParsedRow[]; mtr: string; key: string }; existente: ColetaComItens }) => boolean) => void;
+}) {
+  const [action, setAction] = useState<ConflictAction>("substituir");
+  const [field, setField] = useState<BulkField>("destinador");
+  const [op, setOp] = useState<BulkOp>("contem");
+  const [val, setVal] = useState("");
+
+  const get = (c: { grupo: { rows: ParsedRow[] } }): string | number => {
+    const r = c.grupo.rows[0];
+    if (field === "data") return r.data;
+    if (field === "destinador") return r.destinador;
+    if (field === "transportador") return r.transportador;
+    if (field === "residuo") return c.grupo.rows.map((x) => x.residuo).join(" | ");
+    return c.grupo.rows.reduce((a, b) => a + b.peso, 0);
+  };
+  const compare = (raw: string | number): boolean => {
+    const v = String(raw ?? "").toLowerCase();
+    const t = val.toLowerCase();
+    if (op === "igual") return v === t;
+    if (op === "contem") return v.includes(t);
+    if (op === "comeca") return v.startsWith(t);
+    if (op === "maior") return Number(raw) > Number(val);
+    if (op === "menor") return Number(raw) < Number(val);
+    return false;
+  };
+
+  return (
+    <div className="flex flex-wrap gap-1 items-center text-xs border rounded px-2 py-1">
+      <span className="text-muted-foreground">Aplicar</span>
+      <Select value={action} onValueChange={(v) => setAction(v as ConflictAction)}>
+        <SelectTrigger className="h-7 w-28"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="substituir">Substituir</SelectItem>
+          <SelectItem value="ignorar">Ignorar</SelectItem>
+        </SelectContent>
+      </Select>
+      <span className="text-muted-foreground">onde</span>
+      <Select value={field} onValueChange={(v) => setField(v as BulkField)}>
+        <SelectTrigger className="h-7 w-32"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="data">Data</SelectItem>
+          <SelectItem value="destinador">Destinador</SelectItem>
+          <SelectItem value="transportador">Transportador</SelectItem>
+          <SelectItem value="residuo">Resíduo</SelectItem>
+          <SelectItem value="peso">Peso (kg)</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select value={op} onValueChange={(v) => setOp(v as BulkOp)}>
+        <SelectTrigger className="h-7 w-28"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="igual">igual a</SelectItem>
+          <SelectItem value="contem">contém</SelectItem>
+          <SelectItem value="comeca">começa com</SelectItem>
+          <SelectItem value="maior">maior que</SelectItem>
+          <SelectItem value="menor">menor que</SelectItem>
+        </SelectContent>
+      </Select>
+      <Input className="h-7 w-32" value={val} onChange={(e) => setVal(e.target.value)} placeholder="valor" />
+      <Button size="sm" variant="secondary" className="h-7" onClick={() => onApply(action, (c) => compare(get(c)))}>Aplicar</Button>
     </div>
   );
 }
