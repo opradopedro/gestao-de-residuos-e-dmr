@@ -86,6 +86,7 @@ export function ColetaImportWizard({
   const [conflictActions, setConflictActions] = useState<Record<string, ConflictAction>>({});
   const [missingMap, setMissingMap] = useState<Record<string, string>>({}); // key "tipo:nome" -> id ou "__new__"
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [cadastroQueue, setCadastroQueue] = useState<{ cat: "residuo" | "tratamento" | "destinador" | "transportador"; nomes: string[]; index: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: unidades = [] } = useQuery({ queryKey: ["unidades"], queryFn: listUnidades });
