@@ -189,9 +189,26 @@ export function ColetaImportWizard({
   const conflitos = useMemo(() => {
     const exMap = new Map<string, ColetaComItens>();
     for (const c of coletasUnidade) if (c.mtr) exMap.set(c.mtr, c);
-    return grupos
-      .filter((g) => g.mtr && exMap.has(g.mtr))
-      .map((g) => ({ grupo: g, existente: exMap.get(g.mtr)! }));
+
+    // Sem MTR: detectar duplicata por (data + resíduos + destinador + transportador + tratamento + peso)
+    const noMtrFingerprint = (c: ColetaComItens) => {
+      const its = (c.itens ?? []).map((it) => `${(it.tipo_residuo_nome ?? "").toLowerCase()}|${(it.tratamento ?? "").toLowerCase()}|${Number(it.peso_kg) || 0}`).sort().join("#");
+      return `${c.data}|${(c.destinador ?? "").toLowerCase()}|${(c.transportador ?? "").toLowerCase()}|${its}`;
+    };
+    const exNoMtr = new Map<string, ColetaComItens>();
+    for (const c of coletasUnidade) if (!c.mtr) exNoMtr.set(noMtrFingerprint(c), c);
+
+    const out: { grupo: typeof grupos[number]; existente: ColetaComItens; razao: "mtr" | "fingerprint" }[] = [];
+    for (const g of grupos) {
+      if (g.mtr && exMap.has(g.mtr)) { out.push({ grupo: g, existente: exMap.get(g.mtr)!, razao: "mtr" }); continue; }
+      if (!g.mtr) {
+        const r0 = g.rows[0];
+        const its = g.rows.map((r) => `${r.residuo.toLowerCase()}|${r.tratamento.toLowerCase()}|${r.peso}`).sort().join("#");
+        const fp = `${r0.data}|${r0.destinador.toLowerCase()}|${r0.transportador.toLowerCase()}|${its}`;
+        if (exNoMtr.has(fp)) out.push({ grupo: g, existente: exNoMtr.get(fp)!, razao: "fingerprint" });
+      }
+    }
+    return out;
   }, [grupos, coletasUnidade]);
 
   const missingItems = useMemo(() => {
