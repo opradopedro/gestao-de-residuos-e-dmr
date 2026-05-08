@@ -161,20 +161,27 @@ export function ColetaImportWizard({
       const destinador = colMap.destinador ? String(get(colMap.destinador) ?? "").trim() : "";
       const transportador = colMap.transportador ? String(get(colMap.transportador) ?? "").trim() : "";
       const observacoes = colMap.observacoes ? String(get(colMap.observacoes) ?? "").trim() : "";
+      const peso_estimado = ESTIMADO_RX.test(observacoes);
+      const dmr_manual = DMR_MTR_RX.test(mtr);
+      const mtrFinal = dmr_manual ? "" : mtr;
       // skip empty rows
       if (!residuo && !mtr && peso === 0 && !destinador) continue;
-      out.push({ idx: i + 1, data: dataStr, mtr, residuo, peso, tratamento, destinador, transportador, observacoes });
+      out.push({ idx: i + 1, data: dataStr, mtr: mtrFinal, residuo, peso, tratamento, destinador, transportador, observacoes, peso_estimado, dmr_manual });
     }
     return out;
   }, [matrix, startRow, headerRow, colMap]);
 
-  // Group by MTR; if no MTR, by data+destinador
+  // Group: with MTR -> by mtr; dmr_manual or no MTR -> by data+destinador+transportador (still grouped if all three match)
   const grupos = useMemo(() => {
-    const map = new Map<string, { key: string; mtr: string; rows: ParsedRow[] }>();
+    const map = new Map<string, { key: string; mtr: string; dmr_manual: boolean; rows: ParsedRow[] }>();
     for (const r of parsedRows) {
-      const key = r.mtr ? `mtr:${r.mtr}` : `nm:${r.data}|${r.destinador.toLowerCase()}|${r.idx}`;
-      if (!map.has(key)) map.set(key, { key, mtr: r.mtr, rows: [] });
-      map.get(key)!.rows.push(r);
+      const key = r.mtr
+        ? `mtr:${r.mtr}`
+        : `nm:${r.data}|${r.destinador.toLowerCase()}|${r.transportador.toLowerCase()}`;
+      if (!map.has(key)) map.set(key, { key, mtr: r.mtr, dmr_manual: r.dmr_manual, rows: [] });
+      const g = map.get(key)!;
+      g.rows.push(r);
+      if (r.dmr_manual) g.dmr_manual = true;
     }
     return Array.from(map.values());
   }, [parsedRows]);
