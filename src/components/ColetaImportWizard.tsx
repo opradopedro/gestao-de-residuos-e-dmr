@@ -58,9 +58,11 @@ type ParsedRow = {
   destinador: string;
   transportador: string;
   observacoes: string;
+  peso_estimado: boolean;
+  dmr_manual: boolean;
 };
 
-type ConflictAction = "manter" | "substituir" | "ignorar";
+type ConflictAction = "substituir" | "ignorar";
 
 export function ColetaImportWizard({
   open,
