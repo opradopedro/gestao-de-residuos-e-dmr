@@ -125,6 +125,7 @@ export type ImportJobInput = {
   grupos: Array<{
     key: string;
     mtr: string;
+    dmr_manual?: boolean;
     rows: Array<{
       data: string;
       mtr: string;
@@ -134,6 +135,8 @@ export type ImportJobInput = {
       destinador: string;
       transportador: string;
       observacoes: string;
+      peso_estimado?: boolean;
+      dmr_manual?: boolean;
     }>;
   }>;
   conflictActions: Record<string, "manter" | "substituir" | "ignorar">;
