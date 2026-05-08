@@ -590,15 +590,48 @@ export function ColetaImportWizard({
         {step === "missing" && (
           <div className="space-y-4 max-h-[65vh] overflow-auto">
             <MissingSection title="Resíduos não cadastrados" cat="residuo" items={missingItems.residuos}
-              options={tipos.map((t) => ({ id: t.id, nome: t.nome }))} value={missingMap} onChange={setMissingMap} />
+              options={tipos.map((t) => ({ id: t.id, nome: t.nome }))} value={missingMap} onChange={setMissingMap}
+              onCadastrar={(cat, nomes) => setCadastroQueue({ cat, nomes, index: 0 })} />
             <MissingSection title="Tratamentos não cadastrados" cat="tratamento" items={missingItems.tratamentos}
-              options={trats.map((t) => ({ id: t.id, nome: t.nome }))} value={missingMap} onChange={setMissingMap} />
+              options={trats.map((t) => ({ id: t.id, nome: t.nome }))} value={missingMap} onChange={setMissingMap}
+              onCadastrar={(cat, nomes) => setCadastroQueue({ cat, nomes, index: 0 })} />
             <MissingSection title="Destinadores não cadastrados" cat="destinador" items={missingItems.destinadores}
-              options={destinadores.map((d) => ({ id: d.id, nome: d.nome }))} value={missingMap} onChange={setMissingMap} />
+              options={destinadores.map((d) => ({ id: d.id, nome: d.nome }))} value={missingMap} onChange={setMissingMap}
+              onCadastrar={(cat, nomes) => setCadastroQueue({ cat, nomes, index: 0 })} />
             <MissingSection title="Transportadores não cadastrados" cat="transportador" items={missingItems.transportadores}
-              options={transportadores.map((t) => ({ id: t.id, nome: t.nome }))} value={missingMap} onChange={setMissingMap} />
+              options={transportadores.map((t) => ({ id: t.id, nome: t.nome }))} value={missingMap} onChange={setMissingMap}
+              onCadastrar={(cat, nomes) => setCadastroQueue({ cat, nomes, index: 0 })} />
           </div>
         )}
+
+        {cadastroQueue && (() => {
+          const { cat, nomes, index } = cadastroQueue;
+          const nomeAtual = nomes[index];
+          const total = nomes.length;
+          const advance = (createdId: string) => {
+            const key = `${cat}:${nomeAtual.toLowerCase()}`;
+            setMissingMap((m) => ({ ...m, [key]: createdId }));
+            qc.invalidateQueries();
+            if (index + 1 < total) setCadastroQueue({ cat, nomes, index: index + 1 });
+            else setCadastroQueue(null);
+          };
+          const close = () => setCadastroQueue(null);
+          const counter = total > 1 ? ` (${index + 1}/${total})` : "";
+          if (cat === "residuo") {
+            return <QuickResiduoDialog open onOpenChange={(o) => { if (!o) close(); }} defaultName={nomeAtual + ""} onCreated={(t) => advance(t.id)} key={`r-${index}`} />;
+          }
+          if (cat === "tratamento") {
+            return <QuickTratamentoDialog open onOpenChange={(o) => { if (!o) close(); }} defaultName={nomeAtual} onCreated={(t) => advance(t.id)} key={`t-${index}`} />;
+          }
+          if (cat === "destinador") {
+            return <QuickEntityDialog kind="destinador" open onOpenChange={(o) => { if (!o) close(); }} defaultName={nomeAtual} onCreated={(d) => advance(d.id)} key={`d-${index}`} />;
+          }
+          return <QuickEntityDialog kind="transportador" open onOpenChange={(o) => { if (!o) close(); }} defaultName={nomeAtual} onCreated={(d) => advance(d.id)} key={`tr-${index}`} />;
+          // counter is informational; shown via dialog title prefix isn't possible without modifying dialogs
+          // (kept simple: badge in MissingSection already shows remaining count)
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          counter;
+        })()}
 
         {step === "final" && (
           <div className="space-y-4">
