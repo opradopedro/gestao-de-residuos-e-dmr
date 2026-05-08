@@ -267,7 +267,7 @@ export function ColetaImportWizard({
     } else if (step === "review") {
       if (conflitos.length > 0) {
         const init: Record<string, ConflictAction> = {};
-        for (const c of conflitos) if (!conflictActions[c.grupo.key]) init[c.grupo.key] = "manter";
+        for (const c of conflitos) if (!conflictActions[c.grupo.key]) init[c.grupo.key] = "ignorar";
         setConflictActions((prev) => ({ ...init, ...prev }));
         setStep("conflicts");
       } else if (hasMissing()) setStep("missing");
