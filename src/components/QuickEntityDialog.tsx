@@ -103,7 +103,16 @@ export function QuickEntityDialog(props: Props) {
       }
       onOpenChange(false);
     } catch (e: any) {
-      toast.error(e.message ?? "Erro ao salvar");
+      if (e?.code === "DUP_CNPJ" && e?.existing) {
+        toast.error(e.message, {
+          action: { label: "Ver existente", onClick: () => {
+            (props as any).onCreated(e.existing);
+            onOpenChange(false);
+          }},
+        });
+      } else {
+        toast.error(e.message ?? "Erro ao salvar");
+      }
     } finally {
       setSaving(false);
     }
