@@ -157,7 +157,24 @@ export async function listTransportadores(): Promise<Transportador[]> {
   if (error) throw error;
   return (data ?? []) as any;
 }
+function onlyDigits(s?: string | null) { return (s ?? "").replace(/\D+/g, ""); }
+export async function findTransportadorByCnpj(cnpj: string): Promise<Transportador | null> {
+  const d = onlyDigits(cnpj);
+  if (!d) return null;
+  const all = await listTransportadores();
+  return all.find((t) => onlyDigits(t.cnpj) === d) ?? null;
+}
+export async function findDestinadorByCnpj(cnpj: string): Promise<Destinador | null> {
+  const d = onlyDigits(cnpj);
+  if (!d) return null;
+  const all = await listDestinadores();
+  return all.find((t) => onlyDigits(t.cnpj) === d) ?? null;
+}
 export async function createTransportador(input: { nome: string; cnpj?: string | null }): Promise<Transportador> {
+  if (input.cnpj) {
+    const dup = await findTransportadorByCnpj(input.cnpj);
+    if (dup) { const e: any = new Error(`CNPJ já cadastrado para "${dup.nome}"`); e.code = "DUP_CNPJ"; e.existing = dup; throw e; }
+  }
   const { data, error } = await supabase.from("transportadores").insert({ nome: input.nome, cnpj: input.cnpj ?? null }).select().single();
   if (error) throw error;
   return data as any;
