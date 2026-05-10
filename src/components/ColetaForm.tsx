@@ -303,6 +303,7 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
                       placeholder="Digite para buscar..."
                       onCreate={(name) => setResiduoDialog({ open: true, defaultName: name, lineIndex: i })}
                       createLabel={(v) => `Adicionar resíduo "${v}"`}
+                      strictOnBlur
                     />
                     {naoVinculado && (
                       <div className="mt-1 text-[11px] text-warning-foreground flex items-center gap-1">
