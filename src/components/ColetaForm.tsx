@@ -225,6 +225,7 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
               options={destOptions}
               placeholder="Buscar destinador..."
               onCreate={(name) => setDestDialog({ open: true, defaultName: name })}
+              strictOnBlur
             />
             {destSemVinculos && (
               <div className="mt-1 text-xs flex items-center gap-1 text-warning-foreground">
