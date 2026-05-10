@@ -73,11 +73,7 @@ function UnidadesTab() {
   const [add, setAdd] = useState(false);
   const [merge, setMerge] = useState(false);
   const [imp, setImp] = useState(false);
-  const mutDel = useMutation({
-    mutationFn: (id: string) => deleteUnidade(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["unidades"] }); toast.success("Unidade removida"); },
-    onError: (e: any) => toast.error(e.message),
-  });
+  const [del, setDel] = useState<Unidade | null>(null);
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
@@ -88,7 +84,7 @@ function UnidadesTab() {
               <span>{u.nome}</span>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" onClick={() => setEdit(u)}><Pencil className="size-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => { if (confirm(`Remover ${u.nome}?`)) mutDel.mutate(u.id); }}>
+                <Button variant="ghost" size="icon" onClick={() => setDel(u)}>
                   <Trash2 className="size-4 text-destructive" />
                 </Button>
               </div>
@@ -98,6 +94,7 @@ function UnidadesTab() {
         {add && <UnidadeAddDialog onClose={() => setAdd(false)} />}
         <UnidadeEditDialog unidade={edit} onClose={() => setEdit(null)} />
         <MergeDialog open={merge} onOpenChange={setMerge} tipo="unidade" itens={unidades.map((u) => ({ id: u.id, nome: u.nome }))} />
+        {del && <EntityDeleteDialog open onOpenChange={(o) => !o && setDel(null)} tipo="unidade" id={del.id} nome={del.nome} alternativos={unidades.map((u) => ({ id: u.id, nome: u.nome }))} />}
         <EntityImportDialog
           open={imp} onOpenChange={setImp} title="Unidades"
           fields={[{ key: "nome", label: "Nome", required: true }]}
