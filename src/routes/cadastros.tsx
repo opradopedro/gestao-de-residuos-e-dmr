@@ -400,11 +400,7 @@ function DestinadoresTab() {
   const [edit, setEdit] = useState<Destinador | null>(null);
   const [merge, setMerge] = useState(false);
   const [imp, setImp] = useState(false);
-  const mutDel = useMutation({
-    mutationFn: (id: string) => deleteDestinador(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["destinadores"] }); toast.success("Removido"); },
-    onError: (e: any) => toast.error(e.message),
-  });
+  const [del, setDel] = useState<Destinador | null>(null);
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
@@ -418,14 +414,15 @@ function DestinadoresTab() {
               </div>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" onClick={() => setEdit(d)}><Pencil className="size-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => { if (confirm(`Remover ${d.nome}?`)) mutDel.mutate(d.id); }}><Trash2 className="size-4 text-destructive" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => setDel(d)}><Trash2 className="size-4 text-destructive" /></Button>
               </div>
             </div>
           ))}
         </div>
         {add && <DestinadorFullDialog mode="create" onClose={() => setAdd(false)} />}
-        {edit && <DestinadorFullDialog mode="edit" destinador={edit} onClose={() => setEdit(null)} />}
+        {edit && <DestinadorFullDialog mode="edit" destinador={edit} onClose={() => setEdit(null)} todos={lista} />}
         <MergeDialog open={merge} onOpenChange={setMerge} tipo="destinador" itens={lista.map((d) => ({ id: d.id, nome: d.nome }))} />
+        {del && <EntityDeleteDialog open onOpenChange={(o) => !o && setDel(null)} tipo="destinador" id={del.id} nome={del.nome} alternativos={lista.map((d) => ({ id: d.id, nome: d.nome }))} />}
         <EntityImportDialog
           open={imp} onOpenChange={setImp} title="Destinadores"
           fields={[{ key: "nome", label: "Nome", required: true }, { key: "cnpj", label: "CNPJ" }]}
