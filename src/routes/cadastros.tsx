@@ -633,7 +633,10 @@ function DestinadorFullDialog({ mode, destinador, onClose, todos = [] }: { mode:
               )}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-wrap gap-2">
+            {mode === "edit" && todos.length > 1 && (
+              <Button variant="outline" type="button" onClick={() => setMergeOpen(true)}><Merge className="size-4 mr-1" /> Unificar com…</Button>
+            )}
             <Button variant="outline" onClick={onClose}>Cancelar</Button>
             <Button disabled={!nome.trim() || mut.isPending || !ready} onClick={() => mut.mutate()}>
               {mut.isPending ? "Salvando..." : "Salvar"}
@@ -641,6 +644,7 @@ function DestinadorFullDialog({ mode, destinador, onClose, todos = [] }: { mode:
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {mode === "edit" && <MergeDialog open={mergeOpen} onOpenChange={setMergeOpen} tipo="destinador" itens={todos.map((d) => ({ id: d.id, nome: d.nome }))} preselectRemoverId={destinador!.id} />}
 
       {quickResiduo !== null && (
         <QuickResiduoInlineDialog
