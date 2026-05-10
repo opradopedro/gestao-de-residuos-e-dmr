@@ -426,15 +426,16 @@ function DestinadoresTab() {
 }
 
 // ============ Merge dialog (genérico) ============
-function MergeDialog({ open, onOpenChange, tipo, itens }: {
+function MergeDialog({ open, onOpenChange, tipo, itens, preselectRemoverId }: {
   open: boolean; onOpenChange: (v: boolean) => void;
   tipo: "destinador" | "transportador" | "unidade" | "residuo" | "tratamento";
   itens: { id: string; nome: string }[];
+  preselectRemoverId?: string;
 }) {
   const qc = useQueryClient();
   const [manterId, setManterId] = useState("");
   const [removerId, setRemoverId] = useState("");
-  useEffect(() => { if (!open) { setManterId(""); setRemoverId(""); } }, [open]);
+  useEffect(() => { if (!open) { setManterId(""); setRemoverId(""); } else if (preselectRemoverId) { setRemoverId(preselectRemoverId); } }, [open, preselectRemoverId]);
   const mut = useMutation<any, Error, void>({
     mutationFn: async () => {
       if (tipo === "destinador") return mergeDestinadores(manterId, removerId);
