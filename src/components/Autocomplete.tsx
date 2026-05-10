@@ -71,6 +71,16 @@ export function Autocomplete({
         value={value}
         disabled={disabled}
         onFocus={() => setOpen(true)}
+        onBlur={() => {
+          // Pequeno delay para não conflitar com o onMouseDown da lista
+          setTimeout(() => {
+            if (!strictOnBlur || !onCreate) return;
+            const v = value.trim();
+            if (!v) return;
+            const exact = options.some((o) => o.label.toLowerCase() === v.toLowerCase());
+            if (!exact) onCreate(v);
+          }, 150);
+        }}
         onChange={(e) => { onChange(e.target.value); setOpen(true); setHighlight(0); }}
         onKeyDown={(e) => {
           if (!open) return;
