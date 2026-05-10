@@ -494,7 +494,9 @@ function MergeDialog({ open, onOpenChange, tipo, itens, preselectRemoverId }: {
   );
 }
 
-function DestinadorFullDialog({ mode, destinador, onClose }: { mode: "create" | "edit"; destinador?: Destinador; onClose: () => void }) {
+function DestinadorFullDialog({ mode, destinador, onClose, todos = [] }: { mode: "create" | "edit"; destinador?: Destinador; onClose: () => void; todos?: Destinador[] }) {
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [expandResiduos, setExpandResiduos] = useState(false);
   const qc = useQueryClient();
   const [nome, setNome] = useState(destinador?.nome ?? "");
   const [cnpj, setCnpj] = useState(destinador?.cnpj ?? "");
