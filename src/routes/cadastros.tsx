@@ -323,11 +323,7 @@ function TransportadoresTab() {
   const [add, setAdd] = useState(false);
   const [merge, setMerge] = useState(false);
   const [imp, setImp] = useState(false);
-  const mutDel = useMutation({
-    mutationFn: (id: string) => deleteTransportador(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["transportadores"] }); },
-    onError: (e: any) => toast.error(e.message),
-  });
+  const [del, setDel] = useState<Transportador | null>(null);
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
@@ -341,14 +337,15 @@ function TransportadoresTab() {
               </div>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" onClick={() => setEdit(t)}><Pencil className="size-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => { if (confirm(`Remover ${t.nome}?`)) mutDel.mutate(t.id); }}><Trash2 className="size-4 text-destructive" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => setDel(t)}><Trash2 className="size-4 text-destructive" /></Button>
               </div>
             </div>
           ))}
         </div>
         {add && <TransportadorDialog mode="create" onClose={() => setAdd(false)} />}
-        {edit && <TransportadorDialog mode="edit" transportador={edit} onClose={() => setEdit(null)} />}
+        {edit && <TransportadorDialog mode="edit" transportador={edit} onClose={() => setEdit(null)} todos={lista} />}
         <MergeDialog open={merge} onOpenChange={setMerge} tipo="transportador" itens={lista.map((t) => ({ id: t.id, nome: t.nome }))} />
+        {del && <EntityDeleteDialog open onOpenChange={(o) => !o && setDel(null)} tipo="transportador" id={del.id} nome={del.nome} alternativos={lista.map((t) => ({ id: t.id, nome: t.nome }))} />}
         <EntityImportDialog
           open={imp} onOpenChange={setImp} title="Transportadores"
           fields={[{ key: "nome", label: "Nome", required: true }, { key: "cnpj", label: "CNPJ" }]}
@@ -359,10 +356,12 @@ function TransportadoresTab() {
   );
 }
 
-function TransportadorDialog({ mode, transportador, onClose }: { mode: "create" | "edit"; transportador?: Transportador; onClose: () => void }) {
+function TransportadorDialog({ mode, transportador, onClose, todos = [] }: { mode: "create" | "edit"; transportador?: Transportador; onClose: () => void; todos?: Transportador[] }) {
   const qc = useQueryClient();
   const [nome, setNome] = useState(transportador?.nome ?? "");
   const [cnpj, setCnpj] = useState(transportador?.cnpj ?? "");
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const isEdit = mode === "edit";
   const mut = useMutation({
     mutationFn: () => mode === "create"
       ? createTransportador({ nome: nome.trim(), cnpj: cnpj.trim() || null })
@@ -371,19 +370,25 @@ function TransportadorDialog({ mode, transportador, onClose }: { mode: "create" 
     onError: (e: any) => toast.error(e.message),
   });
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>{mode === "create" ? "Novo transportador" : "Editar transportador"}</DialogTitle></DialogHeader>
-        <div className="grid gap-3">
-          <div><Label className="text-xs">Nome</Label><Input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-          <div><Label className="text-xs">CNPJ</Label><Input value={cnpj} onChange={(e) => setCnpj(e.target.value)} /></div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button disabled={!nome.trim() || mut.isPending} onClick={() => mut.mutate()}>Salvar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>{mode === "create" ? "Novo transportador" : "Editar transportador"}</DialogTitle></DialogHeader>
+          <div className="grid gap-3">
+            <div><Label className="text-xs">Nome</Label><Input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} /></div>
+            <div><Label className="text-xs">CNPJ</Label><Input value={cnpj} onChange={(e) => setCnpj(e.target.value)} /></div>
+          </div>
+          <DialogFooter className="flex-wrap gap-2">
+            {isEdit && todos.length > 1 && (
+              <Button variant="outline" type="button" onClick={() => setMergeOpen(true)}><Merge className="size-4 mr-1" /> Unificar com…</Button>
+            )}
+            <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button disabled={!nome.trim() || mut.isPending} onClick={() => mut.mutate()}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {isEdit && <MergeDialog open={mergeOpen} onOpenChange={setMergeOpen} tipo="transportador" itens={todos.map((t) => ({ id: t.id, nome: t.nome }))} preselectRemoverId={transportador!.id} />}
+    </>
   );
 }
 
