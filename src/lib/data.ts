@@ -88,8 +88,13 @@ export async function listTiposResiduo(): Promise<TipoResiduo[]> {
 export async function upsertTipoResiduo(input: { id?: string; nome: string; tratamento_padrao: string; codigo?: string | null }): Promise<TipoResiduo> {
   const payload = { nome: input.nome, tratamento_padrao: input.tratamento_padrao, codigo: input.codigo ?? null };
   if (input.id) {
+    // cascade rename: propaga novo nome para itens de coleta vinculados por id
+    const { data: prev } = await supabase.from("tipos_residuo").select("nome").eq("id", input.id).maybeSingle();
     const { data, error } = await supabase.from("tipos_residuo").update(payload).eq("id", input.id).select().single();
     if (error) throw error;
+    if (prev && (prev as any).nome !== input.nome) {
+      await supabase.from("coleta_itens").update({ tipo_residuo_nome: input.nome }).eq("tipo_residuo_id", input.id);
+    }
     return data as any;
   } else {
     const { data, error } = await supabase.from("tipos_residuo").insert(payload).select().single();
