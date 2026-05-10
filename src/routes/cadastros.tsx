@@ -23,6 +23,7 @@ import { Trash2, Plus, Upload, Pencil, Merge } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { EntityImportDialog } from "@/components/EntityImportDialog";
+import { EntityDeleteDialog } from "@/components/EntityDeleteDialog";
 
 export const Route = createFileRoute("/cadastros")({
   head: () => ({ meta: [{ title: "Cadastros — DMR" }] }),
