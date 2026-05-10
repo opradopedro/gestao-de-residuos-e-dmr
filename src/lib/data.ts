@@ -270,6 +270,30 @@ function coletaPayload(input: ColetaInput) {
   };
 }
 
+async function autoLinkResiduosDestinador(input: ColetaInput): Promise<string[]> {
+  if (!input.destinador_id) return [];
+  const itensComId = input.itens.filter((i) => i.tipo_residuo_id);
+  if (itensComId.length === 0) return [];
+  const ids = Array.from(new Set(itensComId.map((i) => i.tipo_residuo_id!)));
+  const { data: existentes } = await supabase
+    .from("destinador_residuos")
+    .select("tipo_residuo_id")
+    .eq("destinador_id", input.destinador_id)
+    .in("tipo_residuo_id", ids);
+  const ja = new Set((existentes ?? []).map((r: any) => r.tipo_residuo_id));
+  const novos: string[] = [];
+  for (const it of itensComId) {
+    if (ja.has(it.tipo_residuo_id!)) continue;
+    await supabase.from("destinador_residuos").upsert(
+      { destinador_id: input.destinador_id, tipo_residuo_id: it.tipo_residuo_id, tratamento: it.tratamento || "Reciclagem" },
+      { onConflict: "destinador_id,tipo_residuo_id" }
+    );
+    ja.add(it.tipo_residuo_id!);
+    novos.push(it.tipo_residuo_nome);
+  }
+  return novos;
+}
+
 export async function createColeta(input: ColetaInput, opts?: { skipAudit?: boolean }): Promise<string> {
   const { data: coleta, error } = await supabase
     .from("coletas")
@@ -289,6 +313,7 @@ export async function createColeta(input: ColetaInput, opts?: { skipAudit?: bool
     );
     if (e2) throw e2;
   }
+  const novosVinculos = await autoLinkResiduosDestinador(input);
   if (!opts?.skipAudit) {
     const { logAction } = await import("@/lib/audit");
     await logAction({
@@ -297,6 +322,12 @@ export async function createColeta(input: ColetaInput, opts?: { skipAudit?: bool
       descricao: `Coleta criada${input.mtr ? ` (MTR ${input.mtr})` : ""}`,
       quantidade: 1,
     });
+  }
+  if (novosVinculos.length > 0) {
+    try {
+      const { toast } = await import("sonner");
+      toast.info(`Vinculado ao destinador: ${novosVinculos.join(", ")}`);
+    } catch {}
   }
   return coleta.id;
 }
@@ -317,6 +348,7 @@ export async function updateColeta(id: string, input: ColetaInput, opts?: { skip
     );
     if (e2) throw e2;
   }
+  const novosVinculos = await autoLinkResiduosDestinador(input);
   if (!opts?.skipAudit) {
     const { logAction } = await import("@/lib/audit");
     await logAction({
@@ -325,6 +357,12 @@ export async function updateColeta(id: string, input: ColetaInput, opts?: { skip
       descricao: `Coleta editada${input.mtr ? ` (MTR ${input.mtr})` : ""}`,
       quantidade: 1,
     });
+  }
+  if (novosVinculos.length > 0) {
+    try {
+      const { toast } = await import("sonner");
+      toast.info(`Vinculado ao destinador: ${novosVinculos.join(", ")}`);
+    } catch {}
   }
 }
 
