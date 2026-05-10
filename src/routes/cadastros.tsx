@@ -583,9 +583,16 @@ function DestinadorFullDialog({ mode, destinador, onClose, todos = [] }: { mode:
             <div><Label className="text-xs">CNPJ</Label><Input value={cnpj} onChange={(e) => setCnpj(e.target.value)} placeholder="00.000.000/0000-00" /></div>
           </div>
           <div>
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-1 gap-2">
               <Label className="text-xs">Resíduos aceitos por este destinador</Label>
-              <span className="text-xs text-muted-foreground">{totalSelecionados} selecionado(s)</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">{totalSelecionados} selecionado(s)</span>
+                {mode === "edit" && (
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setExpandResiduos((v) => !v)}>
+                    {expandResiduos ? "Ver só vinculados" : "Expandir lista"}
+                  </Button>
+                )}
+              </div>
             </div>
             <Input placeholder="Buscar resíduo..." value={busca} onChange={(e) => setBusca(e.target.value)} className="mb-2" />
             <div className="border rounded-md max-h-72 overflow-y-auto divide-y">
