@@ -329,6 +329,7 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
                       placeholder="Ex.: Reciclagem"
                       onCreate={(name) => setTratDialog({ open: true, defaultName: name, lineIndex: i })}
                       createLabel={(v) => `Adicionar tratamento "${v}"`}
+                      strictOnBlur
                     />
                   </div>
                   <div className="md:col-span-1 flex items-end justify-end">
