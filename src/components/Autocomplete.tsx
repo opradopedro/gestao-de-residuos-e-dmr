@@ -20,6 +20,8 @@ type Props = {
   onCreate?: (value: string) => void;
   createLabel?: (value: string) => string;
   disabled?: boolean;
+  /** Se true: ao perder foco com texto sem correspondência, dispara onCreate. */
+  strictOnBlur?: boolean;
 };
 
 export function Autocomplete({
