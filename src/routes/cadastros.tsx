@@ -158,10 +158,7 @@ function ResiduosTab() {
   const [add, setAdd] = useState(false);
   const [merge, setMerge] = useState(false);
   const [imp, setImp] = useState(false);
-  const mutDel = useMutation({
-    mutationFn: (id: string) => deleteTipoResiduo(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tipos_residuo"] }); },
-  });
+  const [del, setDel] = useState<TipoResiduo | null>(null);
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
@@ -176,14 +173,15 @@ function ResiduosTab() {
               </div>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" onClick={() => setEdit(t)}><Pencil className="size-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => { if (confirm(`Remover ${t.nome}?`)) mutDel.mutate(t.id); }}><Trash2 className="size-4 text-destructive" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => setDel(t)}><Trash2 className="size-4 text-destructive" /></Button>
               </div>
             </div>
           ))}
         </div>
         {add && <ResiduoEditDialog tipo={null} onClose={() => setAdd(false)} />}
-        {edit && <ResiduoEditDialog tipo={edit} onClose={() => setEdit(null)} />}
+        {edit && <ResiduoEditDialog tipo={edit} onClose={() => setEdit(null)} todos={tipos} />}
         <MergeDialog open={merge} onOpenChange={setMerge} tipo="residuo" itens={tipos.map((t) => ({ id: t.id, nome: t.nome }))} />
+        {del && <EntityDeleteDialog open onOpenChange={(o) => !o && setDel(null)} tipo="residuo" id={del.id} nome={del.nome} alternativos={tipos.map((t) => ({ id: t.id, nome: t.nome }))} />}
         <EntityImportDialog
           open={imp} onOpenChange={setImp} title="Tipos de resíduo"
           fields={[
