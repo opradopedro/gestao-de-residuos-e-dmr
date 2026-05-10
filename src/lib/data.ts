@@ -285,7 +285,7 @@ async function autoLinkResiduosDestinador(input: ColetaInput): Promise<string[]>
   for (const it of itensComId) {
     if (ja.has(it.tipo_residuo_id!)) continue;
     await supabase.from("destinador_residuos").upsert(
-      { destinador_id: input.destinador_id, tipo_residuo_id: it.tipo_residuo_id, tratamento: it.tratamento || "Reciclagem" },
+      { destinador_id: input.destinador_id as string, tipo_residuo_id: it.tipo_residuo_id as string, tratamento: it.tratamento || "Reciclagem" },
       { onConflict: "destinador_id,tipo_residuo_id" }
     );
     ja.add(it.tipo_residuo_id!);
