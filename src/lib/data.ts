@@ -651,14 +651,73 @@ export async function updateUnidade(id: string, nome: string): Promise<Unidade> 
   return data as any;
 }
 export async function updateTransportador(id: string, input: { nome: string; cnpj?: string | null }): Promise<Transportador> {
+  if (input.cnpj) {
+    const dup = await findTransportadorByCnpj(input.cnpj);
+    if (dup && dup.id !== id) { const e: any = new Error(`CNPJ já cadastrado para "${dup.nome}"`); e.code = "DUP_CNPJ"; e.existing = dup; throw e; }
+  }
   const { data, error } = await supabase.from("transportadores").update({ nome: input.nome, cnpj: input.cnpj ?? null }).eq("id", id).select().single();
   if (error) throw error;
+  await supabase.from("coletas").update({ transportador: input.nome }).eq("transportador_id", id);
   return data as any;
 }
 export async function updateDestinador(id: string, input: { nome: string; cnpj?: string | null }): Promise<Destinador> {
+  if (input.cnpj) {
+    const dup = await findDestinadorByCnpj(input.cnpj);
+    if (dup && dup.id !== id) { const e: any = new Error(`CNPJ já cadastrado para "${dup.nome}"`); e.code = "DUP_CNPJ"; e.existing = dup; throw e; }
+  }
   const { data, error } = await supabase.from("destinadores").update({ nome: input.nome, cnpj: input.cnpj ?? null }).eq("id", id).select().single();
   if (error) throw error;
+  await supabase.from("coletas").update({ destinador: input.nome }).eq("destinador_id", id);
   return data as any;
+}
+
+// ===== Exclusão com transferência (Fase 5) =====
+export async function deleteEntidadeComTransferencia(
+  tipo: "unidade" | "residuo" | "tratamento" | "transportador" | "destinador",
+  id: string,
+  transferToId: string | null,
+): Promise<{ afetados: number }> {
+  if (transferToId) {
+    if (tipo === "unidade") return { afetados: (await mergeUnidades(transferToId, id)).coletasAtualizadas };
+    if (tipo === "residuo") return { afetados: (await mergeTiposResiduo(transferToId, id)).itensAtualizados };
+    if (tipo === "tratamento") { await mergeTratamentos(transferToId, id); return { afetados: 1 }; }
+    if (tipo === "transportador") return { afetados: (await mergeTransportadores(transferToId, id)).coletasAtualizadas };
+    if (tipo === "destinador") return { afetados: (await mergeDestinadores(transferToId, id)).coletasAtualizadas };
+  }
+  if (tipo === "unidade") {
+    const { count } = await supabase.from("coletas").select("id", { count: "exact", head: true }).eq("unidade_id", id);
+    if ((count ?? 0) > 0) throw new Error("Existem coletas nesta unidade. Selecione uma unidade de destino para transferir.");
+    await deleteUnidade(id);
+    return { afetados: 0 };
+  }
+  if (tipo === "residuo") {
+    const { data: itens } = await supabase.from("coleta_itens").select("id").eq("tipo_residuo_id", id);
+    const ids = (itens ?? []).map((r: any) => r.id);
+    if (ids.length > 0) await supabase.from("coleta_itens").update({ tipo_residuo_id: null }).in("id", ids);
+    await supabase.from("destinador_residuos").delete().eq("tipo_residuo_id", id);
+    await deleteTipoResiduo(id);
+    return { afetados: ids.length };
+  }
+  if (tipo === "tratamento") {
+    await deleteTratamento(id);
+    return { afetados: 0 };
+  }
+  if (tipo === "transportador") {
+    const { data: cs } = await supabase.from("coletas").select("id").eq("transportador_id", id);
+    const ids = (cs ?? []).map((r: any) => r.id);
+    if (ids.length > 0) await supabase.from("coletas").update({ transportador_id: null, transportador: null }).in("id", ids);
+    await deleteTransportador(id);
+    return { afetados: ids.length };
+  }
+  if (tipo === "destinador") {
+    const { data: cs } = await supabase.from("coletas").select("id").eq("destinador_id", id);
+    const ids = (cs ?? []).map((r: any) => r.id);
+    if (ids.length > 0) await supabase.from("coletas").update({ destinador_id: null, destinador: null }).in("id", ids);
+    await supabase.from("destinador_residuos").delete().eq("destinador_id", id);
+    await deleteDestinador(id);
+    return { afetados: ids.length };
+  }
+  return { afetados: 0 };
 }
 
 // Helpers para análises
