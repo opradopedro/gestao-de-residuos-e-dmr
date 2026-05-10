@@ -211,6 +211,7 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
               options={transpOptions}
               placeholder="Buscar transportador..."
               onCreate={(name) => setTranspDialog({ open: true, defaultName: name })}
+              strictOnBlur
             />
           </div>
           <div>
@@ -224,6 +225,7 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
               options={destOptions}
               placeholder="Buscar destinador..."
               onCreate={(name) => setDestDialog({ open: true, defaultName: name })}
+              strictOnBlur
             />
             {destSemVinculos && (
               <div className="mt-1 text-xs flex items-center gap-1 text-warning-foreground">
@@ -301,6 +303,7 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
                       placeholder="Digite para buscar..."
                       onCreate={(name) => setResiduoDialog({ open: true, defaultName: name, lineIndex: i })}
                       createLabel={(v) => `Adicionar resíduo "${v}"`}
+                      strictOnBlur
                     />
                     {naoVinculado && (
                       <div className="mt-1 text-[11px] text-warning-foreground flex items-center gap-1">
@@ -326,6 +329,7 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
                       placeholder="Ex.: Reciclagem"
                       onCreate={(name) => setTratDialog({ open: true, defaultName: name, lineIndex: i })}
                       createLabel={(v) => `Adicionar tratamento "${v}"`}
+                      strictOnBlur
                     />
                   </div>
                   <div className="md:col-span-1 flex items-end justify-end">

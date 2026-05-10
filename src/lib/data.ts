@@ -88,8 +88,13 @@ export async function listTiposResiduo(): Promise<TipoResiduo[]> {
 export async function upsertTipoResiduo(input: { id?: string; nome: string; tratamento_padrao: string; codigo?: string | null }): Promise<TipoResiduo> {
   const payload = { nome: input.nome, tratamento_padrao: input.tratamento_padrao, codigo: input.codigo ?? null };
   if (input.id) {
+    // cascade rename: propaga novo nome para itens de coleta vinculados por id
+    const { data: prev } = await supabase.from("tipos_residuo").select("nome").eq("id", input.id).maybeSingle();
     const { data, error } = await supabase.from("tipos_residuo").update(payload).eq("id", input.id).select().single();
     if (error) throw error;
+    if (prev && (prev as any).nome !== input.nome) {
+      await supabase.from("coleta_itens").update({ tipo_residuo_nome: input.nome }).eq("tipo_residuo_id", input.id);
+    }
     return data as any;
   } else {
     const { data, error } = await supabase.from("tipos_residuo").insert(payload).select().single();
@@ -124,8 +129,16 @@ export async function listTratamentos(): Promise<Tratamento[]> {
 export async function upsertTratamento(input: { id?: string; nome: string; codigo?: string | null }): Promise<Tratamento> {
   const payload = { nome: input.nome, codigo: input.codigo ?? null };
   if (input.id) {
+    // cascade rename: propaga em coleta_itens.tratamento, tipos_residuo.tratamento_padrao, destinador_residuos.tratamento
+    const { data: prev } = await supabase.from("tratamentos").select("nome").eq("id", input.id).maybeSingle();
     const { data, error } = await supabase.from("tratamentos").update(payload).eq("id", input.id).select().single();
     if (error) throw error;
+    const oldNome = (prev as any)?.nome;
+    if (oldNome && oldNome !== input.nome) {
+      await supabase.from("coleta_itens").update({ tratamento: input.nome }).eq("tratamento", oldNome);
+      await supabase.from("tipos_residuo").update({ tratamento_padrao: input.nome }).eq("tratamento_padrao", oldNome);
+      await supabase.from("destinador_residuos").update({ tratamento: input.nome }).eq("tratamento", oldNome);
+    }
     return data as any;
   } else {
     const { data, error } = await supabase.from("tratamentos").insert(payload).select().single();
@@ -257,6 +270,30 @@ function coletaPayload(input: ColetaInput) {
   };
 }
 
+async function autoLinkResiduosDestinador(input: ColetaInput): Promise<string[]> {
+  if (!input.destinador_id) return [];
+  const itensComId = input.itens.filter((i) => i.tipo_residuo_id);
+  if (itensComId.length === 0) return [];
+  const ids = Array.from(new Set(itensComId.map((i) => i.tipo_residuo_id!)));
+  const { data: existentes } = await supabase
+    .from("destinador_residuos")
+    .select("tipo_residuo_id")
+    .eq("destinador_id", input.destinador_id)
+    .in("tipo_residuo_id", ids);
+  const ja = new Set((existentes ?? []).map((r: any) => r.tipo_residuo_id));
+  const novos: string[] = [];
+  for (const it of itensComId) {
+    if (ja.has(it.tipo_residuo_id!)) continue;
+    await supabase.from("destinador_residuos").upsert(
+      { destinador_id: input.destinador_id as string, tipo_residuo_id: it.tipo_residuo_id as string, tratamento: it.tratamento || "Reciclagem" },
+      { onConflict: "destinador_id,tipo_residuo_id" }
+    );
+    ja.add(it.tipo_residuo_id!);
+    novos.push(it.tipo_residuo_nome);
+  }
+  return novos;
+}
+
 export async function createColeta(input: ColetaInput, opts?: { skipAudit?: boolean }): Promise<string> {
   const { data: coleta, error } = await supabase
     .from("coletas")
@@ -276,6 +313,7 @@ export async function createColeta(input: ColetaInput, opts?: { skipAudit?: bool
     );
     if (e2) throw e2;
   }
+  const novosVinculos = await autoLinkResiduosDestinador(input);
   if (!opts?.skipAudit) {
     const { logAction } = await import("@/lib/audit");
     await logAction({
@@ -284,6 +322,12 @@ export async function createColeta(input: ColetaInput, opts?: { skipAudit?: bool
       descricao: `Coleta criada${input.mtr ? ` (MTR ${input.mtr})` : ""}`,
       quantidade: 1,
     });
+  }
+  if (novosVinculos.length > 0) {
+    try {
+      const { toast } = await import("sonner");
+      toast.info(`Vinculado ao destinador: ${novosVinculos.join(", ")}`);
+    } catch {}
   }
   return coleta.id;
 }
@@ -304,6 +348,7 @@ export async function updateColeta(id: string, input: ColetaInput, opts?: { skip
     );
     if (e2) throw e2;
   }
+  const novosVinculos = await autoLinkResiduosDestinador(input);
   if (!opts?.skipAudit) {
     const { logAction } = await import("@/lib/audit");
     await logAction({
@@ -312,6 +357,12 @@ export async function updateColeta(id: string, input: ColetaInput, opts?: { skip
       descricao: `Coleta editada${input.mtr ? ` (MTR ${input.mtr})` : ""}`,
       quantidade: 1,
     });
+  }
+  if (novosVinculos.length > 0) {
+    try {
+      const { toast } = await import("sonner");
+      toast.info(`Vinculado ao destinador: ${novosVinculos.join(", ")}`);
+    } catch {}
   }
 }
 
@@ -600,14 +651,73 @@ export async function updateUnidade(id: string, nome: string): Promise<Unidade> 
   return data as any;
 }
 export async function updateTransportador(id: string, input: { nome: string; cnpj?: string | null }): Promise<Transportador> {
+  if (input.cnpj) {
+    const dup = await findTransportadorByCnpj(input.cnpj);
+    if (dup && dup.id !== id) { const e: any = new Error(`CNPJ já cadastrado para "${dup.nome}"`); e.code = "DUP_CNPJ"; e.existing = dup; throw e; }
+  }
   const { data, error } = await supabase.from("transportadores").update({ nome: input.nome, cnpj: input.cnpj ?? null }).eq("id", id).select().single();
   if (error) throw error;
+  await supabase.from("coletas").update({ transportador: input.nome }).eq("transportador_id", id);
   return data as any;
 }
 export async function updateDestinador(id: string, input: { nome: string; cnpj?: string | null }): Promise<Destinador> {
+  if (input.cnpj) {
+    const dup = await findDestinadorByCnpj(input.cnpj);
+    if (dup && dup.id !== id) { const e: any = new Error(`CNPJ já cadastrado para "${dup.nome}"`); e.code = "DUP_CNPJ"; e.existing = dup; throw e; }
+  }
   const { data, error } = await supabase.from("destinadores").update({ nome: input.nome, cnpj: input.cnpj ?? null }).eq("id", id).select().single();
   if (error) throw error;
+  await supabase.from("coletas").update({ destinador: input.nome }).eq("destinador_id", id);
   return data as any;
+}
+
+// ===== Exclusão com transferência (Fase 5) =====
+export async function deleteEntidadeComTransferencia(
+  tipo: "unidade" | "residuo" | "tratamento" | "transportador" | "destinador",
+  id: string,
+  transferToId: string | null,
+): Promise<{ afetados: number }> {
+  if (transferToId) {
+    if (tipo === "unidade") return { afetados: (await mergeUnidades(transferToId, id)).coletasAtualizadas };
+    if (tipo === "residuo") return { afetados: (await mergeTiposResiduo(transferToId, id)).itensAtualizados };
+    if (tipo === "tratamento") { await mergeTratamentos(transferToId, id); return { afetados: 1 }; }
+    if (tipo === "transportador") return { afetados: (await mergeTransportadores(transferToId, id)).coletasAtualizadas };
+    if (tipo === "destinador") return { afetados: (await mergeDestinadores(transferToId, id)).coletasAtualizadas };
+  }
+  if (tipo === "unidade") {
+    const { count } = await supabase.from("coletas").select("id", { count: "exact", head: true }).eq("unidade_id", id);
+    if ((count ?? 0) > 0) throw new Error("Existem coletas nesta unidade. Selecione uma unidade de destino para transferir.");
+    await deleteUnidade(id);
+    return { afetados: 0 };
+  }
+  if (tipo === "residuo") {
+    const { data: itens } = await supabase.from("coleta_itens").select("id").eq("tipo_residuo_id", id);
+    const ids = (itens ?? []).map((r: any) => r.id);
+    if (ids.length > 0) await supabase.from("coleta_itens").update({ tipo_residuo_id: null }).in("id", ids);
+    await supabase.from("destinador_residuos").delete().eq("tipo_residuo_id", id);
+    await deleteTipoResiduo(id);
+    return { afetados: ids.length };
+  }
+  if (tipo === "tratamento") {
+    await deleteTratamento(id);
+    return { afetados: 0 };
+  }
+  if (tipo === "transportador") {
+    const { data: cs } = await supabase.from("coletas").select("id").eq("transportador_id", id);
+    const ids = (cs ?? []).map((r: any) => r.id);
+    if (ids.length > 0) await supabase.from("coletas").update({ transportador_id: null, transportador: null }).in("id", ids);
+    await deleteTransportador(id);
+    return { afetados: ids.length };
+  }
+  if (tipo === "destinador") {
+    const { data: cs } = await supabase.from("coletas").select("id").eq("destinador_id", id);
+    const ids = (cs ?? []).map((r: any) => r.id);
+    if (ids.length > 0) await supabase.from("coletas").update({ destinador_id: null, destinador: null }).in("id", ids);
+    await supabase.from("destinador_residuos").delete().eq("destinador_id", id);
+    await deleteDestinador(id);
+    return { afetados: ids.length };
+  }
+  return { afetados: 0 };
 }
 
 // Helpers para análises
