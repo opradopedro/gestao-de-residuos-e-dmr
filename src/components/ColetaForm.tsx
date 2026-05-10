@@ -211,6 +211,7 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
               options={transpOptions}
               placeholder="Buscar transportador..."
               onCreate={(name) => setTranspDialog({ open: true, defaultName: name })}
+              strictOnBlur
             />
           </div>
           <div>
