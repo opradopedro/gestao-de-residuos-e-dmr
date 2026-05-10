@@ -129,8 +129,16 @@ export async function listTratamentos(): Promise<Tratamento[]> {
 export async function upsertTratamento(input: { id?: string; nome: string; codigo?: string | null }): Promise<Tratamento> {
   const payload = { nome: input.nome, codigo: input.codigo ?? null };
   if (input.id) {
+    // cascade rename: propaga em coleta_itens.tratamento, tipos_residuo.tratamento_padrao, destinador_residuos.tratamento
+    const { data: prev } = await supabase.from("tratamentos").select("nome").eq("id", input.id).maybeSingle();
     const { data, error } = await supabase.from("tratamentos").update(payload).eq("id", input.id).select().single();
     if (error) throw error;
+    const oldNome = (prev as any)?.nome;
+    if (oldNome && oldNome !== input.nome) {
+      await supabase.from("coleta_itens").update({ tratamento: input.nome }).eq("tratamento", oldNome);
+      await supabase.from("tipos_residuo").update({ tratamento_padrao: input.nome }).eq("tratamento_padrao", oldNome);
+      await supabase.from("destinador_residuos").update({ tratamento: input.nome }).eq("tratamento", oldNome);
+    }
     return data as any;
   } else {
     const { data, error } = await supabase.from("tratamentos").insert(payload).select().single();
