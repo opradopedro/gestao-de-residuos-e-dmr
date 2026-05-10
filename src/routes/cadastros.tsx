@@ -199,12 +199,13 @@ function ResiduosTab() {
   );
 }
 
-function ResiduoEditDialog({ tipo, onClose }: { tipo: TipoResiduo | null; onClose: () => void }) {
+function ResiduoEditDialog({ tipo, onClose, todos = [] }: { tipo: TipoResiduo | null; onClose: () => void; todos?: TipoResiduo[] }) {
   const qc = useQueryClient();
   const isEdit = !!tipo;
   const [nome, setNome] = useState("");
   const [codigo, setCodigo] = useState("");
   const [trat, setTrat] = useState("");
+  const [mergeOpen, setMergeOpen] = useState(false);
   useEffect(() => {
     setNome(tipo?.nome ?? "");
     setCodigo(tipo?.codigo ?? "");
@@ -216,20 +217,26 @@ function ResiduoEditDialog({ tipo, onClose }: { tipo: TipoResiduo | null; onClos
     onError: (e: any) => toast.error(e.message),
   });
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader><DialogTitle>{isEdit ? "Editar tipo de resíduo" : "Novo tipo de resíduo"}</DialogTitle></DialogHeader>
-        <div className="grid gap-3">
-          <div><Label className="text-xs">Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-          <div><Label className="text-xs">Código (IBAMA)</Label><Input value={codigo} onChange={(e) => setCodigo(e.target.value)} /></div>
-          <div><Label className="text-xs">Tratamento padrão</Label><Input value={trat} onChange={(e) => setTrat(e.target.value)} placeholder="Ex.: Reciclagem" /></div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button disabled={!nome.trim() || mut.isPending} onClick={() => mut.mutate()}>Salvar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>{isEdit ? "Editar tipo de resíduo" : "Novo tipo de resíduo"}</DialogTitle></DialogHeader>
+          <div className="grid gap-3">
+            <div><Label className="text-xs">Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
+            <div><Label className="text-xs">Código (IBAMA)</Label><Input value={codigo} onChange={(e) => setCodigo(e.target.value)} /></div>
+            <div><Label className="text-xs">Tratamento padrão</Label><Input value={trat} onChange={(e) => setTrat(e.target.value)} placeholder="Ex.: Reciclagem" /></div>
+          </div>
+          <DialogFooter className="flex-wrap gap-2">
+            {isEdit && todos.length > 1 && (
+              <Button variant="outline" type="button" onClick={() => setMergeOpen(true)}><Merge className="size-4 mr-1" /> Unificar com…</Button>
+            )}
+            <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button disabled={!nome.trim() || mut.isPending} onClick={() => mut.mutate()}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {isEdit && <MergeDialog open={mergeOpen} onOpenChange={setMergeOpen} tipo="residuo" itens={todos.map((t) => ({ id: t.id, nome: t.nome }))} preselectRemoverId={tipo!.id} />}
+    </>
   );
 }
 
