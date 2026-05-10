@@ -534,9 +534,14 @@ function DestinadorFullDialog({ mode, destinador, onClose, todos = [] }: { mode:
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    if (!q) return tipos;
-    return tipos.filter((t) => t.nome.toLowerCase().includes(q) || (t.codigo ?? "").toLowerCase().includes(q));
-  }, [tipos, busca]);
+    let base = tipos;
+    // Quando edição e não expandido: mostrar apenas vinculados (selecionados)
+    if (mode === "edit" && !expandResiduos && !q) {
+      base = tipos.filter((t) => vinculos[t.id]?.selected);
+    }
+    if (!q) return base;
+    return base.filter((t) => t.nome.toLowerCase().includes(q) || (t.codigo ?? "").toLowerCase().includes(q));
+  }, [tipos, busca, mode, expandResiduos, vinculos]);
 
   const matchExato = useMemo(() => {
     const q = busca.trim().toLowerCase();
