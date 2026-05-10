@@ -26,7 +26,7 @@ type Props = {
 
 export function Autocomplete({
   value, onChange, options, placeholder, className,
-  emptyText = "Nenhum resultado", onCreate, createLabel, disabled,
+  emptyText = "Nenhum resultado", onCreate, createLabel, disabled, strictOnBlur,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
