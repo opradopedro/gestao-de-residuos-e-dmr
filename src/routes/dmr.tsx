@@ -267,6 +267,7 @@ type Grupo = {
   causasSemMtr: any[];
   causasEstimado: any[];
   dmrLinhas: any[];
+  tipoResiduo?: TipoResiduo;
 };
 
 function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId: string }) {
