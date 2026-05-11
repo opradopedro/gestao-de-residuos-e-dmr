@@ -84,3 +84,14 @@ export async function deleteDmrUpload(id: string) {
   const { error } = await supabase.from("dmr_uploads").delete().eq("id", id);
   if (error) throw error;
 }
+
+/** Renomeia o texto do resíduo nas linhas de um upload (usado quando o usuário
+ *  resolve um resíduo não cadastrado, escolhendo um existente ou criando um novo). */
+export async function renameDmrLinhasResiduo(uploadId: string, fromText: string, toText: string) {
+  const { error } = await supabase
+    .from("dmr_linhas")
+    .update({ residuo: toText })
+    .eq("upload_id", uploadId)
+    .eq("residuo", fromText);
+  if (error) throw error;
+}

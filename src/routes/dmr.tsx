@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo, setPeriodoAtivo } from "@/hooks/use-periodo";
-import { listColetasByUnidade, totalPesoColeta } from "@/lib/data";
+import { listColetasByUnidade, totalPesoColeta, listTiposResiduo, type TipoResiduo } from "@/lib/data";
 import { listDmrUploads, getDmrLinhas, createDmrUpload, deleteDmrUpload, DmrMapeamento } from "@/lib/dmr";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,12 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Upload, Trash2, AlertTriangle, FileSpreadsheet, ChevronRight } from "lucide-react";
+import { Upload, Trash2, AlertTriangle, FileSpreadsheet, ChevronRight, Wand2, Pencil } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { quarterOf } from "@/lib/quarter";
 import { formatTon, formatDate } from "@/lib/format";
+import { TipoResiduoEditDialog } from "@/components/TipoResiduoEditDialog";
+import { DmrResolveResiduosDialog } from "@/components/DmrResolveResiduosDialog";
 
 export const Route = createFileRoute("/dmr")({
   head: () => ({ meta: [{ title: "DMR — Conferência" }] }),
@@ -265,16 +267,43 @@ type Grupo = {
   causasSemMtr: any[];
   causasEstimado: any[];
   dmrLinhas: any[];
+  tipoResiduo?: TipoResiduo;
 };
 
 function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId: string }) {
   const { data: upload } = useQuery({ queryKey: ["dmr_uploads", unidadeId], queryFn: () => listDmrUploads(unidadeId), select: (l) => l.find((u) => u.id === uploadId) });
   const { data: linhas = [] } = useQuery({ queryKey: ["dmr_linhas", uploadId], queryFn: () => getDmrLinhas(uploadId) });
   const { data: coletas = [] } = useQuery({ queryKey: ["coletas", unidadeId], queryFn: () => listColetasByUnidade(unidadeId) });
+  const { data: tipos = [] } = useQuery({ queryKey: ["tipos_residuo"], queryFn: listTiposResiduo });
   const [detail, setDetail] = useState<Grupo | null>(null);
+  const [resolveOpen, setResolveOpen] = useState(false);
+  const [editTipo, setEditTipo] = useState<TipoResiduo | null>(null);
 
-  const grupos: Grupo[] = useMemo(() => {
-    if (!upload) return [];
+  // Resolve um texto livre da DMR para o nome canônico de um tipo cadastrado
+  // 1) tenta casar pelo prefixo de código IBAMA ("200138 - madeira…")
+  // 2) cai no nome (case-insensitive)
+  function resolveResiduoCanonical(texto: string | null): { canonical: string; tipo?: TipoResiduo; matched: boolean } {
+    const raw = (texto ?? "").trim();
+    if (!raw) return { canonical: "(sem resíduo)", matched: false };
+    const lower = raw.toLowerCase();
+    // prefixo de código (4-8 dígitos no começo)
+    const m = /^([0-9]{4,8})/.exec(raw);
+    if (m) {
+      const code = m[1];
+      const t = tipos.find((x) => x.codigo && x.codigo.replace(/\D/g, "") === code.replace(/\D/g, ""));
+      if (t) return { canonical: t.nome, tipo: t, matched: true };
+    }
+    // por código contido em qualquer lugar
+    const tCod = tipos.find((x) => x.codigo && raw.replace(/\s/g, "").toLowerCase().startsWith(x.codigo.replace(/\s/g, "").toLowerCase()));
+    if (tCod) return { canonical: tCod.nome, tipo: tCod, matched: true };
+    // por nome
+    const tNome = tipos.find((x) => x.nome.toLowerCase() === lower);
+    if (tNome) return { canonical: tNome.nome, tipo: tNome, matched: true };
+    return { canonical: raw, matched: false };
+  }
+
+  const { grupos, pendentes } = useMemo(() => {
+    if (!upload) return { grupos: [] as Grupo[], pendentes: [] as { texto: string; ocorrencias: number }[] };
     const coletasTri = coletas.filter((c) => {
       const q = quarterOf(c.data);
       return q.ano === upload.ano && q.trimestre === upload.trimestre;
@@ -283,43 +312,89 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
     const norm = (s?: string | null) => (s ?? "").trim().toLowerCase();
     const interno = new Map<string, number>();
     const internoColetas = new Map<string, any[]>();
+    const tipoPorKey = new Map<string, TipoResiduo | undefined>();
+
     for (const c of coletasTri) {
       const dest = norm(c.destinador) || "(sem destinador)";
       for (const it of c.itens ?? []) {
-        const k = `${norm(it.tipo_residuo_nome)}||${dest}`;
+        const r = resolveResiduoCanonical(it.tipo_residuo_nome);
+        const k = `${norm(r.canonical)}||${dest}`;
         interno.set(k, (interno.get(k) ?? 0) + Number(it.peso_kg));
         if (!internoColetas.has(k)) internoColetas.set(k, []);
         if (!internoColetas.get(k)!.includes(c)) internoColetas.get(k)!.push(c);
+        if (r.tipo) tipoPorKey.set(k, r.tipo);
       }
     }
     const dmr = new Map<string, number>();
     const dmrLinhasMap = new Map<string, any[]>();
+    const labelMap = new Map<string, string>();
+    const pendCount = new Map<string, number>();
+
     for (const l of linhas) {
-      const k = `${norm(l.residuo)}||${norm(l.destinador) || "(sem destinador)"}`;
+      const r = resolveResiduoCanonical(l.residuo);
+      const k = `${norm(r.canonical)}||${norm(l.destinador) || "(sem destinador)"}`;
       dmr.set(k, (dmr.get(k) ?? 0) + Number(l.peso_kg ?? 0));
       if (!dmrLinhasMap.has(k)) dmrLinhasMap.set(k, []);
       dmrLinhasMap.get(k)!.push(l);
+      labelMap.set(k, r.canonical);
+      if (r.tipo && !tipoPorKey.get(k)) tipoPorKey.set(k, r.tipo);
+      if (!r.matched && l.residuo) {
+        pendCount.set(l.residuo, (pendCount.get(l.residuo) ?? 0) + 1);
+      }
     }
+    for (const [k] of interno) {
+      if (!labelMap.has(k)) labelMap.set(k, k.split("||")[0]);
+    }
+
     const keys = new Set([...interno.keys(), ...dmr.keys()]);
-    return Array.from(keys).map((k) => {
-      const [residuo, destinador] = k.split("||");
+    const grupos: Grupo[] = Array.from(keys).map((k) => {
+      const [, destinador] = k.split("||");
       const internoKg = interno.get(k) ?? 0;
       const dmrKg = dmr.get(k) ?? 0;
       const diff = dmrKg - internoKg;
       const matches = internoColetas.get(k) ?? [];
       return {
-        key: k, residuo, destinador, internoKg, dmrKg, diff, matches,
+        key: k,
+        residuo: labelMap.get(k) ?? k.split("||")[0],
+        destinador,
+        internoKg, dmrKg, diff, matches,
         causasSemMtr: matches.filter((c) => !c.mtr),
         causasEstimado: matches.filter((c) => c.peso_estimado),
         dmrLinhas: dmrLinhasMap.get(k) ?? [],
+        tipoResiduo: tipoPorKey.get(k),
       };
     }).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
-  }, [upload, linhas, coletas]);
+
+    const pendentes = Array.from(pendCount.entries())
+      .map(([texto, ocorrencias]) => ({ texto, ocorrencias }))
+      .sort((a, b) => b.ocorrencias - a.ocorrencias);
+
+    return { grupos, pendentes };
+  }, [upload, linhas, coletas, tipos]);
 
   if (!upload) return null;
 
   return (
     <>
+      {pendentes.length > 0 && (
+        <Card>
+          <CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-sm">
+              <div className="font-medium flex items-center gap-2">
+                <AlertTriangle className="size-4 text-warning-foreground" />
+                {pendentes.length} resíduo(s) na DMR sem cadastro correspondente
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Substitua por um existente (match por código IBAMA) ou cadastre novo.
+              </div>
+            </div>
+            <Button onClick={() => setResolveOpen(true)}>
+              <Wand2 className="size-4 mr-1" /> Resolver pendentes
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="p-0">
           <div className="p-4 border-b border-border">
@@ -371,73 +446,139 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
 
       <Sheet open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <SheetContent className="sm:max-w-xl overflow-y-auto">
-          {detail && (
-            <>
-              <SheetHeader>
-                <SheetTitle>{detail.residuo} · {detail.destinador}</SheetTitle>
-              </SheetHeader>
-              <div className="mt-4 space-y-4 text-sm">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-md border p-3">
-                    <div className="text-xs text-muted-foreground">Interno</div>
-                    <div className="font-semibold">{formatTon(detail.internoKg)}</div>
-                  </div>
-                  <div className="rounded-md border p-3">
-                    <div className="text-xs text-muted-foreground">DMR</div>
-                    <div className="font-semibold">{formatTon(detail.dmrKg)}</div>
-                  </div>
-                  <div className="rounded-md border p-3">
-                    <div className="text-xs text-muted-foreground">Diferença</div>
-                    <div className={`font-semibold ${Math.abs(detail.diff) > 50 ? "text-destructive" : ""}`}>{detail.diff > 0 ? "+" : ""}{formatTon(detail.diff)}</div>
-                  </div>
-                </div>
-
-                {(detail.causasSemMtr.length > 0 || detail.causasEstimado.length > 0) && (
-                  <div className="rounded-md border border-warning/40 bg-warning/10 p-3">
-                    <div className="font-medium flex items-center gap-2"><AlertTriangle className="size-4 text-warning-foreground" /> Causas sugeridas</div>
-                    <ul className="mt-1 text-sm list-disc pl-5">
-                      {detail.causasSemMtr.length > 0 && <li>{detail.causasSemMtr.length} coleta(s) sem MTR — provavelmente não foram à DMR.</li>}
-                      {detail.causasEstimado.length > 0 && <li>{detail.causasEstimado.length} coleta(s) com peso estimado.</li>}
-                    </ul>
-                  </div>
-                )}
-
-                <div>
-                  <div className="font-medium mb-2">Coletas internas ({detail.matches.length})</div>
-                  {detail.matches.length === 0 ? <div className="text-muted-foreground text-xs">Nada no sistema interno.</div> : (
-                    <div className="space-y-2">
-                      {detail.matches.map((c) => (
-                        <div key={c.id} className="border rounded-md p-2 flex items-center justify-between">
-                          <div>
-                            <div className="text-xs">{formatDate(c.data)} · MTR {c.mtr || <span className="text-destructive">—</span>}</div>
-                            <div className="text-xs text-muted-foreground">{formatTon(totalPesoColeta(c))} {c.peso_estimado && <span className="text-warning-foreground">(estimado)</span>}</div>
-                          </div>
-                          <Button asChild size="sm" variant="ghost"><Link to="/coletas/$id" params={{ id: c.id }}>Editar</Link></Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <div className="font-medium mb-2">Linhas da DMR ({detail.dmrLinhas.length})</div>
-                  {detail.dmrLinhas.length === 0 ? <div className="text-muted-foreground text-xs">Sem linhas correspondentes na DMR.</div> : (
-                    <div className="space-y-1 text-xs">
-                      {detail.dmrLinhas.slice(0, 20).map((l, i) => (
-                        <div key={i} className="border rounded-md p-2 flex justify-between">
-                          <span>{l.residuo || "—"} · {l.destinador || "—"}</span>
-                          <span className="tabular-nums">{formatTon(Number(l.peso_kg ?? 0))}</span>
-                        </div>
-                      ))}
-                      {detail.dmrLinhas.length > 20 && <div className="text-muted-foreground">+ {detail.dmrLinhas.length - 20} mais...</div>}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
+          {detail && <DetailContent detail={detail} onEditTipo={() => detail.tipoResiduo && setEditTipo(detail.tipoResiduo)} />}
         </SheetContent>
       </Sheet>
+
+      <DmrResolveResiduosDialog
+        open={resolveOpen}
+        onOpenChange={setResolveOpen}
+        uploadId={uploadId}
+        pendentes={pendentes}
+      />
+
+      <TipoResiduoEditDialog
+        open={!!editTipo}
+        onOpenChange={(o) => !o && setEditTipo(null)}
+        tipo={editTipo}
+      />
+    </>
+  );
+}
+
+type DetailSort = "data-desc" | "data-asc" | "peso-desc";
+type DetailFilter = "todas" | "estimado" | "sem-mtr";
+
+function DetailContent({ detail, onEditTipo }: { detail: Grupo; onEditTipo: () => void }) {
+  const [sort, setSort] = useState<DetailSort>("data-desc");
+  const [filter, setFilter] = useState<DetailFilter>("todas");
+
+  const matches = useMemo(() => {
+    let arr = [...detail.matches];
+    if (filter === "estimado") arr = arr.filter((c) => c.peso_estimado);
+    else if (filter === "sem-mtr") arr = arr.filter((c) => !c.mtr);
+    arr.sort((a, b) => {
+      if (sort === "data-asc") return String(a.data).localeCompare(String(b.data));
+      if (sort === "peso-desc") return totalPesoColeta(b) - totalPesoColeta(a);
+      return String(b.data).localeCompare(String(a.data));
+    });
+    return arr;
+  }, [detail, sort, filter]);
+
+  return (
+    <>
+      <SheetHeader>
+        <SheetTitle className="flex items-center gap-2">
+          <button
+            className="hover:underline text-left"
+            onClick={onEditTipo}
+            disabled={!detail.tipoResiduo}
+            title={detail.tipoResiduo ? "Editar tipo de resíduo" : "Resíduo não cadastrado"}
+          >
+            {detail.residuo}
+          </button>
+          {detail.tipoResiduo && <Pencil className="size-3 text-muted-foreground" />}
+          <span className="text-muted-foreground font-normal">· {detail.destinador}</span>
+        </SheetTitle>
+      </SheetHeader>
+      <div className="mt-4 space-y-4 text-sm">
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-muted-foreground">Interno</div>
+            <div className="font-semibold">{formatTon(detail.internoKg)}</div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-muted-foreground">DMR</div>
+            <div className="font-semibold">{formatTon(detail.dmrKg)}</div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-muted-foreground">Diferença</div>
+            <div className={`font-semibold ${Math.abs(detail.diff) > 50 ? "text-destructive" : ""}`}>{detail.diff > 0 ? "+" : ""}{formatTon(detail.diff)}</div>
+          </div>
+        </div>
+
+        {(detail.causasSemMtr.length > 0 || detail.causasEstimado.length > 0) && (
+          <div className="rounded-md border border-warning/40 bg-warning/10 p-3">
+            <div className="font-medium flex items-center gap-2"><AlertTriangle className="size-4 text-warning-foreground" /> Causas sugeridas</div>
+            <ul className="mt-1 text-sm list-disc pl-5">
+              {detail.causasSemMtr.length > 0 && <li>{detail.causasSemMtr.length} coleta(s) sem MTR — provavelmente não foram à DMR.</li>}
+              {detail.causasEstimado.length > 0 && <li>{detail.causasEstimado.length} coleta(s) com peso estimado.</li>}
+            </ul>
+          </div>
+        )}
+
+        <div>
+          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+            <div className="font-medium">Coletas internas ({matches.length}/{detail.matches.length})</div>
+            <div className="flex gap-1">
+              {(["todas", "estimado", "sem-mtr"] as DetailFilter[]).map((f) => (
+                <Button key={f} size="sm" variant={filter === f ? "default" : "outline"} onClick={() => setFilter(f)}>
+                  {f === "todas" ? "Todas" : f === "estimado" ? "Peso estimado" : "Sem MTR"}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mb-2">
+            <Label className="text-xs">Ordenar:</Label>
+            <Select value={sort} onValueChange={(v) => setSort(v as DetailSort)}>
+              <SelectTrigger className="w-48 h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="data-desc">Data (mais recente)</SelectItem>
+                <SelectItem value="data-asc">Data (mais antiga)</SelectItem>
+                <SelectItem value="peso-desc">Peso (maior)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {matches.length === 0 ? <div className="text-muted-foreground text-xs">Nenhuma coleta para o filtro atual.</div> : (
+            <div className="space-y-2">
+              {matches.map((c) => (
+                <div key={c.id} className="border rounded-md p-2 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs">{formatDate(c.data)} · MTR {c.mtr || <span className="text-destructive">—</span>}</div>
+                    <div className="text-xs text-muted-foreground">{formatTon(totalPesoColeta(c))} {c.peso_estimado && <span className="text-warning-foreground">(estimado)</span>}</div>
+                  </div>
+                  <Button asChild size="sm" variant="ghost"><Link to="/coletas/$id" params={{ id: c.id }}>Editar</Link></Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div className="font-medium mb-2">Linhas da DMR ({detail.dmrLinhas.length})</div>
+          {detail.dmrLinhas.length === 0 ? <div className="text-muted-foreground text-xs">Sem linhas correspondentes na DMR.</div> : (
+            <div className="space-y-1 text-xs">
+              {detail.dmrLinhas.slice(0, 20).map((l, i) => (
+                <div key={i} className="border rounded-md p-2 flex justify-between">
+                  <span>{l.residuo || "—"} · {l.destinador || "—"}</span>
+                  <span className="tabular-nums">{formatTon(Number(l.peso_kg ?? 0))}</span>
+                </div>
+              ))}
+              {detail.dmrLinhas.length > 20 && <div className="text-muted-foreground">+ {detail.dmrLinhas.length - 20} mais...</div>}
+            </div>
+          )}
+        </div>
+      </div>
     </>
   );
 }
