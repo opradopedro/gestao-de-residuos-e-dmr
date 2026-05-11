@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo, setPeriodoAtivo } from "@/hooks/use-periodo";
-import { listColetasByUnidade, totalPesoColeta } from "@/lib/data";
+import { listColetasByUnidade, totalPesoColeta, listTiposResiduo, type TipoResiduo } from "@/lib/data";
 import { listDmrUploads, getDmrLinhas, createDmrUpload, deleteDmrUpload, DmrMapeamento } from "@/lib/dmr";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,12 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Upload, Trash2, AlertTriangle, FileSpreadsheet, ChevronRight } from "lucide-react";
+import { Upload, Trash2, AlertTriangle, FileSpreadsheet, ChevronRight, Wand2, Pencil } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { quarterOf } from "@/lib/quarter";
 import { formatTon, formatDate } from "@/lib/format";
+import { TipoResiduoEditDialog } from "@/components/TipoResiduoEditDialog";
+import { DmrResolveResiduosDialog } from "@/components/DmrResolveResiduosDialog";
 
 export const Route = createFileRoute("/dmr")({
   head: () => ({ meta: [{ title: "DMR — Conferência" }] }),
