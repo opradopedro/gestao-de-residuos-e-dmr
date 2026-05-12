@@ -509,7 +509,7 @@ function MergeDialog({ open, onOpenChange, tipo, itens, preselectRemoverId }: {
                     <td className="p-2 border-l">
                       <div><span className="font-semibold">{c.original.data}</span> · MTR: {c.original.mtr || "N/A"}</div>
                       <div className="text-muted-foreground mt-1">{(c.original.itens ?? []).map((it: any) => `${it.tipo_residuo_nome} (${it.peso_kg}kg)`).join(", ")}</div>
-                      <Button variant="link" className="px-0 h-auto text-xs mt-2" onClick={() => window.open(`/coletas/${c.original.id}`, '_blank')}>Verleta original</Button>
+                      <Button variant="link" className="px-0 h-auto text-xs mt-2" onClick={() => window.open(`/coletas/${c.original.id}`, '_blank')}>Ver coleta original</Button>
                     </td>
                     <td className="p-2 border-l">
                       <div><span className="font-semibold">{c.com.data}</span> · MTR: {c.com.mtr || "N/A"}</div>
