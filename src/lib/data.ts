@@ -429,6 +429,52 @@ export async function listAnosComColetas(): Promise<number[]> {
   return Array.from(anos).sort((a, b) => a - b);
 }
 
+export async function checkMergeConflicts(tipo: "destinador" | "transportador", manterId: string, removerId: string) {
+  const table = tipo === "destinador" ? "destinadores" : "transportadores";
+  const colName = tipo === "destinador" ? "destinador_id" : "transportador_id";
+  const { data: manter } = await supabase.from(table).select("nome").eq("id", manterId).single();
+  const nomeManter = manter?.nome ?? "";
+
+  const { data } = await supabase.from("coletas").select("*, itens:coleta_itens(*)").in(colName, [manterId, removerId]);
+  const coletas = (data ?? []) as ColetaComItens[];
+  
+  const afetadas = coletas.filter((c: any) => c[colName] === removerId);
+  const existentes = coletas.filter((c: any) => c[colName] === manterId);
+
+  const mtrMap = new Map<string, ColetaComItens>();
+  for (const c of existentes) if (c.mtr) mtrMap.set(c.mtr, c);
+
+  const noMtrFingerprint = (c: ColetaComItens, destText: string, transText: string) => {
+    const its = (c.itens ?? []).map((it) => `${(it.tipo_residuo_nome||"").toLowerCase()}|${(it.tratamento||"").toLowerCase()}|${it.peso_kg}`).sort().join("#");
+    return `${c.data}|${destText.toLowerCase()}|${transText.toLowerCase()}|${its}`;
+  };
+
+  const exNoMtr = new Map<string, ColetaComItens>();
+  for (const c of existentes) {
+    if (!c.mtr) exNoMtr.set(noMtrFingerprint(c, c.destinador ?? "", c.transportador ?? ""), c);
+  }
+
+  const conflitos: { original: ColetaComItens; com: ColetaComItens; razao: "mtr" | "fingerprint" }[] = [];
+
+  for (const a of afetadas) {
+    const pretDest = tipo === "destinador" ? nomeManter : (a.destinador ?? "");
+    const pretTrans = tipo === "transportador" ? nomeManter : (a.transportador ?? "");
+
+    if (a.mtr && mtrMap.has(a.mtr)) {
+      conflitos.push({ original: a, com: mtrMap.get(a.mtr)!, razao: "mtr" });
+    } else if (!a.mtr) {
+      const fp = noMtrFingerprint(a, pretDest, pretTrans);
+      if (exNoMtr.has(fp)) {
+        conflitos.push({ original: a, com: exNoMtr.get(fp)!, razao: "fingerprint" });
+      }
+      exNoMtr.set(fp, a);
+    }
+    if (a.mtr) mtrMap.set(a.mtr, a);
+  }
+
+  return conflitos;
+}
+
 // ===== Merge =====
 export async function mergeDestinadores(manterId: string, removerId: string): Promise<{ coletasAtualizadas: number; vinculosTransferidos: number }> {
   const { logAction } = await import("@/lib/audit");
