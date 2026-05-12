@@ -1,3 +1,4 @@
+import { parseTonelada } from "@/lib/format";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
@@ -32,7 +33,7 @@ const FIELDS: { key: keyof DmrMapeamento; label: string }[] = [
   { key: "peso_kg", label: "Peso (toneladas)" },
 ];
 
-import { parseTonelada } from "@/lib/format";
+
 
 function DmrPage() {
   const unidade = useUnidadeAtiva();
