@@ -1,3 +1,4 @@
+import { parseTonelada } from "@/lib/format";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
@@ -32,29 +33,7 @@ const FIELDS: { key: keyof DmrMapeamento; label: string }[] = [
   { key: "peso_kg", label: "Peso (toneladas)" },
 ];
 
-// Converte um valor de planilha (que representa TONELADAS) em número.
-// Aceita: número JS (xlsx já parseou), string com vírgula decimal (BR) ou ponto (EN).
-// NÃO remove pontos cegamente (bug anterior multiplicava 2.7 por 10).
-function parseTonelada(v: any): number {
-  if (v == null || v === "") return 0;
-  if (typeof v === "number") return isFinite(v) ? v : 0;
-  let s = String(v).trim();
-  if (!s) return 0;
-  // remove espaços e símbolos de unidade
-  s = s.replace(/\s+/g, "").replace(/t(on(eladas?)?)?$/i, "");
-  const hasComma = s.includes(",");
-  const hasDot = s.includes(".");
-  if (hasComma && hasDot) {
-    // formato BR: "1.234,56" -> remove pontos (milhar), troca vírgula por ponto
-    s = s.replace(/\./g, "").replace(",", ".");
-  } else if (hasComma) {
-    // só vírgula -> decimal BR
-    s = s.replace(",", ".");
-  }
-  // só ponto OU sem separador -> mantém (ponto é decimal padrão)
-  const n = Number(s);
-  return isFinite(n) ? n : 0;
-}
+
 
 function DmrPage() {
   const unidade = useUnidadeAtiva();

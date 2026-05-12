@@ -8,6 +8,7 @@ import {
   listDestinadores, createDestinador, updateDestinador, deleteDestinador, bulkInsertDestinadores,
   listDestinadorResiduos, setDestinadorResiduos,
   mergeDestinadores, mergeTransportadores, mergeUnidades, mergeTiposResiduo, mergeTratamentos,
+  checkMergeConflicts,
   type TipoResiduo, type Tratamento, type Transportador, type Destinador, type Unidade,
 } from "@/lib/data";
 import { PageHeader } from "@/components/NoUnidade";
@@ -443,7 +444,10 @@ function MergeDialog({ open, onOpenChange, tipo, itens, preselectRemoverId }: {
   const qc = useQueryClient();
   const [manterId, setManterId] = useState("");
   const [removerId, setRemoverId] = useState("");
-  useEffect(() => { if (!open) { setManterId(""); setRemoverId(""); } else if (preselectRemoverId) { setRemoverId(preselectRemoverId); } }, [open, preselectRemoverId]);
+  const [conflitos, setConflitos] = useState<any[]>([]);
+
+  useEffect(() => { if (!open) { setManterId(""); setRemoverId(""); setConflitos([]); } else if (preselectRemoverId) { setRemoverId(preselectRemoverId); } }, [open, preselectRemoverId]);
+  
   const mut = useMutation<any, Error, void>({
     mutationFn: async () => {
       if (tipo === "destinador") return mergeDestinadores(manterId, removerId);
@@ -459,7 +463,73 @@ function MergeDialog({ open, onOpenChange, tipo, itens, preselectRemoverId }: {
     },
     onError: (e: any) => toast.error("Erro: " + e.message),
   });
+
+  const checkMut = useMutation<any[], Error, void>({
+    mutationFn: async () => {
+      if (tipo === "destinador" || tipo === "transportador") {
+        return checkMergeConflicts(tipo, manterId, removerId);
+      }
+      return [];
+    },
+    onSuccess: (conf) => {
+      if (conf.length > 0) {
+        setConflitos(conf);
+      } else {
+        mut.mutate();
+      }
+    },
+    onError: (e: any) => toast.error("Erro na verificação: " + e.message),
+  });
+
   const valid = manterId && removerId && manterId !== removerId;
+
+  if (conflitos.length > 0) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Conflitos detectados</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
+              A unificação criará coletas duplicadas. Acesse as coletas abaixo e resolva os conflitos (ex: alterar MTR, excluir duplicata) antes de prosseguir com a unificação.
+            </div>
+            <table className="w-full text-xs border rounded">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="text-left p-2 border-b">Razão</th>
+                  <th className="text-left p-2 border-b">Coleta que será modificada</th>
+                  <th className="text-left p-2 border-b">Coleta existente (já tem o valor)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {conflitos.map((c, i) => (
+                  <tr key={i} className="border-b">
+                    <td className="p-2 font-medium">{c.razao === "mtr" ? `MTR duplicado (${c.original.mtr})` : "Mesmos dados"}</td>
+                    <td className="p-2 border-l">
+                      <div><span className="font-semibold">{c.original.data}</span> · MTR: {c.original.mtr || "N/A"}</div>
+                      <div className="text-muted-foreground mt-1">{(c.original.itens ?? []).map((it: any) => `${it.tipo_residuo_nome} (${it.peso_kg}kg)`).join(", ")}</div>
+                      <Button variant="link" className="px-0 h-auto text-xs mt-2" onClick={() => window.open(`/coletas/${c.original.id}`, '_blank')}>Ver coleta original</Button>
+                    </td>
+                    <td className="p-2 border-l">
+                      <div><span className="font-semibold">{c.com.data}</span> · MTR: {c.com.mtr || "N/A"}</div>
+                      <div className="text-muted-foreground mt-1">{(c.com.itens ?? []).map((it: any) => `${it.tipo_residuo_nome} (${it.peso_kg}kg)`).join(", ")}</div>
+                      <Button variant="link" className="px-0 h-auto text-xs mt-2" onClick={() => window.open(`/coletas/${c.com.id}`, '_blank')}>Ver coleta existente</Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConflitos([])}>Voltar</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar unificação</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -487,7 +557,7 @@ function MergeDialog({ open, onOpenChange, tipo, itens, preselectRemoverId }: {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button disabled={!valid || mut.isPending} onClick={() => mut.mutate()}>{mut.isPending ? "Unificando…" : "Confirmar"}</Button>
+          <Button disabled={!valid || checkMut.isPending || mut.isPending} onClick={() => checkMut.mutate()}>{checkMut.isPending || mut.isPending ? "Unificando…" : "Confirmar"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
