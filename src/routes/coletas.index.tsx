@@ -31,9 +31,10 @@ import { formatDate, formatKgPlain } from "@/lib/format";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+type ColetasSearch = { risco?: string };
 export const Route = createFileRoute("/coletas/")({
   head: () => ({ meta: [{ title: "Coletas — DMR" }] }),
-  validateSearch: (s: Record<string, unknown>) => ({ risco: (s.risco as string) ?? undefined }),
+  validateSearch: (s: Record<string, unknown>): ColetasSearch => ({ risco: s.risco ? String(s.risco) : undefined }),
   component: ColetasList,
 });
 
