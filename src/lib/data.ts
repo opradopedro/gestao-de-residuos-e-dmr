@@ -818,6 +818,32 @@ export function isPendenciaPesoEstimadoSemPeso(c: ColetaComItens): boolean {
   return totalPesoColeta(c) === 0 && !!c.peso_estimado;
 }
 
+// Erro de preenchimento: campos essenciais ausentes (excluindo peso, que tem seção própria).
+export function isErroPreenchimento(c: ColetaComItens): boolean {
+  if (!c.data) return true;
+  if (!c.destinador) return true;
+  if (!c.transportador && !c.dmr_manual) return true;
+  const itens = c.itens ?? [];
+  if (itens.length === 0) return true;
+  return itens.some((it) => !it.tipo_residuo_nome || !it.tratamento);
+}
+
+// Fingerprint canônico: usado para detectar duplicatas em import e merges.
+// Inclui data + destinador + transportador (lowercased trim) + soma normalizada de itens.
+export function coletaFingerprint(input: {
+  data: string;
+  destinador?: string | null;
+  transportador?: string | null;
+  itens: { tipo_residuo_nome: string; tratamento: string; peso_kg: number }[];
+}): string {
+  const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
+  const its = (input.itens ?? [])
+    .map((it) => `${norm(it.tipo_residuo_nome)}|${norm(it.tratamento)}|${Math.round(Number(it.peso_kg || 0) * 1000) / 1000}`)
+    .sort()
+    .join("#");
+  return `${input.data}|${norm(input.destinador)}|${norm(input.transportador)}|${its}`;
+}
+
 // Quantidade de MTRs únicos duplicados no conjunto.
 export function countMtrsDuplicadosUnicos(coletas: ColetaComItens[]): number {
   return findMtrDuplicates(coletas).size;

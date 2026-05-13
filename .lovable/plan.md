@@ -1,216 +1,97 @@
-# Plano de evolução do sistema (8 fases)
-
-Vou agrupar todas as mudanças em fases coerentes, cada uma entregável e testável de forma independente. Nada será dividido entre mensagens — cada fase será executada inteira quando aprovada. Você pode aprovar este plano e pedir para executar tudo de uma vez, ou fase por fase.
-
----
-
-## Fase 1 — Histórico global + UX clicável
-
-**Histórico de alterações**
-
-- Mover acesso ao Histórico do botão da página de Coletas para o **menu lateral** (`AppShell.tsx`), com ícone próprio.
-- Registrar **todas as ações do sistema** (cadastros, edições, merges, importações, DMR, exclusões, rollbacks de qualquer entidade) — não só coletas.
-- O modal passa a ter seletor de unidade: "Todas as unidades" (padrão) ou unidade específica.
-- Limite passa a ser **15 por unidade** (consulta por unidade quando filtrado; quando "Todas", mostra 15 por unidade agrupadas por seção).
-- Quando uma entrada afeta **1 único registro**, mostrar botão **"Ver registro"** que abre modal lado-a-lado: estado anterior (snapshot) × estado atual, com ações **"Editar atual"** e **"Reverter para anterior"**.
-- Rollbacks em massa passam a rodar em **background** com barra de progresso (reaproveitar infra do `import-job.ts`, generalizando para "long-running jobs").
-
-**UX de clicabilidade**
-
-- Em `src/styles.css` / classes utilitárias: garantir `cursor-pointer` em todo elemento clicável (botões, badges interativas, linhas de tabela com ação, ícones).
-- Adicionar micro-animação padrão (`hover:scale-[1.02] active:scale-[0.98] transition`) nos botões via variante do `Button`.
-
----
-
-## Fase 2 — Filtros avançados de Coletas + visualização multi-unidade
-
-**Reestruturação dos filtros (`coletas.index.tsx`)**
-
-- Remover os 3 `MultiSelectFilter` (resíduo/destinador/transportador) e os botões rápidos de filtro.
-- Manter busca livre e **ordenação por cabeçalho** (não alterar).
-- Novo botão **"Filtro avançado"** abrindo painel/sheet com regras compostas:
-  - Campo (data, mtr, resíduo, destinador, transportador, peso, observações, unidade, status)
-  - Operador (igual, contém, começa com, maior que, menor que, entre, vazio, não vazio)
-  - Valor (input adequado ao tipo; data = `De DD/MM/AAAA → A DD/MM/AAAA`)
-  - Múltiplas regras com AND/OR
-- Botão **"Filtros salvos"** ao lado: salvar conjunto atual com nome, listar, aplicar, excluir. Persistência em nova tabela `filtros_salvos` (user-less, por unidade ou global).
-
-**Multi-unidade**
-
-- Toggle no topo: **"Apenas unidade ativa"** (padrão) × **"Todas as unidades"**.
-- Quando "Todas": adicionar coluna **Unidade** na tabela; respeitar período do menu lateral.
-- **Remover coluna "Trimestre"**.
-- Ações de linha: manter **lápis (Editar)** e adicionar **lixeira (Excluir)** com confirmação simples.
-
-**Formato de peso**
-
-- `formatKg` na tabela de coletas passa a sempre exibir em **kg** (sem conversão automática para t). Demais telas (DMR, consolidação) mantêm comportamento atual.
-
----
-
-## Fase 3 — Indicadores de risco unificados + dashboard de risco
-
-**Sistema de severidade**
-
-- Criar helper `getColetaRiscos(coleta)` retornando array de riscos com nível:
-  - Sem MTR por erro de preenchimento → **amarelo**
-  - Sem MTR por operação (DMR manual) → **laranja**
-  - Sem peso (peso 0 ou nulo em qualquer item) → **vermelho**
-  - Peso estimado → **amarelo**
-  - MTR duplicado → **amarelo**
-  - Volume fora da DMR → **laranja**
-- Na tabela de coletas e em qualquer listagem: **um único ícone de exclamação**, cor = maior severidade. Tooltip lista todos os riscos.
-
-**Dashboard de risco (`risco.tsx`)**
-
-- Contabilizar **peso 0 / nulo como "Sem peso"** (hoje só aparece em pendências).
-- Garantir que pendências e dashboard usem o mesmo helper.
-
----
-
-## Fase 4 — Wizard de importação melhorado
-
-**Conflitos**
-
-- Reduzir opções por linha para **"Substituir"** ou **"Ignorar"** (remover "Manter existente" redundante).
-- Barra superior com ações em massa:
-  - Substituir todos / Ignorar todos
-  - **Substituir onde {campo} {operador} {valor}**
-  - **Ignorar onde {campo} {operador} {valor}**
-
-**Detecção de duplicatas sem MTR**
-
-- Quando MTR vazio, comparar (data + resíduo + destinador + transportador + tratamento + peso) — ignora observações.
-- Marcar como **"Possível duplicata"** e exibir tela lado-a-lado: importada × existente, ambas editáveis antes de confirmar.
-
-**Detecção "estimado" em observações**
-
-- Regex tolerante a acentos/typos: `/est[ií]m[ao]?d?[ao]?s?/i` aplicado ao campo observações → marca `peso_estimado = true` automaticamente.
-
-**MTR = "DMR" / "DRM" / variações**
-
-- Regex `/^d[mr]{2}$|incluir.*dmr/i` → trata como `dmr_manual = true`, MTR vazio.
-- Mostrar tabela resumo dessas linhas com ação "Sem MTR / Incluir na DMR" ou "Editar manualmente".
-- **Não agregar** em uma única coleta: cada linha vira coleta separada — exceto quando data + destinador + transportador batem (aí agrupa itens).
-
-**Cadastro inline durante importação**
-
-- Ao clicar **"Adicionar novo"** numa entidade ausente, abrir o **modal completo** da entidade:
-  - Resíduo → modal com tratamento padrão e código IBAMA
-  - Destinador → modal com CNPJ + tipos de tratamento aceitos
-  - Transportador → modal com CNPJ
-- Se houver N novos a cadastrar, abrir modais sequencialmente com contador **"1/N", "2/N"…** no botão de avançar. Se N=1, só "Continuar".
-- Não perder progresso do wizard.
-
-**Validação de CNPJ**
-
-- Ao cadastrar transportador/destinador (em qualquer fluxo): consultar duplicidade de CNPJ **dentro da mesma entidade** (transportador e destinador são independentes).
-- Se duplicado: mensagem **"CNPJ já cadastrado, clique aqui para ver"** → abre modal de edição do existente.
-
----
-
-## Fase 5 — Cadastros: vínculos automáticos, merge ampliado, exclusão inteligente
-
-**Vínculos automáticos**
-
-- Ao salvar coleta com resíduo não vinculado ao destinador: criar vínculo em `destinador_residuos` automaticamente e disparar **toast** "Resíduo X vinculado ao destinador Y". Funciona para múltiplos itens.
-
-**UI de resíduos por destinador**
-
-- Mostrar apenas vinculados + botão **"Expandir lista"** revelando todos.
-
-**Validação dura nos autocompletes**
-
-- `Autocomplete` usado em `ColetaForm`: ao perder foco com valor não existente em (resíduo, tratamento, destinador, transportador), abrir automaticamente o modal de cadastro pré-preenchido. Só aceita o valor se cadastrado.
-
-**Edição em cascata**
-
-- Ao renomear resíduo / destinador / transportador / tratamento no cadastro: `UPDATE` em todas as coletas e itens que usam o nome antigo (já existe via `_id`, mas o **nome textual** em `coleta_itens.tipo_residuo_nome` / `coletas.destinador` / `coletas.transportador` precisa ser propagado). Implementar com transação SQL.
-
-**Merge ampliado**
-
-- Hoje só transportador e destinador. Adicionar merge para **resíduos** e **tratamentos**.
-- Botão "Unificar duplicados" disponível também ao **editar** o item (não só na lista).
-- Confirmação destacada: **"Esta ação não pode ser desfeita"**, mas registrar no histórico.
-
-**Exclusão com transferência**
-
-- Ao excluir unidade/resíduo/tratamento/transportador/destinador com dados associados: dialog perguntando **"Transferir dados para outro {tipo}?"** com dropdown dos existentes.
-- Se transferir: mover coletas/itens/vínculos; ignorar duplicatas (vínculos que já existem no destino).
-- Se não transferir: coletas afetadas perdem o vínculo e entram em **Pendências**.
-
----
-
-## Fase 6 — DMR melhorada (parsing IBAMA + cadastro inline + drilldown)
-
-**Match por código IBAMA**
-
-- Resíduos ganham campo `codigo_ibama` (já existe `codigo` em `tipos_residuo` — reutilizar e renomear semanticamente).
-- Ao casar resíduo da DMR: `dmrResiduo.startsWith(tipo.codigo_ibama)` (não "contém").
-- Exemplo: "200138 - madeira não abrangida..." casa com tipo cujo código é `200138`.
-
-**Resíduos não cadastrados na DMR**
-
-- Mesmo fluxo da importação de coletas: lista os ausentes, opção **"Substituir por existente"** ou **"Criar novo"** (modal completo, com contador N/N).
-
-**Editar resíduo a partir da DMR**
-
-- Clicar em resíduo interno na DMR: abre modal de edição do tipo de resíduo (incluindo código IBAMA).
-- Ao salvar: propagação em cascata (Fase 5) para todas coletas/itens.
-
-**Drilldown**
-
-- Adicionar ordenação por data.
-- Botões de filtro: **Todas**, **Peso estimado**, **Sem MTR**.
-
----
-
-## Fase 7 — Coleta: merge/import com validação cruzada de MTR
-
-**Detecção em merge**
-
-- Ao fazer merge de transportador/destinador, se houver coletas com MTR já presente em outra coleta do sistema: avisar e abrir comparativo lado-a-lado, opção de editar uma das duas.
-
-**Duplicata sem MTR no merge/import**
-
-- Mesma regra da Fase 4 (data + resíduo + destinador + tratamento bateram → duplicata).
-
----
-
-## Fase 8 — Correção do bug crítico de DMR em toneladas
-
-Já foi corrigido em fase anterior — fazer **revisão + testes**:
-
-- Conferir que valores como "2,7" continuam virando 2.7 t (não 270 t).
-- Adicionar testes unitários simples em `parseTonelada` para os formatos: `2,7`, `1.234,56`, `1234.56`, `2700`.
-
----
-
-## Mudanças de banco previstas
-
-```sql
--- Fase 1: histórico global (audit_log já existe; permitir unidade_id null = global)
--- Já está null-able; ajustar apenas listAuditLog para agrupar por unidade.
-
--- Fase 2: filtros salvos
-CREATE TABLE filtros_salvos (
-  id uuid PK, nome text, escopo text, -- 'coletas'
-  unidade_id uuid NULL, regras jsonb, criado_em timestamptz
-);
-
--- Fase 6: garantir tipos_residuo.codigo_ibama (usar coluna 'codigo' existente; documentar)
-```
-
-Sem mudanças destrutivas. RLS mantida como `public all` (modo atual do projeto).
-
----
-
-## Garantias
-
-- Cada fase é independente: rollback de uma não quebra as outras.
-- Funcionalidades existentes (ordenação por cabeçalho, importação em background, rollback de import, formato BR de números, etc.) **não serão alteradas** exceto onde explicitamente listado.
-- Testes manuais sugeridos ao fim de cada fase: checklist por bullet.
-
----
-
-**Como prosseguir:** Faça 2 fases por vez.
+## Plano de correções e melhorias
+
+Organizei as ~25 demandas em 6 fases para ataque coordenado. Cada fase termina em estado utilizável; fases pesadas ficam por último.
+
+### Fase 1 — Riscos & Pendências (unificação) e correções pontuais
+
+1. **Tooltip do "!" no menu lateral** (`src/components/AppShell.tsx`): substituir badge estático por `TooltipProvider/Tooltip` que usa `getColetaRiscos` + helpers (`countMtrDuplicatesExcess`, `isPendenciaSemMtr`, `isPendenciaSemPeso`, novo `hasErrosPreenchimento`) para listar resumo ("2 sem MTR · 1 sem peso · 1 MTR duplicado · 3 erros de preenchimento").
+2. **Peso = 0 reconhecido como risco**: `isPendenciaSemPeso` já trata, mas a tela de Risco (`src/routes/risco.tsx`) usa filtro errado. Revisar para usar `totalPesoColeta(c) === 0` direto. Também aceitar itens com `peso_kg === 0`.
+3. **Renomear "Operação Manual" → "MTR não Emitido (Incluir na DMR)"** em todas as telas (`risco.tsx`, `coletas.index.tsx`, `ColetaViewDialog.tsx`, badges, banners, audit). Obs: Adicionar o incluir na DMR somente quando houver espaço e ficar visualmente bonito.
+4. **Página de risco — explicação dos níveis**: adicionar bloco "Entenda os indicadores" (Vermelho/Laranja/Amarelo) no topo de `risco.tsx`.
+5. **Nova seção "Erros de preenchimento"** em `risco.tsx`: filtra coletas com qualquer campo nulo (data, destinador, transportador, tipo_residuo_nome, tratamento), exceto peso (que já tem seção própria).
+6. **Drill-down dos cards de risco**: cada card navega para `/coletas?filtroRisco=<tipo>` com pré-aplicação do filtro avançado equivalente. Adicionar suporte em `coletas.index.tsx` para ler `search` params e popular `AdvancedFilterDialog`.
+7. **Remover página Pendências** (`src/routes/pendencias.tsx`) e item de menu; redirecionar `/pendencias` → `/risco` (que vira "Riscos e Pendências").
+
+### Fase 2 — Filtros e exclusão em massa
+
+1. **Filtro avançado em todos os locais que tem filtro**: cadastros (`cadastros.tsx`), DMR (`dmr.tsx`), histórico, etc. Extrair `AdvancedFilterDialog` em modo genérico aceitando `fields: {key,label,type}[]`.
+2. `**BulkDeleteDialog` usar mesmo motor do filtro avançado**: substituir o filtro simples atual (campo/op/valor único) por `AdvancedFilterDialog` com regras combináveis (igual, contém, não contém, vazio, não vazio, intervalo de datas, etc). Adicionar campo "Unidade" como opção.
+3. **Exclusão em massa nos cadastros**: novo `BulkDeleteEntidadesDialog` para resíduos/tratamentos/transportadores/destinadores. Para cada item perguntar transferência (mesma UX do `EntityDeleteDialog`) ou deixar como pendência. Auditável.
+4. `**EntityDeleteDialog` — permitir "Não transferir"**: hoje trava porque `deleteEntidadeComTransferencia` provavelmente erra quando `transferTo === null`. Ajustar `src/lib/data.ts` para deslinkar (set null) e seguir adiante; após escolha, abrir confirmação extra ("Tem certeza? Isto desvinculará N registros que aparecerão em Pendências").
+
+### Fase 3 — Edição rápida & modais consistentes
+
+1. **Click em coleta abre modal de edição** (não navegar para rota): substituir `ColetaViewDialog` por `ColetaEditDialog` que usa `ColetaForm` com botões "Voltar" e "Salvar alterações" (desabilitado até `isDirty`). Aplicar em coletas, drill-down de risco, conflitos.
+2. **Padronizar todos os "Quick…" e "…FullDialog"**:
+  - `QuickTratamentoDialog` x dialog de tratamento em `cadastros.tsx`: mesmos campos (Nome, Código opcional), mesma validação.
+  - Idem para resíduo, destinador, transportador. Extrair um único componente reutilizável por entidade.
+3. **Autocomplete + cancelar quick dialog**: ao fechar (X / overlay click) o `QuickResiduoDialog`/`QuickTratamentoDialog`, limpar o valor digitado no campo de origem (ColetaForm). Hoje texto fica órfão.
+4. **Tratamento sem cadastro no `ColetaForm**`: hoje só resíduo abre modal automático. Aplicar `strictOnBlur` igual no campo Tratamento, abrindo `QuickTratamentoDialog`.
+5. **"Ver todos" do destinador**: corrigir lógica em `cadastros.tsx`/`ColetaForm` que não está respondendo. Quando usuário marca um resíduo da lista expandida, chamar `autoLinkResiduosDestinador` para vincular ao destinador específico imediatamente (com toast).
+
+### Fase 4 — CNPJ, código IBAMA, MTR provisório
+
+1. **Validação oficial de CNPJ** (`src/lib/format.ts` ou novo `src/lib/cnpj.ts`):
+  - `normalizeCNPJ(s)`: só dígitos.
+  - `isValidCNPJ(s)`: 14 dígitos + verificação de DV oficial + rejeitar sequências repetidas (00000000000000…).
+  - `formatCNPJ(s)`: `00.000.000/0000-00`.
+  - Aplicar em `QuickEntityDialog` (destinador/transportador) e em cadastros. Salvar normalizado; exibir formatado ao lado do nome em todos os locais (selects, listas, badges).
+2. **Código IBAMA**:
+  - `normalizeCodigoIbama(s)`: extrai 6 dígitos + opcional `*`. Aceita formatos `16 10 01*`, `161001`, `150202(*)`.
+  - `formatCodigoIbama(s)`: sempre `## ## ##` + `*` se for perigoso.
+  - Aplicar em `TipoResiduoEditDialog`, `QuickResiduoDialog`, e na resolução de resíduos da DMR (`resolveResiduoCanonical`) para casar `150202(*)` com `150202*`.
+3. **MTR provisório**:
+  - Em `ColetaImportWizard.parsedRows`, antes do `dmr_manual` check, detectar regex `/\bP\d{4,}\b/i` e usar como MTR (não tratar como manual).
+  - Mesma detecção em `dmr.ts` (parser DMR).
+
+### Fase 5 — Importação de coletas (PRIORIDADE ALTA — duplicatas)
+
+Causas identificadas no fluxo atual (`ColetaImportWizard.tsx`):
+
+- O fingerprint de "sem MTR" inclui `tratamento` e `residuo` em lowercase do **valor do arquivo**, mas no banco eles foram normalizados pelo `missingMap` (substituídos por nomes canônicos). Re-importação compara texto cru × texto canônico → 16 falsos negativos.
+- Coletas marcadas `dmr_manual` perdem `mtr` (vira ""), então fingerprint vira "nm:data|dest|trans" — qualquer pequena diferença de tratamento/residuo escapa.
+- Itens importados em **uma só coleta** quando deveriam ser separados (ex: 03/07 Madeira + Lixo Seco).
+
+Plano:
+
+1. **Aplicar `missingMap` ANTES de gerar fingerprint**: no `parsedRows`, substituir `residuo`/`tratamento`/`destinador`/`transportador` para o nome canônico escolhido pelo usuário antes de agrupar.
+2. **Fingerprint canônico unificado**: criar `coletaFingerprint(c|grupo)` em `src/lib/data.ts` — sempre baseado em (data + destinador normalizado + transportador normalizado + Σ itens [residuo norm | tratamento norm | peso arredondado 3 casas]). Usar **a mesma função** em import wizard, `checkMergeConflicts` e novo detector de merge sem MTR.
+3. **Tela "DMR/Manual: agrupamento"** (novo step do wizard, antes de `review`): listar todos os grupos `dmr_manual` que possuem >1 item; permitir marcar item-a-item "manter junto" / "separar". Suportar regra global ("separar tudo", "separar por resíduo", "manter agrupado se mesmo destinador").
+4. **Cadastros faltantes obrigatórios**: o wizard só avança quando todos os ausentes têm `missingMap[chave] !== undefined` (cadastrar novo OU substituir). UI atual com "cadastre um a um, contador embaixo (3 de 7)" — bloquear botão Avançar.
+5. **Detecção de duplicatas em DMR manual**: usar fingerprint canônico independentemente de `mtr === ""`.
+6. **Suíte de testes manual**: documentar no PR roteiro de re-importar `Controle_de_Coletas.xlsx` 2x, garantir 0 novas coletas. Validar com user.
+
+### Fase 6 — DMR, merge & histórico
+
+1. **DMR — bug do "pula de 2 em 2"** (`DmrResolveResiduosDialog`): índice deriva da lista filtrada que se atualiza ao vivo após cada `renameDmrLinhasResiduo`. Solução: congelar a lista de pendências no estado local na abertura do dialog; só refazer a query ao fechar.
+2. **DMR — destinadores não cadastrados**: replicar fluxo de resíduos com `DmrResolveDestinadoresDialog` (substituir / criar novo).
+3. **Histórico — exclusão de cadastro**: `cadastros.tsx` deve registrar `audit_log` em deletes/edits de tipo_residuo, tratamento, transportador, destinador (com snapshot para rollback).
+4. **Histórico — ver registros afetados**: `HistoryDialog` deve, para entradas de tipo "import" / "bulk_delete", exibir lista (do `snapshot`) com link para abrir cada coleta no novo `ColetaEditDialog`.
+5. **Merge com conflitos — UX nova**:
+  - Em `MergeDialog` (`cadastros.tsx`), para cada par exibir cards lado-a-lado com nomes reais ("MTR 250003976498 — Multilixo" vs "MTR 250003976498 — Multibio Energia") e radio "Manter A" / "Manter B".
+  - Botões "Pré-selecionar todos A" / "Pré-selecionar todos B".
+  - Habilitar botão "Confirmar merge" mesmo com conflitos não resolvidos? **Não** — mas resolver = escolher A ou B (em vez de "ir editar"). A escolha deleta a outra coleta no mesmo passo da merge.
+  - Travamento em DMR manual: garantir que detecção use fingerprint canônico (Fase 5.2).
+6. **Detecção de duplicata sem MTR aplicada em todos os fluxos**: import, merge, e novo botão "Detectar duplicatas" na tela de coletas (opcional, se sobrar tempo).
+
+### Correções pontuais menores (vão entrando ao longo das fases acima)
+
+- **Coletas — escopo "ver todas" mostra período errado** (`coletas.index.tsx`): texto "(período Jan-Mar 2026)" deve ser substituído por "(período: Total)" quando `escopo === "todas"`. Bug em template literal — checar e ajustar.
+
+### Detalhes técnicos
+
+- Sem mudanças de schema. Tudo client-side + helpers em `src/lib/`.
+- `audit_log` já cobre snapshot + rollback; basta novos `tipo` para "cadastro_excluido", "cadastro_editado".
+- `ColetaEditDialog` reutiliza `ColetaForm` com prop `mode="edit"` + handlers de dirty-check.
+- Nenhuma necessidade de novo secret / migration.
+
+### Ordem sugerida de execução
+
+1. Fase 1 (curta, alto impacto visual)
+2. Fase 4 (CNPJ + IBAMA + MTR provisório — base para outras fases)
+3. Fase 5 (CRÍTICA — duplicatas)
+4. Fase 2 (filtros & bulk)
+5. Fase 3 (UX modais)
+6. Fase 6 (DMR/merge/histórico)
+
+Pergunta antes de implementar: **posso começar pela Fase 1 + Fase 4 em conjunto** (são as mais isoladas), e depois atacar a Fase 5 sozinha (por ser sensível a regressões)?

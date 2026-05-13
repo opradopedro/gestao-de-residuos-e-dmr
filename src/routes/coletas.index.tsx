@@ -31,8 +31,10 @@ import { formatDate, formatKgPlain } from "@/lib/format";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+type ColetasSearch = { risco?: string };
 export const Route = createFileRoute("/coletas/")({
   head: () => ({ meta: [{ title: "Coletas — DMR" }] }),
+  validateSearch: (s: Record<string, unknown>): ColetasSearch => ({ risco: s.risco ? String(s.risco) : undefined }),
   component: ColetasList,
 });
 
@@ -144,7 +146,7 @@ function ColetasList() {
     <div className="p-6 max-w-7xl">
       <PageHeader
         title="Coletas"
-        description={`${coletas.length} coletas no escopo · ${filtradas.length} visíveis após filtros (período ${periodo.label}).`}
+        description={`${coletas.length} coletas no escopo · ${filtradas.length} visíveis após filtros${todasColetas ? " (todos os períodos)" : ` (período ${periodo.label})`}.`}
         actions={
           <div className="flex gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={() => setBulkDeleteOpen(true)}>
