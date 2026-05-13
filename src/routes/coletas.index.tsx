@@ -33,6 +33,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/coletas/")({
   head: () => ({ meta: [{ title: "Coletas — DMR" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({ risco: (s.risco as string) ?? undefined }),
   component: ColetasList,
 });
 
