@@ -59,13 +59,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const noTri = coletas.filter((c) => c.data >= periodo.start && c.data <= periodo.end);
     const semMtr = noTri.filter(isPendenciaSemMtr).length;
     const semPeso = noTri.filter(isPendenciaSemPeso).length;
-    const dupUnicos = findMtrDuplicates(noTri).size;
+    const errosPreench = noTri.filter(isErroPreenchimento).length;
+    const dupExcess = countMtrDuplicatesExcess(noTri);
     const pesoSemMtr = noTri.filter(isPendenciaSemMtr).reduce((s, c) => s + totalPesoColeta(c), 0);
-    const pendencias = semMtr + semPeso + dupUnicos;
-    const risco = (semMtr > 5 || pesoSemMtr > 1000)
+    const pendencias = semMtr + semPeso + dupExcess + errosPreench;
+    const risco = (semMtr > 5 || pesoSemMtr > 1000 || semPeso > 0)
       ? "alto"
       : pendencias > 0 ? "medio" : "ok";
-    return { pendencias, risco };
+    return { pendencias, risco, semMtr, semPeso, dupExcess, errosPreench };
   }, [coletas, periodo.start, periodo.end]);
 
   return (
