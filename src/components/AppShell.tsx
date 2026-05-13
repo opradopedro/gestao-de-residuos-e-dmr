@@ -121,12 +121,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Button>
         </div>
         <nav className="flex-1 p-3 space-y-0.5">
+          <TooltipProvider delayDuration={150}>
           {NAV.map((item) => {
             const active = item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to);
             const Icon = item.icon;
-            const badgeVal = item.badge === "pendencias" && badges.pendencias > 0 ? String(badges.pendencias)
-              : item.badge === "risco" && badges.risco === "alto" ? "!" : null;
-            return (
+            const showRisk = item.badge === "risco" && (badges.risco === "alto" || badges.pendencias > 0);
+            const linkEl = (
               <Link
                 key={item.to}
                 to={item.to as any}
@@ -137,15 +137,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 <Icon className="size-4" />
                 <span className="flex-1">{item.label}</span>
-                {badgeVal && (
+                {showRisk && (
                   <span className={cn("text-[10px] font-semibold rounded-full px-1.5 py-0.5 min-w-5 text-center",
-                    item.badge === "pendencias" ? "bg-warning text-warning-foreground" : "bg-destructive text-destructive-foreground")}>
-                    {badgeVal}
+                    badges.risco === "alto" ? "bg-destructive text-destructive-foreground" : "bg-warning text-warning-foreground")}>
+                    {badges.risco === "alto" ? "!" : String(badges.pendencias)}
                   </span>
                 )}
               </Link>
             );
+            if (!showRisk) return linkEl;
+            return (
+              <Tooltip key={item.to}>
+                <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
+                <TooltipContent side="right" className="text-left">
+                  <div className="space-y-0.5">
+                    {badges.semMtr > 0 && <div>{badges.semMtr} coleta(s) sem MTR</div>}
+                    {badges.semPeso > 0 && <div>{badges.semPeso} coleta(s) sem peso</div>}
+                    {badges.dupExcess > 0 && <div>{badges.dupExcess} MTR(s) duplicado(s)</div>}
+                    {badges.errosPreench > 0 && <div>{badges.errosPreench} erro(s) de preenchimento</div>}
+                    {badges.pendencias === 0 && <div>Sem pendências no período</div>}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            );
           })}
+          </TooltipProvider>
           <button
             onClick={() => setHistoryOpen(true)}
             className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors text-sidebar-foreground hover:bg-sidebar-accent/60"
