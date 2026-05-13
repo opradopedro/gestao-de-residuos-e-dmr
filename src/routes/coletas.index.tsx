@@ -144,7 +144,7 @@ function ColetasList() {
     <div className="p-6 max-w-7xl">
       <PageHeader
         title="Coletas"
-        description={`${coletas.length} coletas no escopo · ${filtradas.length} visíveis após filtros (período ${periodo.label}).`}
+        description={`${coletas.length} coletas no escopo · ${filtradas.length} visíveis após filtros${todasColetas ? " (todos os períodos)" : ` (período ${periodo.label})`}.`}
         actions={
           <div className="flex gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={() => setBulkDeleteOpen(true)}>
