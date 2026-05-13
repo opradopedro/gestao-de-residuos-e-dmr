@@ -1,27 +1,32 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo } from "@/hooks/use-periodo";
 import {
   listColetasByUnidade, totalPesoColeta, findMtrDuplicates,
-  isPendenciaSemMtr, isSemMtrOperacao, isPendenciaPesoEstimadoSemPeso,
+  isPendenciaSemMtr, isSemMtrOperacao, isPendenciaSemPeso, isErroPreenchimento,
 } from "@/lib/data";
 import { listDmrUploads, getDmrLinhas } from "@/lib/dmr";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ShieldAlert, ShieldCheck, ShieldQuestion, ArrowRight, AlertTriangle, FileWarning, Scale, FileSpreadsheet, FileCheck } from "lucide-react";
+import { ShieldAlert, ShieldCheck, ShieldQuestion, ArrowRight, AlertTriangle, FileWarning, Scale, FileSpreadsheet, FileCheck, Info } from "lucide-react";
 import { useMemo } from "react";
 import { formatTon, formatKg } from "@/lib/format";
 
 export const Route = createFileRoute("/risco")({
-  head: () => ({ meta: [{ title: "Risco — DMR" }] }),
+  head: () => ({ meta: [{ title: "Riscos & Pendências — DMR" }] }),
   component: RiscoPage,
 });
+
+type RiskFilter =
+  | "sem_mtr_erro" | "sem_mtr_dmr" | "sem_peso" | "mtr_duplicado"
+  | "peso_estimado" | "fora_dmr" | "erro_preenchimento";
 
 function RiscoPage() {
   const unidade = useUnidadeAtiva();
   const periodo = usePeriodoAtivo();
+  const navigate = useNavigate();
 
   const { data: coletas = [] } = useQuery({
     queryKey: ["coletas", unidade],
@@ -47,7 +52,7 @@ function RiscoPage() {
     const semMtrOp = noTri.filter(isSemMtrOperacao);
     const semMtrTotal = semMtrErro.length + semMtrOp.length;
     const estimadoComPeso = noTri.filter((c) => c.peso_estimado && totalPesoColeta(c) > 0);
-    const estimadoSemPeso = noTri.filter(isPendenciaPesoEstimadoSemPeso);
+    const semPesoTodos = noTri.filter(isPendenciaSemPeso);
     const totalKg = noTri.reduce((s, c) => s + totalPesoColeta(c), 0);
     const pesoSemMtr = semMtrErro.reduce((s, c) => s + totalPesoColeta(c), 0);
     const pesoSemMtrOp = semMtrOp.reduce((s, c) => s + totalPesoColeta(c), 0);
@@ -55,6 +60,7 @@ function RiscoPage() {
     const dups = findMtrDuplicates(noTri);
     const dupColetas = noTri.filter((c) => c.mtr && dups.has(c.mtr));
     const dupUnicos = dups.size;
+    const errosPreench = noTri.filter(isErroPreenchimento);
 
     let foraDmr = 0;
     if (upload) {
@@ -62,17 +68,16 @@ function RiscoPage() {
       foraDmr = Math.max(0, totalKg - totalDmr);
     }
 
-    // Total de fatores de risco = total de coletas sem MTR (erro + operação).
-    const fatoresRisco = semMtrTotal;
+    const fatoresRisco = semMtrTotal + (semPesoTodos.length > 0 ? 1 : 0) + (dupUnicos > 0 ? 1 : 0) + (errosPreench.length > 0 ? 1 : 0);
 
     let nivel: "alto" | "medio" | "baixo" = "baixo";
-    if (semMtrErro.length > 5 || foraDmr > 1000 || estimadoSemPeso.length > 0) nivel = "alto";
-    else if (semMtrTotal > 0 || dupUnicos > 0 || (totalKg > 0 && pesoEstimado / totalKg > 0.1)) nivel = "medio";
+    if (semMtrErro.length > 5 || foraDmr > 1000 || semPesoTodos.length > 0 || errosPreench.length > 5) nivel = "alto";
+    else if (semMtrTotal > 0 || dupUnicos > 0 || errosPreench.length > 0 || (totalKg > 0 && pesoEstimado / totalKg > 0.1)) nivel = "medio";
 
     return {
-      nivel, semMtrErro, semMtrOp, semMtrTotal, estimadoComPeso, estimadoSemPeso,
+      nivel, semMtrErro, semMtrOp, semMtrTotal, estimadoComPeso, semPesoTodos,
       pesoSemMtr, pesoSemMtrOp, pesoEstimado, totalKg, foraDmr, dupColetas, dupUnicos,
-      totalColetas: noTri.length, temUpload: !!upload, fatoresRisco,
+      totalColetas: noTri.length, temUpload: !!upload, fatoresRisco, errosPreench,
     };
   }, [coletas, periodo, upload, linhasDmr]);
 
@@ -85,9 +90,13 @@ function RiscoPage() {
     : { bg: "bg-success/10", border: "border-success/40", text: "text-success", icon: ShieldCheck, label: "Risco baixo" };
   const Icon = tone.icon;
 
+  const goColetas = (filtro: RiskFilter) => {
+    navigate({ to: "/coletas", search: { risco: filtro } as any });
+  };
+
   return (
     <div className="p-6 max-w-6xl space-y-6">
-      <PageHeader title="Dashboard de Risco" description={`Avaliação consolidada para ${periodo.label}.`} />
+      <PageHeader title="Riscos & Pendências" description={`Avaliação consolidada para ${periodo.label}.`} />
 
       <Card className={`${tone.bg} ${tone.border} border-2`}>
         <CardContent className="p-6 flex items-start gap-5">
@@ -102,9 +111,21 @@ function RiscoPage() {
             <div className="text-sm text-muted-foreground mt-2">
               {analise.totalColetas} coleta(s) registrada(s) totalizando {formatTon(analise.totalKg)} no período.
               {analise.semMtrTotal > 0 && (
-                <> · <span className="text-destructive font-medium">{analise.semMtrErro.length} sem MTR (erro)</span> + <span className="text-warning-foreground font-medium">{analise.semMtrOp.length} sem MTR (operação manual)</span></>
+                <> · <span className="text-destructive font-medium">{analise.semMtrErro.length} sem MTR (erro)</span> + <span className="text-warning-foreground font-medium">{analise.semMtrOp.length} Incluir na DMR</span></>
               )}
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border bg-muted/30">
+        <CardContent className="p-4 flex items-start gap-3">
+          <Info className="size-5 text-muted-foreground shrink-0 mt-0.5" />
+          <div className="text-sm space-y-1">
+            <div className="font-medium">Entenda os indicadores</div>
+            <div><span className="inline-block size-2 rounded-full bg-destructive mr-2" /><strong>Vermelho — Crítico:</strong> coletas sem MTR por erro de preenchimento, DMR incompleta com volume relevante, ou peso ausente. Resolver antes de fechar o trimestre.</div>
+            <div><span className="inline-block size-2 rounded-full bg-orange-500 mr-2" /><strong>Laranja — Alto:</strong> erros pontuais (ex: poucas coletas sem MTR, MTRs duplicados, divergências menores com a DMR). Revisar antes do envio.</div>
+            <div><span className="inline-block size-2 rounded-full bg-warning mr-2" /><strong>Amarelo — Atenção:</strong> situações intencionais ou informativas (peso estimado, coletas marcadas para inclusão manual na DMR). Não bloqueia, mas vale conferir.</div>
           </div>
         </CardContent>
       </Card>
@@ -118,29 +139,39 @@ function RiscoPage() {
           descricao={analise.semMtrErro.length > 0
             ? `${analise.semMtrErro.length} coleta(s) totalizando ${formatKg(analise.pesoSemMtr)} sem rastreio oficial.`
             : "Todas as coletas que deveriam ter MTR possuem MTR."}
-          link="/pendencias"
+          onClick={() => goColetas("sem_mtr_erro")}
           subtitulo="risco — erro de preenchimento"
         />
         <FatorRisco
           ativa={analise.semMtrOp.length > 0}
           nivel="medio"
           icon={FileCheck}
-          titulo="Sem MTR (operação manual / INCLUIR NA DMR)"
+          titulo="Incluir na DMR"
           descricao={analise.semMtrOp.length > 0
-            ? `${analise.semMtrOp.length} coleta(s) totalizando ${formatKg(analise.pesoSemMtrOp)} marcadas para inclusão manual na DMR — também são risco, embora intencional.`
+            ? `${analise.semMtrOp.length} coleta(s) totalizando ${formatKg(analise.pesoSemMtrOp)} marcadas para inclusão manual na DMR.`
             : "Nenhuma coleta marcada para inclusão manual na DMR."}
-          link="/coletas"
+          onClick={() => goColetas("sem_mtr_dmr")}
           subtitulo="risco — operação"
         />
         <FatorRisco
-          ativa={analise.estimadoSemPeso.length > 0}
+          ativa={analise.semPesoTodos.length > 0}
           nivel="alto"
           icon={Scale}
-          titulo="Sem peso (inclui peso estimado vazio)"
-          descricao={analise.estimadoSemPeso.length > 0
-            ? `${analise.estimadoSemPeso.length} coleta(s) sem valor de peso informado.`
+          titulo="Sem peso (peso = 0 ou ausente)"
+          descricao={analise.semPesoTodos.length > 0
+            ? `${analise.semPesoTodos.length} coleta(s) com peso zerado ou não informado.`
             : "Todas as coletas têm peso informado."}
-          link="/pendencias"
+          onClick={() => goColetas("sem_peso")}
+        />
+        <FatorRisco
+          ativa={analise.errosPreench.length > 0}
+          nivel={analise.errosPreench.length > 5 ? "alto" : "medio"}
+          icon={AlertTriangle}
+          titulo="Erros de preenchimento"
+          descricao={analise.errosPreench.length > 0
+            ? `${analise.errosPreench.length} coleta(s) com campos essenciais vazios (data, destinador, transportador, resíduo ou tratamento).`
+            : "Sem erros de preenchimento."}
+          onClick={() => goColetas("erro_preenchimento")}
         />
         <FatorInformativo
           ativa={analise.estimadoComPeso.length > 0}
@@ -149,7 +180,7 @@ function RiscoPage() {
           descricao={analise.estimadoComPeso.length > 0
             ? `${analise.estimadoComPeso.length} coleta(s) com ${formatKg(analise.pesoEstimado)} emitidas com peso estimado.`
             : "Nenhuma coleta com peso estimado."}
-          link="/coletas"
+          onClick={() => goColetas("peso_estimado")}
         />
         <FatorRisco
           ativa={analise.dupUnicos > 0}
@@ -159,7 +190,7 @@ function RiscoPage() {
           descricao={analise.dupUnicos > 0
             ? `${analise.dupUnicos} MTR(s) único(s) duplicado(s) em ${analise.dupColetas.length} coleta(s).`
             : "Nenhum MTR duplicado detectado."}
-          link="/pendencias"
+          onClick={() => goColetas("mtr_duplicado")}
         />
         <FatorRisco
           ativa={analise.foraDmr > 0}
@@ -171,7 +202,7 @@ function RiscoPage() {
             : analise.foraDmr > 0
             ? `${formatTon(analise.foraDmr)} no sistema interno não aparecem na DMR oficial.`
             : "Sistema interno e DMR estão alinhados."}
-          link="/dmr"
+          onClick={() => navigate({ to: "/dmr" })}
         />
       </div>
     </div>
@@ -187,7 +218,7 @@ function severidadeTone(severidade: "vermelho" | "laranja" | "amarelo" | "ok") {
   }
 }
 
-function FatorRisco({ ativa, nivel, icon: Icon, titulo, descricao, link, subtitulo }: { ativa: boolean; nivel: "alto" | "medio" | "baixo"; icon: any; titulo: string; descricao: string; link: string; subtitulo?: string }) {
+function FatorRisco({ ativa, nivel, icon: Icon, titulo, descricao, onClick, subtitulo }: { ativa: boolean; nivel: "alto" | "medio" | "baixo"; icon: any; titulo: string; descricao: string; onClick: () => void; subtitulo?: string }) {
   const sev: "vermelho" | "laranja" | "amarelo" | "ok" = !ativa ? "ok"
     : nivel === "alto" ? "vermelho"
     : nivel === "medio" ? "laranja"
@@ -206,8 +237,8 @@ function FatorRisco({ ativa, nivel, icon: Icon, titulo, descricao, link, subtitu
           <div className="text-sm text-muted-foreground">{descricao}</div>
         </div>
         {ativa && (
-          <Button asChild size="sm" variant="outline">
-            <Link to={link as any}>Ver <ArrowRight className="size-3.5 ml-1" /></Link>
+          <Button size="sm" variant="outline" onClick={onClick}>
+            Ver coletas <ArrowRight className="size-3.5 ml-1" />
           </Button>
         )}
       </CardContent>
@@ -215,7 +246,7 @@ function FatorRisco({ ativa, nivel, icon: Icon, titulo, descricao, link, subtitu
   );
 }
 
-function FatorInformativo({ ativa, icon: Icon, titulo, descricao, link }: { ativa: boolean; icon: any; titulo: string; descricao: string; link: string }) {
+function FatorInformativo({ ativa, icon: Icon, titulo, descricao, onClick }: { ativa: boolean; icon: any; titulo: string; descricao: string; onClick: () => void }) {
   return (
     <Card className="border border-border bg-muted/30">
       <CardContent className="p-4 flex items-center gap-4">
@@ -225,8 +256,8 @@ function FatorInformativo({ ativa, icon: Icon, titulo, descricao, link }: { ativ
           <div className="text-sm text-muted-foreground">{descricao}</div>
         </div>
         {ativa && (
-          <Button asChild size="sm" variant="ghost">
-            <Link to={link as any}>Ver <ArrowRight className="size-3.5 ml-1" /></Link>
+          <Button size="sm" variant="ghost" onClick={onClick}>
+            Ver coletas <ArrowRight className="size-3.5 ml-1" />
           </Button>
         )}
       </CardContent>
