@@ -1,9 +1,10 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Recycle, LayoutDashboard, ClipboardList, AlertTriangle, BarChart3, FileSpreadsheet, Settings, Plus, ShieldAlert, Calendar, History } from "lucide-react";
+import { Recycle, LayoutDashboard, ClipboardList, BarChart3, FileSpreadsheet, Settings, Plus, ShieldAlert, Calendar, History } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { listUnidades, listColetasByUnidade, totalPesoColeta, isPendenciaSemMtr, isPendenciaSemPeso, findMtrDuplicates, listAnosComColetas } from "@/lib/data";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { listUnidades, listColetasByUnidade, totalPesoColeta, isPendenciaSemMtr, isPendenciaSemPeso, isErroPreenchimento, countMtrDuplicatesExcess, listAnosComColetas } from "@/lib/data";
 import { useUnidadeAtiva, setUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo, setPeriodoAtivo } from "@/hooks/use-periodo";
 import { useEffect, useMemo, useState } from "react";
@@ -11,12 +12,11 @@ import { cn } from "@/lib/utils";
 import { ImportStatusBanner } from "@/components/ImportStatusBanner";
 import { HistoryDialog } from "@/components/HistoryDialog";
 
-type NavItem = { to: string; label: string; icon: any; exact?: boolean; badge?: "pendencias" | "risco" };
+type NavItem = { to: string; label: string; icon: any; exact?: boolean; badge?: "risco" };
 const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/coletas", label: "Coletas", icon: ClipboardList },
-  { to: "/pendencias", label: "Pendências", icon: AlertTriangle, badge: "pendencias" },
-  { to: "/risco", label: "Risco", icon: ShieldAlert, badge: "risco" },
+  { to: "/risco", label: "Riscos & Pendências", icon: ShieldAlert, badge: "risco" },
   { to: "/consolidacao", label: "Consolidação", icon: BarChart3 },
   { to: "/dmr", label: "DMR", icon: FileSpreadsheet },
   { to: "/cadastros", label: "Cadastros", icon: Settings },
