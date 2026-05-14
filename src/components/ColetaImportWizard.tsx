@@ -191,10 +191,21 @@ export function ColetaImportWizard({
     const exMap = new Map<string, ColetaComItens>();
     for (const c of coletasUnidade) if (c.mtr) exMap.set(c.mtr, c);
 
-    // Sem MTR: detectar duplicata por (data + resíduos + destinador + transportador + tratamento + peso)
+    // Resolve canonical name via missingMap (user pode ter mapeado nome do arquivo → entidade existente).
+    const canonical = (cat: "residuo" | "tratamento" | "destinador" | "transportador", nome: string): string => {
+      if (!nome) return "";
+      const k = `${cat}:${nome.toLowerCase()}`;
+      const sub = missingMap[k];
+      if (!sub || sub === "__new__") return nome;
+      const list = cat === "residuo" ? tipos : cat === "tratamento" ? trats : cat === "destinador" ? destinadores : transportadores;
+      const found = (list as any[]).find((x) => x.id === sub);
+      return found ? found.nome : nome;
+    };
+
+    const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
     const noMtrFingerprint = (c: ColetaComItens) => {
-      const its = (c.itens ?? []).map((it) => `${(it.tipo_residuo_nome ?? "").toLowerCase()}|${(it.tratamento ?? "").toLowerCase()}|${Number(it.peso_kg) || 0}`).sort().join("#");
-      return `${c.data}|${(c.destinador ?? "").toLowerCase()}|${(c.transportador ?? "").toLowerCase()}|${its}`;
+      const its = (c.itens ?? []).map((it) => `${norm(it.tipo_residuo_nome)}|${norm(it.tratamento)}|${Math.round(Number(it.peso_kg || 0) * 1000) / 1000}`).sort().join("#");
+      return `${c.data}|${norm(c.destinador)}|${norm(c.transportador)}|${its}`;
     };
     const exNoMtr = new Map<string, ColetaComItens>();
     for (const c of coletasUnidade) if (!c.mtr) exNoMtr.set(noMtrFingerprint(c), c);
@@ -204,13 +215,15 @@ export function ColetaImportWizard({
       if (g.mtr && exMap.has(g.mtr)) { out.push({ grupo: g, existente: exMap.get(g.mtr)!, razao: "mtr" }); continue; }
       if (!g.mtr) {
         const r0 = g.rows[0];
-        const its = g.rows.map((r) => `${r.residuo.toLowerCase()}|${r.tratamento.toLowerCase()}|${r.peso}`).sort().join("#");
-        const fp = `${r0.data}|${r0.destinador.toLowerCase()}|${r0.transportador.toLowerCase()}|${its}`;
+        const dest = canonical("destinador", r0.destinador);
+        const trans = canonical("transportador", r0.transportador);
+        const its = g.rows.map((r) => `${norm(canonical("residuo", r.residuo))}|${norm(canonical("tratamento", r.tratamento))}|${Math.round(Number(r.peso || 0) * 1000) / 1000}`).sort().join("#");
+        const fp = `${r0.data}|${norm(dest)}|${norm(trans)}|${its}`;
         if (exNoMtr.has(fp)) out.push({ grupo: g, existente: exNoMtr.get(fp)!, razao: "fingerprint" });
       }
     }
     return out;
-  }, [grupos, coletasUnidade]);
+  }, [grupos, coletasUnidade, missingMap, tipos, trats, destinadores, transportadores]);
 
   const missingItems = useMemo(() => {
     const tiposSet = new Set(tipos.map((t) => t.nome.toLowerCase()));
