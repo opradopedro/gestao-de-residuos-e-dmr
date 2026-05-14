@@ -137,7 +137,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {NAV.map((item) => {
             const active = item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to);
             const Icon = item.icon;
-            const showRisk = item.badge === "risco" && (badges.risco === "alto" || badges.pendencias > 0);
+            const showRisk = item.badge === "risco" && badges.severidade !== "ok";
+            const badgeClass = badges.severidade === "vermelho"
+              ? "bg-destructive text-destructive-foreground"
+              : badges.severidade === "laranja"
+              ? "bg-orange-500 text-white"
+              : "bg-warning text-warning-foreground";
             const linkEl = (
               <Link
                 key={item.to}
@@ -150,24 +155,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Icon className="size-4" />
                 <span className="flex-1">{item.label}</span>
                 {showRisk && (
-                  <span className={cn("text-[10px] font-semibold rounded-full px-1.5 py-0.5 min-w-5 text-center",
-                    badges.risco === "alto" ? "bg-destructive text-destructive-foreground" : "bg-warning text-warning-foreground")}>
-                    {badges.risco === "alto" ? "!" : String(badges.pendencias)}
+                  <span className={cn("text-[10px] font-semibold rounded-full px-1.5 py-0.5 min-w-5 text-center", badgeClass)}>
+                    {badges.severidade === "vermelho" ? "!" : String(badges.totalFatores)}
                   </span>
                 )}
               </Link>
             );
             if (!showRisk) return linkEl;
+            const sevLabel = badges.severidade === "vermelho" ? "Crítico"
+              : badges.severidade === "laranja" ? "Alto impacto"
+              : "Atenção";
             return (
               <Tooltip key={item.to}>
                 <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
                 <TooltipContent side="right" className="text-left">
                   <div className="space-y-0.5">
-                    {badges.semMtr > 0 && <div>{badges.semMtr} coleta(s) sem MTR</div>}
-                    {badges.semPeso > 0 && <div>{badges.semPeso} coleta(s) sem peso</div>}
-                    {badges.dupExcess > 0 && <div>{badges.dupExcess} MTR(s) duplicado(s)</div>}
-                    {badges.errosPreench > 0 && <div>{badges.errosPreench} erro(s) de preenchimento</div>}
-                    {badges.pendencias === 0 && <div>Sem pendências no período</div>}
+                    <div className="font-semibold">{sevLabel} · {badges.totalFatores} fator(es)</div>
+                    {badges.semPeso > 0 && <div>• {badges.semPeso} sem peso (crítico)</div>}
+                    {badges.errosPreench > 0 && <div>• {badges.errosPreench} erro(s) de preenchimento</div>}
+                    {badges.semMtrOp > 0 && <div>• {badges.semMtrOp} Incluir na DMR</div>}
+                    {badges.resSemIbama > 0 && <div>• {badges.resSemIbama} resíduo(s) sem código IBAMA</div>}
+                    {badges.semMtrErro > 0 && <div>• {badges.semMtrErro} sem MTR</div>}
+                    {badges.dupUnicos > 0 && <div>• {badges.dupUnicos} MTR(s) duplicado(s)</div>}
+                    {badges.destSemCnpj > 0 && <div>• {badges.destSemCnpj} destinador(es) sem CNPJ</div>}
                   </div>
                 </TooltipContent>
               </Tooltip>
