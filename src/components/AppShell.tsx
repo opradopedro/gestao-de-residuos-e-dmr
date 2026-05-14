@@ -47,6 +47,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     queryFn: () => listColetasByUnidade(unidadeAtiva!),
     enabled: !!unidadeAtiva,
   });
+  const { data: destinadores = [] } = useQuery({ queryKey: ["destinadores"], queryFn: listDestinadores });
+  const { data: tiposResiduo = [] } = useQuery({ queryKey: ["tipos_residuo"], queryFn: listTiposResiduo });
 
   useEffect(() => {
     if (!unidadeAtiva && unidades.length > 0) setUnidadeAtiva(unidades[0].id);
@@ -57,17 +59,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const badges = useMemo(() => {
     const noTri = coletas.filter((c) => c.data >= periodo.start && c.data <= periodo.end);
-    const semMtr = noTri.filter(isPendenciaSemMtr).length;
     const semPeso = noTri.filter(isPendenciaSemPeso).length;
     const errosPreench = noTri.filter(isErroPreenchimento).length;
-    const dupExcess = countMtrDuplicatesExcess(noTri);
-    const pesoSemMtr = noTri.filter(isPendenciaSemMtr).reduce((s, c) => s + totalPesoColeta(c), 0);
-    const pendencias = semMtr + semPeso + dupExcess + errosPreench;
-    const risco = (semMtr > 5 || pesoSemMtr > 1000 || semPeso > 0)
-      ? "alto"
-      : pendencias > 0 ? "medio" : "ok";
-    return { pendencias, risco, semMtr, semPeso, dupExcess, errosPreench };
-  }, [coletas, periodo.start, periodo.end]);
+    const semMtrErro = noTri.filter(isPendenciaSemMtr).length;
+    const semMtrOp = noTri.filter(isSemMtrOperacao).length;
+    const dupUnicos = countMtrsDuplicadosUnicos(noTri);
+    const destSemCnpj = destinadores.filter((d) => !d.cnpj || !d.cnpj.trim()).length;
+    const resSemIbama = tiposResiduo.filter((t) => !t.codigo || !t.codigo.trim()).length;
+
+    // Severidade vermelha: sem peso (volume fora DMR não calculável aqui).
+    const vermelho = semPeso > 0;
+    // Laranja: erros, incluir DMR, resíduo sem IBAMA.
+    const laranja = errosPreench > 0 || semMtrOp > 0 || resSemIbama > 0;
+    // Amarelo: sem MTR (erro), MTR duplicado, destinador sem CNPJ.
+    const amarelo = semMtrErro > 0 || dupUnicos > 0 || destSemCnpj > 0;
+
+    const severidade: "vermelho" | "laranja" | "amarelo" | "ok" = vermelho ? "vermelho" : laranja ? "laranja" : amarelo ? "amarelo" : "ok";
+    const totalFatores = (semPeso > 0 ? 1 : 0) + (errosPreench > 0 ? 1 : 0) + (semMtrOp > 0 ? 1 : 0)
+      + (resSemIbama > 0 ? 1 : 0) + (semMtrErro > 0 ? 1 : 0) + (dupUnicos > 0 ? 1 : 0) + (destSemCnpj > 0 ? 1 : 0);
+
+    return { severidade, totalFatores, semPeso, errosPreench, semMtrErro, semMtrOp, dupUnicos, destSemCnpj, resSemIbama };
+  }, [coletas, periodo.start, periodo.end, destinadores, tiposResiduo]);
 
   return (
     <div className="min-h-screen bg-background flex">
