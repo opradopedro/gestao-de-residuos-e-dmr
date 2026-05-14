@@ -4,7 +4,7 @@ import { Recycle, LayoutDashboard, ClipboardList, BarChart3, FileSpreadsheet, Se
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { listUnidades, listColetasByUnidade, totalPesoColeta, isPendenciaSemMtr, isPendenciaSemPeso, isErroPreenchimento, countMtrDuplicatesExcess, listAnosComColetas } from "@/lib/data";
+import { listUnidades, listColetasByUnidade, totalPesoColeta, isPendenciaSemMtr, isSemMtrOperacao, isPendenciaSemPeso, isErroPreenchimento, countMtrsDuplicadosUnicos, listAnosComColetas, listDestinadores, listTiposResiduo } from "@/lib/data";
 import { useUnidadeAtiva, setUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo, setPeriodoAtivo } from "@/hooks/use-periodo";
 import { useEffect, useMemo, useState } from "react";
