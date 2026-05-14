@@ -79,30 +79,60 @@ export function EntityDeleteDialog({
             <AlertTriangle className="size-5 text-warning-foreground" /> Excluir "{nome}"
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 text-sm">
-          <p>Antes de excluir, você pode transferir os dados associados para outro {tipo}.</p>
-          <div>
-            <Label className="text-xs">Transferir para</Label>
-            <Select value={transferTo} onValueChange={setTransferTo}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Não transferir (dados ficam pendentes)</SelectItem>
-                {opts.map((o) => <SelectItem key={o.id} value={o.id}>{o.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          {transferTo === "__none__" && (
-            <div className="text-xs text-warning-foreground border border-warning/40 bg-warning/10 rounded p-2">
-              Os registros vinculados perderão a referência e aparecerão em Pendências.
+        {!confirmStep ? (
+          <>
+            <div className="space-y-3 text-sm">
+              <p>Antes de excluir, você pode transferir os dados associados para outro {tipo}.</p>
+              <div>
+                <Label className="text-xs">Transferir para</Label>
+                <Select value={transferTo} onValueChange={setTransferTo}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Não transferir (dados ficam pendentes)</SelectItem>
+                    {opts.map((o) => <SelectItem key={o.id} value={o.id}>{o.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {transferTo === "__none__" && (
+                <div className="text-xs text-warning-foreground border border-warning/40 bg-warning/10 rounded p-2">
+                  {afetados > 0
+                    ? <><strong>{afetados}</strong> registro(s) vinculado(s) perderão a referência e aparecerão em Pendências.</>
+                    : "Nenhum registro vinculado — exclusão segura."}
+                  {isUnidadeBlocked && <div className="mt-1 font-semibold">Para excluir uma unidade com coletas, é necessário transferi-las.</div>}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button variant="destructive" disabled={mut.isPending} onClick={() => mut.mutate()}>
-            {mut.isPending ? "Excluindo…" : "Confirmar exclusão"}
-          </Button>
-        </DialogFooter>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+              <Button
+                variant="destructive"
+                disabled={isUnidadeBlocked}
+                onClick={() => {
+                  if (transferTo === "__none__" && afetados > 0) setConfirmStep(true);
+                  else mut.mutate();
+                }}
+              >
+                {transferTo === "__none__" && afetados > 0 ? "Continuar" : "Confirmar exclusão"}
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <div className="space-y-3 text-sm">
+              <div className="border border-destructive/40 bg-destructive/10 rounded p-3">
+                <div className="font-semibold text-destructive mb-1">Tem certeza?</div>
+                Você está prestes a excluir <strong>"{nome}"</strong>. Isso desvinculará <strong>{afetados}</strong> registro(s),
+                que ficarão visíveis em <strong>Riscos & Pendências</strong>.
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConfirmStep(false)}>Voltar</Button>
+              <Button variant="destructive" disabled={mut.isPending} onClick={() => mut.mutate()}>
+                {mut.isPending ? "Excluindo…" : `Sim, excluir e desvincular ${afetados}`}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
