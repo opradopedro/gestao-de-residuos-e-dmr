@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteEntidadeComTransferencia } from "@/lib/data";
+import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,6 +10,26 @@ import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 type Tipo = "unidade" | "residuo" | "tratamento" | "transportador" | "destinador";
+
+async function countAfetados(tipo: Tipo, id: string): Promise<number> {
+  if (tipo === "residuo") {
+    const { count } = await supabase.from("coleta_itens").select("id", { count: "exact", head: true }).eq("tipo_residuo_id", id);
+    return count ?? 0;
+  }
+  if (tipo === "transportador") {
+    const { count } = await supabase.from("coletas").select("id", { count: "exact", head: true }).eq("transportador_id", id);
+    return count ?? 0;
+  }
+  if (tipo === "destinador") {
+    const { count } = await supabase.from("coletas").select("id", { count: "exact", head: true }).eq("destinador_id", id);
+    return count ?? 0;
+  }
+  if (tipo === "unidade") {
+    const { count } = await supabase.from("coletas").select("id", { count: "exact", head: true }).eq("unidade_id", id);
+    return count ?? 0;
+  }
+  return 0;
+}
 
 export function EntityDeleteDialog({
   open, onOpenChange, tipo, id, nome, alternativos,
@@ -22,6 +43,17 @@ export function EntityDeleteDialog({
 }) {
   const qc = useQueryClient();
   const [transferTo, setTransferTo] = useState<string>("__none__");
+  const [confirmStep, setConfirmStep] = useState(false);
+
+  useEffect(() => {
+    if (!open) { setTransferTo("__none__"); setConfirmStep(false); }
+  }, [open]);
+
+  const { data: afetados = 0 } = useQuery({
+    queryKey: ["entity-afetados", tipo, id],
+    queryFn: () => countAfetados(tipo, id),
+    enabled: open,
+  });
 
   const mut = useMutation({
     mutationFn: () => deleteEntidadeComTransferencia(tipo, id, transferTo === "__none__" ? null : transferTo),
@@ -37,6 +69,7 @@ export function EntityDeleteDialog({
   });
 
   const opts = alternativos.filter((a) => a.id !== id);
+  const isUnidadeBlocked = tipo === "unidade" && transferTo === "__none__" && afetados > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
