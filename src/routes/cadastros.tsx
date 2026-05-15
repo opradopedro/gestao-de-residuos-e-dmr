@@ -171,7 +171,7 @@ function ResiduosTab() {
             <div key={t.id} className="flex items-center justify-between p-3">
               <div>
                 <span className="font-medium">{t.nome}</span>
-                {t.codigo && <span className="text-xs text-muted-foreground ml-2">({t.codigo})</span>}
+                {t.codigo && <span className="text-xs text-muted-foreground ml-2">({formatCodigoIbama(t.codigo)})</span>}
                 <span className="text-muted-foreground text-sm"> → {t.tratamento_padrao}</span>
               </div>
               <div className="flex gap-1">
