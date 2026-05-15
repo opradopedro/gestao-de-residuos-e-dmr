@@ -379,7 +379,11 @@ function TransportadorDialog({ mode, transportador, onClose, todos = [] }: { mod
           <DialogHeader><DialogTitle>{mode === "create" ? "Novo transportador" : "Editar transportador"}</DialogTitle></DialogHeader>
           <div className="grid gap-3">
             <div><Label className="text-xs">Nome</Label><Input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-            <div><Label className="text-xs">CNPJ</Label><Input value={cnpj} onChange={(e) => setCnpj(e.target.value)} /></div>
+            <div>
+              <Label className="text-xs">CNPJ</Label>
+              <Input value={formatCNPJ(cnpj)} onChange={(e) => setCnpj(normalizeCNPJ(e.target.value))} placeholder="00.000.000/0000-00" maxLength={18} />
+              {cnpj && !isValidCNPJ(cnpj) && <div className="text-xs text-destructive mt-1">CNPJ inválido</div>}
+            </div>
           </div>
           <DialogFooter className="flex-wrap gap-2">
             {isEdit && todos.length > 1 && (
