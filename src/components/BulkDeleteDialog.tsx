@@ -99,6 +99,7 @@ export function BulkDeleteDialog({
                     <SelectItem value="destinador">Destinador</SelectItem>
                     <SelectItem value="transportador">Transportador</SelectItem>
                     <SelectItem value="residuo">Resíduo</SelectItem>
+                    <SelectItem value="unidade">Unidade</SelectItem>
                     <SelectItem value="data">Data</SelectItem>
                     <SelectItem value="observacoes">Observações</SelectItem>
                   </SelectContent>
