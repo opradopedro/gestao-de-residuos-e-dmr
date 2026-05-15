@@ -21,13 +21,24 @@ export function DmrResolveResiduosDialog({
 }) {
   const qc = useQueryClient();
   const { data: tipos = [] } = useQuery({ queryKey: ["tipos_residuo"], queryFn: listTiposResiduo });
+  // Freeze pendentes list on open so resolving an item doesn't shift indexes (skip 2 by 2 bug).
+  const [frozen, setFrozen] = useState<Pendente[]>(pendentes);
   const [idx, setIdx] = useState(0);
   const [escolha, setEscolha] = useState<string>("");
   const [criar, setCriar] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const atual = pendentes[idx];
-  const total = pendentes.length;
+  useEffect(() => {
+    if (open) {
+      setFrozen(pendentes);
+      setIdx(0);
+      setEscolha("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const atual = frozen[idx];
+  const total = frozen.length;
 
   // sugestão por código IBAMA presente no início do texto (ex.: "200138 - madeira…")
   const codigoSugerido = useMemo(() => {
