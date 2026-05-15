@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listTiposResiduo, type TipoResiduo } from "@/lib/data";
 import { renameDmrLinhasResiduo } from "@/lib/dmr";
