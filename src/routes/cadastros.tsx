@@ -707,7 +707,11 @@ function DestinadorFullDialog({ mode, destinador, onClose, todos = [] }: { mode:
           <DialogHeader><DialogTitle>{mode === "create" ? "Novo destinador" : "Editar destinador"}</DialogTitle></DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <div><Label className="text-xs">Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-            <div><Label className="text-xs">CNPJ</Label><Input value={cnpj} onChange={(e) => setCnpj(e.target.value)} placeholder="00.000.000/0000-00" /></div>
+            <div>
+              <Label className="text-xs">CNPJ</Label>
+              <Input value={formatCNPJ(cnpj)} onChange={(e) => setCnpj(normalizeCNPJ(e.target.value))} placeholder="00.000.000/0000-00" maxLength={18} />
+              {cnpj && !isValidCNPJ(cnpj) && <div className="text-xs text-destructive mt-1">CNPJ inválido</div>}
+            </div>
           </div>
           <div>
             <div className="flex items-center justify-between mb-1 gap-2">
