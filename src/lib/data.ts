@@ -461,7 +461,7 @@ export async function checkMergeConflicts(tipo: "destinador" | "transportador", 
     if (a.mtr && mtrMap.has(a.mtr)) {
       conflitos.push({ original: a, com: mtrMap.get(a.mtr)!, razao: "mtr" });
     } else if (!a.mtr) {
-      const fp = noMtrFingerprint(a, pretDest, pretTrans);
+      const fp = fpFor(a, pretDest, pretTrans);
       if (exNoMtr.has(fp)) {
         conflitos.push({ original: a, com: exNoMtr.get(fp)!, razao: "fingerprint" });
       }
