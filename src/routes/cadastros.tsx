@@ -413,7 +413,7 @@ function DestinadoresTab() {
             <div key={d.id} className="flex items-center justify-between p-3">
               <div>
                 <span className="font-medium">{d.nome}</span>
-                {d.cnpj && <span className="text-xs text-muted-foreground ml-2">{d.cnpj}</span>}
+                {d.cnpj && <span className="text-xs text-muted-foreground ml-2">{formatCNPJ(d.cnpj)}</span>}
               </div>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" onClick={() => setEdit(d)}><Pencil className="size-4" /></Button>
