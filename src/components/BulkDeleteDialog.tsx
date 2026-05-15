@@ -29,6 +29,9 @@ export function BulkDeleteDialog({
   const [confirma, setConfirma] = useState("");
   const [step, setStep] = useState<"filtro" | "preview" | "confirma">("filtro");
 
+  const { data: unidades = [] } = useQuery({ queryKey: ["unidades"], queryFn: listUnidades });
+  const unidadeNomes = useMemo(() => Object.fromEntries(unidades.map((u) => [u.id, u.nome])), [unidades]);
+
   const matches = useMemo(() => {
     if (!valor.trim()) return [];
     const q = valor.trim().toLowerCase();
@@ -43,14 +46,16 @@ export function BulkDeleteDialog({
         case "transportador": return test(c.transportador);
         case "data": return test(c.data) || test(formatDate(c.data));
         case "observacoes": return test(c.observacoes);
+        case "unidade": return test(unidadeNomes[c.unidade_id] ?? "");
         case "residuo": return (c.itens ?? []).some((it) => test(it.tipo_residuo_nome));
         case "qualquer":
           return test(c.mtr) || test(c.destinador) || test(c.transportador)
             || test(c.observacoes) || test(c.data) || test(formatDate(c.data))
+            || test(unidadeNomes[c.unidade_id] ?? "")
             || (c.itens ?? []).some((it) => test(it.tipo_residuo_nome));
       }
     });
-  }, [coletas, field, op, valor]);
+  }, [coletas, field, op, valor, unidadeNomes]);
 
   const expected = `EXCLUIR ${matches.length} COLETAS`;
   const pct = totalGeral > 0 ? (matches.length / totalGeral) * 100 : 0;
