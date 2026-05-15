@@ -336,7 +336,7 @@ function TransportadoresTab() {
             <div key={t.id} className="flex items-center justify-between p-3">
               <div>
                 <span className="font-medium">{t.nome}</span>
-                {t.cnpj && <span className="text-xs text-muted-foreground ml-2">{t.cnpj}</span>}
+                {t.cnpj && <span className="text-xs text-muted-foreground ml-2">{formatCNPJ(t.cnpj)}</span>}
               </div>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" onClick={() => setEdit(t)}><Pencil className="size-4" /></Button>
