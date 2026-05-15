@@ -25,6 +25,8 @@ import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { EntityImportDialog } from "@/components/EntityImportDialog";
 import { EntityDeleteDialog } from "@/components/EntityDeleteDialog";
+import { formatCNPJ, isValidCNPJ, normalizeCNPJ } from "@/lib/cnpj";
+import { formatCodigoIbama } from "@/lib/ibama";
 
 export const Route = createFileRoute("/cadastros")({
   head: () => ({ meta: [{ title: "Cadastros — DMR" }] }),
