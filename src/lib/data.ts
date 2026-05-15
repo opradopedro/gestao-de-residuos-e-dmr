@@ -444,14 +444,12 @@ export async function checkMergeConflicts(tipo: "destinador" | "transportador", 
   const mtrMap = new Map<string, ColetaComItens>();
   for (const c of existentes) if (c.mtr) mtrMap.set(c.mtr, c);
 
-  const noMtrFingerprint = (c: ColetaComItens, destText: string, transText: string) => {
-    const its = (c.itens ?? []).map((it) => `${(it.tipo_residuo_nome||"").toLowerCase()}|${(it.tratamento||"").toLowerCase()}|${it.peso_kg}`).sort().join("#");
-    return `${c.data}|${destText.toLowerCase()}|${transText.toLowerCase()}|${its}`;
-  };
+  const fpFor = (c: ColetaComItens, destText: string, transText: string) =>
+    coletaFingerprint({ data: c.data, destinador: destText, transportador: transText, itens: c.itens ?? [] });
 
   const exNoMtr = new Map<string, ColetaComItens>();
   for (const c of existentes) {
-    if (!c.mtr) exNoMtr.set(noMtrFingerprint(c, c.destinador ?? "", c.transportador ?? ""), c);
+    if (!c.mtr) exNoMtr.set(fpFor(c, c.destinador ?? "", c.transportador ?? ""), c);
   }
 
   const conflitos: { original: ColetaComItens; com: ColetaComItens; razao: "mtr" | "fingerprint" }[] = [];
@@ -463,7 +461,7 @@ export async function checkMergeConflicts(tipo: "destinador" | "transportador", 
     if (a.mtr && mtrMap.has(a.mtr)) {
       conflitos.push({ original: a, com: mtrMap.get(a.mtr)!, razao: "mtr" });
     } else if (!a.mtr) {
-      const fp = noMtrFingerprint(a, pretDest, pretTrans);
+      const fp = fpFor(a, pretDest, pretTrans);
       if (exNoMtr.has(fp)) {
         conflitos.push({ original: a, com: exNoMtr.get(fp)!, razao: "fingerprint" });
       }
