@@ -743,7 +743,7 @@ function DestinadorFullDialog({ mode, destinador, onClose, todos = [] }: { mode:
                         />
                         <div className="flex-1 min-w-0 text-sm">
                           <div className="truncate font-medium">{t.nome}</div>
-                          {t.codigo && <div className="text-xs text-muted-foreground">{t.codigo}</div>}
+                          {t.codigo && <div className="text-xs text-muted-foreground">{formatCodigoIbama(t.codigo)}</div>}
                         </div>
                         <Input
                           className="h-8 w-40"
