@@ -7,11 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { bulkDeleteColetas, type ColetaComItens, totalPesoColeta } from "@/lib/data";
+import { bulkDeleteColetas, listUnidades, type ColetaComItens, totalPesoColeta } from "@/lib/data";
 import { formatDate, formatKg } from "@/lib/format";
 
 type Op = "contem" | "igual";
-type Field = "qualquer" | "mtr" | "destinador" | "transportador" | "residuo" | "data" | "observacoes";
+type Field = "qualquer" | "mtr" | "destinador" | "transportador" | "residuo" | "unidade" | "data" | "observacoes";
 
 export function BulkDeleteDialog({
   open, onOpenChange, coletas, unidadeId, totalGeral,
