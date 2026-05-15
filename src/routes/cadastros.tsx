@@ -445,9 +445,13 @@ function MergeDialog({ open, onOpenChange, tipo, itens, preselectRemoverId }: {
   const [manterId, setManterId] = useState("");
   const [removerId, setRemoverId] = useState("");
   const [conflitos, setConflitos] = useState<any[]>([]);
+  const [escolhas, setEscolhas] = useState<Record<number, "A" | "B">>({});
 
-  useEffect(() => { if (!open) { setManterId(""); setRemoverId(""); setConflitos([]); } else if (preselectRemoverId) { setRemoverId(preselectRemoverId); } }, [open, preselectRemoverId]);
-  
+  useEffect(() => {
+    if (!open) { setManterId(""); setRemoverId(""); setConflitos([]); setEscolhas({}); }
+    else if (preselectRemoverId) { setRemoverId(preselectRemoverId); }
+  }, [open, preselectRemoverId]);
+
   const mut = useMutation<any, Error, void>({
     mutationFn: async () => {
       if (tipo === "destinador") return mergeDestinadores(manterId, removerId);
@@ -464,6 +468,25 @@ function MergeDialog({ open, onOpenChange, tipo, itens, preselectRemoverId }: {
     onError: (e: any) => toast.error("Erro: " + e.message),
   });
 
+  const resolveAndMergeMut = useMutation<void, Error, void>({
+    mutationFn: async () => {
+      const { deleteColeta } = await import("@/lib/data");
+      const idsParaExcluir: string[] = [];
+      conflitos.forEach((c, i) => {
+        const escolha = escolhas[i];
+        if (escolha === "A") idsParaExcluir.push(c.com.id);
+        else if (escolha === "B") idsParaExcluir.push(c.original.id);
+      });
+      for (const id of idsParaExcluir) {
+        await deleteColeta(id);
+      }
+    },
+    onSuccess: () => {
+      mut.mutate();
+    },
+    onError: (e: any) => toast.error("Erro ao resolver conflitos: " + e.message),
+  });
+
   const checkMut = useMutation<any[], Error, void>({
     mutationFn: async () => {
       if (tipo === "destinador" || tipo === "transportador") {
@@ -474,6 +497,7 @@ function MergeDialog({ open, onOpenChange, tipo, itens, preselectRemoverId }: {
     onSuccess: (conf) => {
       if (conf.length > 0) {
         setConflitos(conf);
+        setEscolhas({});
       } else {
         mut.mutate();
       }
@@ -482,48 +506,75 @@ function MergeDialog({ open, onOpenChange, tipo, itens, preselectRemoverId }: {
   });
 
   const valid = manterId && removerId && manterId !== removerId;
+  const todasResolvidas = conflitos.length > 0 && conflitos.every((_, i) => escolhas[i]);
 
   if (conflitos.length > 0) {
+    const setAll = (lado: "A" | "B") => {
+      const next: Record<number, "A" | "B"> = {};
+      conflitos.forEach((_, i) => { next[i] = lado; });
+      setEscolhas(next);
+    };
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Conflitos detectados</DialogTitle>
+            <DialogTitle>Resolver conflitos da unificação ({conflitos.length})</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-            <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
-              A unificação criará coletas duplicadas. Acesse as coletas abaixo e resolva os conflitos (ex: alterar MTR, excluir duplicata) antes de prosseguir com a unificação.
+          <div className="space-y-3 max-h-[65vh] overflow-y-auto">
+            <div className="text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
+              Para cada par, escolha qual coleta manter. A outra será excluída antes da unificação (registrada no Histórico).
             </div>
-            <table className="w-full text-xs border rounded">
-              <thead className="bg-muted">
-                <tr>
-                  <th className="text-left p-2 border-b">Razão</th>
-                  <th className="text-left p-2 border-b">Coleta que será modificada</th>
-                  <th className="text-left p-2 border-b">Coleta existente (já tem o valor)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {conflitos.map((c, i) => (
-                  <tr key={i} className="border-b">
-                    <td className="p-2 font-medium">{c.razao === "mtr" ? `MTR duplicado (${c.original.mtr})` : "Mesmos dados"}</td>
-                    <td className="p-2 border-l">
-                      <div><span className="font-semibold">{c.original.data}</span> · MTR: {c.original.mtr || "N/A"}</div>
-                      <div className="text-muted-foreground mt-1">{(c.original.itens ?? []).map((it: any) => `${it.tipo_residuo_nome} (${it.peso_kg}kg)`).join(", ")}</div>
-                      <Button variant="link" className="px-0 h-auto text-xs mt-2" onClick={() => window.open(`/coletas/${c.original.id}`, '_blank')}>Ver coleta original</Button>
-                    </td>
-                    <td className="p-2 border-l">
-                      <div><span className="font-semibold">{c.com.data}</span> · MTR: {c.com.mtr || "N/A"}</div>
-                      <div className="text-muted-foreground mt-1">{(c.com.itens ?? []).map((it: any) => `${it.tipo_residuo_nome} (${it.peso_kg}kg)`).join(", ")}</div>
-                      <Button variant="link" className="px-0 h-auto text-xs mt-2" onClick={() => window.open(`/coletas/${c.com.id}`, '_blank')}>Ver coleta existente</Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setAll("A")}>Manter todas A</Button>
+              <Button size="sm" variant="outline" onClick={() => setAll("B")}>Manter todas B</Button>
+              <Button size="sm" variant="ghost" onClick={() => setEscolhas({})}>Limpar</Button>
+            </div>
+            <div className="space-y-3">
+              {conflitos.map((c, i) => {
+                const escolha = escolhas[i];
+                const card = (lado: "A" | "B", coleta: any, label: string) => (
+                  <div
+                    className={`flex-1 border rounded p-3 cursor-pointer transition-colors ${
+                      escolha === lado ? "border-primary bg-primary/5" : "hover:bg-muted/40"
+                    }`}
+                    onClick={() => setEscolhas((p) => ({ ...p, [i]: lado }))}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold uppercase text-muted-foreground">{label}</span>
+                      <input type="radio" checked={escolha === lado} readOnly />
+                    </div>
+                    <div className="text-sm font-medium">{coleta.data} · MTR: {coleta.mtr || "—"}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Destinador: {coleta.destinador || "—"} · Transportador: {coleta.transportador || "—"}
+                    </div>
+                    <div className="text-xs mt-1">
+                      {(coleta.itens ?? []).map((it: any) => `${it.tipo_residuo_nome} (${it.peso_kg}kg)`).join(", ") || "—"}
+                    </div>
+                  </div>
+                );
+                return (
+                  <div key={i} className="border rounded p-2 bg-background">
+                    <div className="text-xs text-muted-foreground mb-2">
+                      {c.razao === "mtr" ? `MTR duplicado: ${c.original.mtr}` : "Mesma data, destinador, transportador e itens"}
+                    </div>
+                    <div className="flex gap-2">
+                      {card("A", c.original, "A — Será modificada")}
+                      {card("B", c.com, "B — Já existe")}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConflitos([])}>Voltar</Button>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar unificação</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button
+              disabled={!todasResolvidas || resolveAndMergeMut.isPending || mut.isPending}
+              onClick={() => resolveAndMergeMut.mutate()}
+            >
+              {resolveAndMergeMut.isPending || mut.isPending ? "Aplicando…" : "Resolver e unificar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
