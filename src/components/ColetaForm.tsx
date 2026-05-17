@@ -192,7 +192,7 @@ export function ColetaForm({ unidadeId, initial, onSubmit, submitting, showAddAn
             <Input type="date" value={data} onChange={(e) => setData(e.target.value)} required />
           </div>
           <div>
-            <Label>MTR {dmrManual && <span className="text-xs text-muted-foreground">(N/A — DMR manual)</span>}</Label>
+            <Label>MTR {dmrManual && <span className="text-xs text-muted-foreground">(N/A — Incluir na DMR)</span>}</Label>
             <Input
               value={dmrManual ? "" : (mtr ?? "")}
               onChange={(e) => setMtr(e.target.value)}
