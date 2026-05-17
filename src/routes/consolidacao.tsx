@@ -99,7 +99,7 @@ function Consolidacao() {
           Transportador: c.transportador ?? "",
           Destinador: c.destinador ?? "",
           "Peso Estimado": c.peso_estimado ? "Sim" : "Não",
-          "DMR Manual": c.dmr_manual ? "Sim" : "Não",
+          "Incluir na DMR": c.dmr_manual ? "Sim" : "Não",
           "Tipo Resíduo": it.tipo_residuo_nome,
           Tratamento: it.tratamento,
           "Peso (kg)": Number(it.peso_kg),
@@ -211,7 +211,7 @@ function Consolidacao() {
                         <div className="text-xs text-muted-foreground mt-1">
                           Total da coleta: {formatTon(totalPesoColeta(c))}
                           {c.peso_estimado && " · estimado"}
-                          {c.dmr_manual && " · DMR manual"}
+                          {c.dmr_manual && " · Incluir na DMR"}
                         </div>
                       </div>
                     );
