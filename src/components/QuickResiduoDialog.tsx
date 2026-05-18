@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Autocomplete } from "@/components/Autocomplete";
 import { toast } from "sonner";
+import { normalizeCodigoIbama, formatCodigoIbama } from "@/lib/ibama";
+import { formatCNPJ } from "@/lib/cnpj";
 
 type Props = {
   open: boolean;
