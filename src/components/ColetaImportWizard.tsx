@@ -33,6 +33,8 @@ import { QuickTratamentoDialog } from "@/components/QuickTratamentoDialog";
 
 const ESTIMADO_RX = /est[ií]m[ao]?d?[ao]?s?/i;
 const DMR_MTR_RX = /^\s*d[mr]{2}\s*$|incluir.*dmr/i;
+// MTR provisório: começa com P seguido de 4+ dígitos (ex: P12345). Tratado como MTR válido.
+const MTR_PROVISORIO_RX = /\bP\d{4,}\b/i;
 
 type Step = "file" | "config" | "unidade" | "review" | "conflicts" | "missing" | "final" | "running";
 
