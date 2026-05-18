@@ -114,7 +114,7 @@ export function QuickResiduoDialog({ open, onOpenChange, defaultName, defaultDes
                 <label key={d.id} className="flex items-center gap-2 p-2 cursor-pointer hover:bg-accent/50">
                   <Checkbox checked={destSelecionados.has(d.id)} onCheckedChange={() => toggleDest(d.id)} />
                   <span className="text-sm">{d.nome}</span>
-                  {d.cnpj && <span className="text-xs text-muted-foreground ml-auto">{d.cnpj}</span>}
+                  {d.cnpj && <span className="text-xs text-muted-foreground ml-auto">{formatCNPJ(d.cnpj)}</span>}
                 </label>
               ))}
             </div>
