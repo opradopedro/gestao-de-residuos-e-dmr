@@ -136,7 +136,13 @@ export function QuickEntityDialog(props: Props) {
           </div>
           <div>
             <Label className="text-xs">CNPJ</Label>
-            <Input value={cnpj} onChange={(e) => setCnpj(e.target.value)} placeholder="00.000.000/0000-00" />
+            <Input
+              value={cnpj.length === 14 && /^\d+$/.test(cnpj) ? formatCNPJ(cnpj) : cnpj}
+              onChange={(e) => setCnpj(normalizeCNPJ(e.target.value))}
+              placeholder="00.000.000/0000-00"
+              maxLength={18}
+            />
+            {cnpjInvalido && <div className="text-xs text-destructive mt-1">CNPJ inválido (verifique os dígitos)</div>}
           </div>
 
           {kind === "destinador" && (
