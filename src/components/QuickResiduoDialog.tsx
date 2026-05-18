@@ -62,7 +62,7 @@ export function QuickResiduoDialog({ open, onOpenChange, defaultName, defaultDes
     try {
       const tipo = await upsertTipoResiduo({
         nome: nome.trim(),
-        codigo: codigo.trim() || null,
+        codigo: normalizeCodigoIbama(codigo) || null,
         tratamento_padrao: tratamento.trim(),
       });
       const ids = Array.from(destSelecionados);
