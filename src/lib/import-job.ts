@@ -17,6 +17,7 @@ import {
   updateColeta,
   type ColetaInput,
   type ColetaComItens,
+  coletaFingerprint,
 } from "@/lib/data";
 import { logAction } from "@/lib/audit";
 
@@ -241,16 +242,37 @@ async function runJob(input: ImportJobInput) {
   const exMap = new Map<string, ColetaComItens>();
   for (const c of input.coletasExistentes) if (c.mtr) exMap.set(c.mtr, c);
 
+  // Fingerprint canônico das coletas existentes sem MTR para detecção de duplicatas dmr_manual.
+  const exNoMtr = new Map<string, ColetaComItens>();
+  for (const c of input.coletasExistentes) {
+    if (!c.mtr) {
+      const fp = coletaFingerprint({
+        data: c.data,
+        destinador: c.destinador,
+        transportador: c.transportador,
+        itens: (c.itens ?? []).map((it) => ({
+          tipo_residuo_nome: it.tipo_residuo_nome,
+          tratamento: it.tratamento,
+          peso_kg: Number(it.peso_kg || 0),
+        })),
+      });
+      exNoMtr.set(fp, c);
+    }
+  }
+
   let criadas = 0, atualizadas = 0, ignoradas = 0;
   const idsCriadas: string[] = [];
 
   for (let i = 0; i < input.grupos.length; i++) {
     const g = input.grupos[i];
-    const action = (g.mtr && exMap.has(g.mtr)) ? (input.conflictActions[g.key] ?? "manter") : "substituir";
-    if (g.mtr && exMap.has(g.mtr) && (action === "ignorar" || action === "manter")) {
-      ignoradas++;
-      update({ done: i + 1, ignoradas });
-      continue;
+    // Conflito por MTR
+    if (g.mtr && exMap.has(g.mtr)) {
+      const act = input.conflictActions[g.key] ?? "manter";
+      if (act === "ignorar" || act === "manter") {
+        ignoradas++;
+        update({ done: i + 1, ignoradas });
+        continue;
+      }
     }
     const first = g.rows[0];
     const dest = first.destinador ? finalName("destinador", first.destinador) : "";
@@ -289,14 +311,44 @@ async function runJob(input: ImportJobInput) {
       itens,
     };
 
-    if (action === "substituir" && g.mtr && exMap.has(g.mtr)) {
+    // Conflito MTR — substituir
+    if (g.mtr && exMap.has(g.mtr)) {
       await updateColeta(exMap.get(g.mtr)!.id, coletaInput, { skipAudit: true });
       atualizadas++;
-    } else {
-      const novoId = await createColeta(coletaInput, { skipAudit: true });
-      idsCriadas.push(novoId);
-      criadas++;
+      update({ done: i + 1, criadas, atualizadas, ignoradas });
+      continue;
     }
+
+    // Conflito fingerprint para coletas sem MTR (dmr_manual / sem MTR)
+    if (!g.mtr) {
+      const fp = coletaFingerprint({
+        data: coletaInput.data,
+        destinador: coletaInput.destinador,
+        transportador: coletaInput.transportador,
+        itens: coletaInput.itens.map((it) => ({
+          tipo_residuo_nome: it.tipo_residuo_nome,
+          tratamento: it.tratamento,
+          peso_kg: Number(it.peso_kg || 0),
+        })),
+      });
+      if (exNoMtr.has(fp)) {
+        const act = input.conflictActions[g.key] ?? "ignorar";
+        if (act === "ignorar" || act === "manter") {
+          ignoradas++;
+          update({ done: i + 1, ignoradas });
+          continue;
+        }
+        // substituir: atualiza a existente
+        await updateColeta(exNoMtr.get(fp)!.id, coletaInput, { skipAudit: true });
+        atualizadas++;
+        update({ done: i + 1, criadas, atualizadas, ignoradas });
+        continue;
+      }
+    }
+
+    const novoId = await createColeta(coletaInput, { skipAudit: true });
+    idsCriadas.push(novoId);
+    criadas++;
     update({ done: i + 1, criadas, atualizadas, ignoradas });
   }
 

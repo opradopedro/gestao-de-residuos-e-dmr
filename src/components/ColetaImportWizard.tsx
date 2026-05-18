@@ -16,6 +16,7 @@ import {
   updateColeta,
   type ColetaInput,
   type ColetaComItens,
+  coletaFingerprint,
 } from "@/lib/data";
 import { setUnidadeAtiva } from "@/hooks/use-unidade";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -33,6 +34,8 @@ import { QuickTratamentoDialog } from "@/components/QuickTratamentoDialog";
 
 const ESTIMADO_RX = /est[ií]m[ao]?d?[ao]?s?/i;
 const DMR_MTR_RX = /^\s*d[mr]{2}\s*$|incluir.*dmr/i;
+// MTR provisório: começa com P seguido de 4+ dígitos (ex: P12345). Tratado como MTR válido.
+const MTR_PROVISORIO_RX = /\bP\d{4,}\b/i;
 
 type Step = "file" | "config" | "unidade" | "review" | "conflicts" | "missing" | "final" | "running";
 
@@ -163,7 +166,8 @@ export function ColetaImportWizard({
       const transportador = colMap.transportador ? String(get(colMap.transportador) ?? "").trim() : "";
       const observacoes = colMap.observacoes ? String(get(colMap.observacoes) ?? "").trim() : "";
       const peso_estimado = ESTIMADO_RX.test(observacoes);
-      const dmr_manual = DMR_MTR_RX.test(mtr);
+      const isProvisorio = MTR_PROVISORIO_RX.test(mtr);
+      const dmr_manual = !isProvisorio && DMR_MTR_RX.test(mtr);
       const mtrFinal = dmr_manual ? "" : mtr;
       // skip empty rows
       if (!residuo && !mtr && peso === 0 && !destinador) continue;
@@ -202,23 +206,38 @@ export function ColetaImportWizard({
       return found ? found.nome : nome;
     };
 
-    const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
-    const noMtrFingerprint = (c: ColetaComItens) => {
-      const its = (c.itens ?? []).map((it) => `${norm(it.tipo_residuo_nome)}|${norm(it.tratamento)}|${Math.round(Number(it.peso_kg || 0) * 1000) / 1000}`).sort().join("#");
-      return `${c.data}|${norm(c.destinador)}|${norm(c.transportador)}|${its}`;
-    };
     const exNoMtr = new Map<string, ColetaComItens>();
-    for (const c of coletasUnidade) if (!c.mtr) exNoMtr.set(noMtrFingerprint(c), c);
+    for (const c of coletasUnidade) {
+      if (!c.mtr) {
+        const fp = coletaFingerprint({
+          data: c.data,
+          destinador: c.destinador,
+          transportador: c.transportador,
+          itens: (c.itens ?? []).map((it) => ({
+            tipo_residuo_nome: it.tipo_residuo_nome,
+            tratamento: it.tratamento,
+            peso_kg: Number(it.peso_kg || 0),
+          })),
+        });
+        exNoMtr.set(fp, c);
+      }
+    }
 
     const out: { grupo: typeof grupos[number]; existente: ColetaComItens; razao: "mtr" | "fingerprint" }[] = [];
     for (const g of grupos) {
       if (g.mtr && exMap.has(g.mtr)) { out.push({ grupo: g, existente: exMap.get(g.mtr)!, razao: "mtr" }); continue; }
       if (!g.mtr) {
         const r0 = g.rows[0];
-        const dest = canonical("destinador", r0.destinador);
-        const trans = canonical("transportador", r0.transportador);
-        const its = g.rows.map((r) => `${norm(canonical("residuo", r.residuo))}|${norm(canonical("tratamento", r.tratamento))}|${Math.round(Number(r.peso || 0) * 1000) / 1000}`).sort().join("#");
-        const fp = `${r0.data}|${norm(dest)}|${norm(trans)}|${its}`;
+        const fp = coletaFingerprint({
+          data: r0.data,
+          destinador: canonical("destinador", r0.destinador),
+          transportador: canonical("transportador", r0.transportador),
+          itens: g.rows.map((r) => ({
+            tipo_residuo_nome: canonical("residuo", r.residuo),
+            tratamento: canonical("tratamento", r.tratamento),
+            peso_kg: Number(r.peso || 0),
+          })),
+        });
         if (exNoMtr.has(fp)) out.push({ grupo: g, existente: exNoMtr.get(fp)!, razao: "fingerprint" });
       }
     }
