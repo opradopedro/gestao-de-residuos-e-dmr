@@ -82,17 +82,21 @@ export function QuickEntityDialog(props: Props) {
     setVinculos((p) => [...p, { tipo_residuo_id: "", tipo_residuo_nome: "", tratamento: "" }]);
   }
 
+  const cnpjNorm = normalizeCNPJ(cnpj);
+  const cnpjInvalido = cnpjNorm.length > 0 && !isValidCNPJ(cnpjNorm);
+
   async function salvar() {
     if (!nome.trim()) { toast.error("Informe o nome"); return; }
+    if (cnpjInvalido) { toast.error("CNPJ inválido"); return; }
     setSaving(true);
     try {
       if (kind === "transportador") {
-        const t = await createTransportador({ nome: nome.trim(), cnpj: cnpj.trim() || null });
+        const t = await createTransportador({ nome: nome.trim(), cnpj: cnpjNorm || null });
         qc.invalidateQueries({ queryKey: ["transportadores"] });
         toast.success("Transportador cadastrado");
         props.onCreated(t);
       } else {
-        const d = await createDestinador({ nome: nome.trim(), cnpj: cnpj.trim() || null });
+        const d = await createDestinador({ nome: nome.trim(), cnpj: cnpjNorm || null });
         const validos = vinculos.filter((v) => v.tipo_residuo_id && v.tratamento.trim());
         if (validos.length > 0) {
           await setDestinadorResiduos(d.id, validos.map((v) => ({ tipo_residuo_id: v.tipo_residuo_id, tratamento: v.tratamento })));
