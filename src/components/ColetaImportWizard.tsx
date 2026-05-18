@@ -16,6 +16,7 @@ import {
   updateColeta,
   type ColetaInput,
   type ColetaComItens,
+  coletaFingerprint,
 } from "@/lib/data";
 import { setUnidadeAtiva } from "@/hooks/use-unidade";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
