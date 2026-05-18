@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Autocomplete } from "@/components/Autocomplete";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
+import { formatCNPJ, isValidCNPJ, normalizeCNPJ } from "@/lib/cnpj";
 
 type Vinculo = { tipo_residuo_id: string; tipo_residuo_nome: string; tratamento: string };
 
