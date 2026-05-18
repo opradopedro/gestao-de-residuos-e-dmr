@@ -165,7 +165,8 @@ export function ColetaImportWizard({
       const transportador = colMap.transportador ? String(get(colMap.transportador) ?? "").trim() : "";
       const observacoes = colMap.observacoes ? String(get(colMap.observacoes) ?? "").trim() : "";
       const peso_estimado = ESTIMADO_RX.test(observacoes);
-      const dmr_manual = DMR_MTR_RX.test(mtr);
+      const isProvisorio = MTR_PROVISORIO_RX.test(mtr);
+      const dmr_manual = !isProvisorio && DMR_MTR_RX.test(mtr);
       const mtrFinal = dmr_manual ? "" : mtr;
       // skip empty rows
       if (!residuo && !mtr && peso === 0 && !destinador) continue;
