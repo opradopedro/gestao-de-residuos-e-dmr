@@ -311,14 +311,44 @@ async function runJob(input: ImportJobInput) {
       itens,
     };
 
-    if (action === "substituir" && g.mtr && exMap.has(g.mtr)) {
+    // Conflito MTR — substituir
+    if (g.mtr && exMap.has(g.mtr)) {
       await updateColeta(exMap.get(g.mtr)!.id, coletaInput, { skipAudit: true });
       atualizadas++;
-    } else {
-      const novoId = await createColeta(coletaInput, { skipAudit: true });
-      idsCriadas.push(novoId);
-      criadas++;
+      update({ done: i + 1, criadas, atualizadas, ignoradas });
+      continue;
     }
+
+    // Conflito fingerprint para coletas sem MTR (dmr_manual / sem MTR)
+    if (!g.mtr) {
+      const fp = coletaFingerprint({
+        data: coletaInput.data,
+        destinador: coletaInput.destinador,
+        transportador: coletaInput.transportador,
+        itens: coletaInput.itens.map((it) => ({
+          tipo_residuo_nome: it.tipo_residuo_nome,
+          tratamento: it.tratamento,
+          peso_kg: Number(it.peso_kg || 0),
+        })),
+      });
+      if (exNoMtr.has(fp)) {
+        const act = input.conflictActions[g.key] ?? "ignorar";
+        if (act === "ignorar" || act === "manter") {
+          ignoradas++;
+          update({ done: i + 1, ignoradas });
+          continue;
+        }
+        // substituir: atualiza a existente
+        await updateColeta(exNoMtr.get(fp)!.id, coletaInput, { skipAudit: true });
+        atualizadas++;
+        update({ done: i + 1, criadas, atualizadas, ignoradas });
+        continue;
+      }
+    }
+
+    const novoId = await createColeta(coletaInput, { skipAudit: true });
+    idsCriadas.push(novoId);
+    criadas++;
     update({ done: i + 1, criadas, atualizadas, ignoradas });
   }
 
