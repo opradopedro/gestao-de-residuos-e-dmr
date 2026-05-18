@@ -188,7 +188,7 @@ export function QuickEntityDialog(props: Props) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={salvar} disabled={saving || !nome.trim()}>{saving ? "Salvando..." : "Salvar"}</Button>
+          <Button onClick={salvar} disabled={saving || !nome.trim() || cnpjInvalido}>{saving ? "Salvando..." : "Salvar"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
