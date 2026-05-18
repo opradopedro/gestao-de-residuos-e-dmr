@@ -205,23 +205,38 @@ export function ColetaImportWizard({
       return found ? found.nome : nome;
     };
 
-    const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
-    const noMtrFingerprint = (c: ColetaComItens) => {
-      const its = (c.itens ?? []).map((it) => `${norm(it.tipo_residuo_nome)}|${norm(it.tratamento)}|${Math.round(Number(it.peso_kg || 0) * 1000) / 1000}`).sort().join("#");
-      return `${c.data}|${norm(c.destinador)}|${norm(c.transportador)}|${its}`;
-    };
     const exNoMtr = new Map<string, ColetaComItens>();
-    for (const c of coletasUnidade) if (!c.mtr) exNoMtr.set(noMtrFingerprint(c), c);
+    for (const c of coletasUnidade) {
+      if (!c.mtr) {
+        const fp = coletaFingerprint({
+          data: c.data,
+          destinador: c.destinador,
+          transportador: c.transportador,
+          itens: (c.itens ?? []).map((it) => ({
+            tipo_residuo_nome: it.tipo_residuo_nome,
+            tratamento: it.tratamento,
+            peso_kg: Number(it.peso_kg || 0),
+          })),
+        });
+        exNoMtr.set(fp, c);
+      }
+    }
 
     const out: { grupo: typeof grupos[number]; existente: ColetaComItens; razao: "mtr" | "fingerprint" }[] = [];
     for (const g of grupos) {
       if (g.mtr && exMap.has(g.mtr)) { out.push({ grupo: g, existente: exMap.get(g.mtr)!, razao: "mtr" }); continue; }
       if (!g.mtr) {
         const r0 = g.rows[0];
-        const dest = canonical("destinador", r0.destinador);
-        const trans = canonical("transportador", r0.transportador);
-        const its = g.rows.map((r) => `${norm(canonical("residuo", r.residuo))}|${norm(canonical("tratamento", r.tratamento))}|${Math.round(Number(r.peso || 0) * 1000) / 1000}`).sort().join("#");
-        const fp = `${r0.data}|${norm(dest)}|${norm(trans)}|${its}`;
+        const fp = coletaFingerprint({
+          data: r0.data,
+          destinador: canonical("destinador", r0.destinador),
+          transportador: canonical("transportador", r0.transportador),
+          itens: g.rows.map((r) => ({
+            tipo_residuo_nome: canonical("residuo", r.residuo),
+            tratamento: canonical("tratamento", r.tratamento),
+            peso_kg: Number(r.peso || 0),
+          })),
+        });
         if (exNoMtr.has(fp)) out.push({ grupo: g, existente: exNoMtr.get(fp)!, razao: "fingerprint" });
       }
     }
