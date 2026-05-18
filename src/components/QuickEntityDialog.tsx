@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Autocomplete } from "@/components/Autocomplete";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
+import { formatCNPJ, isValidCNPJ, normalizeCNPJ } from "@/lib/cnpj";
 
 type Vinculo = { tipo_residuo_id: string; tipo_residuo_nome: string; tratamento: string };
 
@@ -81,17 +82,21 @@ export function QuickEntityDialog(props: Props) {
     setVinculos((p) => [...p, { tipo_residuo_id: "", tipo_residuo_nome: "", tratamento: "" }]);
   }
 
+  const cnpjNorm = normalizeCNPJ(cnpj);
+  const cnpjInvalido = cnpjNorm.length > 0 && !isValidCNPJ(cnpjNorm);
+
   async function salvar() {
     if (!nome.trim()) { toast.error("Informe o nome"); return; }
+    if (cnpjInvalido) { toast.error("CNPJ inválido"); return; }
     setSaving(true);
     try {
       if (kind === "transportador") {
-        const t = await createTransportador({ nome: nome.trim(), cnpj: cnpj.trim() || null });
+        const t = await createTransportador({ nome: nome.trim(), cnpj: cnpjNorm || null });
         qc.invalidateQueries({ queryKey: ["transportadores"] });
         toast.success("Transportador cadastrado");
         props.onCreated(t);
       } else {
-        const d = await createDestinador({ nome: nome.trim(), cnpj: cnpj.trim() || null });
+        const d = await createDestinador({ nome: nome.trim(), cnpj: cnpjNorm || null });
         const validos = vinculos.filter((v) => v.tipo_residuo_id && v.tratamento.trim());
         if (validos.length > 0) {
           await setDestinadorResiduos(d.id, validos.map((v) => ({ tipo_residuo_id: v.tipo_residuo_id, tratamento: v.tratamento })));
@@ -131,7 +136,13 @@ export function QuickEntityDialog(props: Props) {
           </div>
           <div>
             <Label className="text-xs">CNPJ</Label>
-            <Input value={cnpj} onChange={(e) => setCnpj(e.target.value)} placeholder="00.000.000/0000-00" />
+            <Input
+              value={cnpj.length === 14 && /^\d+$/.test(cnpj) ? formatCNPJ(cnpj) : cnpj}
+              onChange={(e) => setCnpj(normalizeCNPJ(e.target.value))}
+              placeholder="00.000.000/0000-00"
+              maxLength={18}
+            />
+            {cnpjInvalido && <div className="text-xs text-destructive mt-1">CNPJ inválido (verifique os dígitos)</div>}
           </div>
 
           {kind === "destinador" && (
@@ -177,7 +188,7 @@ export function QuickEntityDialog(props: Props) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={salvar} disabled={saving || !nome.trim()}>{saving ? "Salvando..." : "Salvar"}</Button>
+          <Button onClick={salvar} disabled={saving || !nome.trim() || cnpjInvalido}>{saving ? "Salvando..." : "Salvar"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

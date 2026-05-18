@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { normalizeCodigoIbama, formatCodigoIbama } from "@/lib/ibama";
 
 export function TipoResiduoEditDialog({
   open, onOpenChange, tipo, defaultName, defaultCodigo, onSaved,
@@ -35,7 +36,7 @@ export function TipoResiduoEditDialog({
     mutationFn: () => upsertTipoResiduo({
       id: tipo?.id, nome: nome.trim(),
       tratamento_padrao: trat.trim() || "Reciclagem",
-      codigo: codigo.trim() || null,
+      codigo: normalizeCodigoIbama(codigo) || null,
     }),
     onSuccess: (t) => {
       qc.invalidateQueries({ queryKey: ["tipos_residuo"] });
@@ -55,7 +56,7 @@ export function TipoResiduoEditDialog({
         </DialogHeader>
         <div className="grid gap-3">
           <div><Label className="text-xs">Nome</Label><Input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-          <div><Label className="text-xs">Código IBAMA</Label><Input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Ex.: 200138" /></div>
+          <div><Label className="text-xs">Código IBAMA</Label><Input value={codigo} onChange={(e) => setCodigo(e.target.value)} onBlur={() => setCodigo(formatCodigoIbama(codigo) || codigo)} placeholder="Ex.: 20 01 38" /></div>
           <div><Label className="text-xs">Tratamento padrão</Label><Input value={trat} onChange={(e) => setTrat(e.target.value)} placeholder="Ex.: Reciclagem" /></div>
         </div>
         <DialogFooter>
