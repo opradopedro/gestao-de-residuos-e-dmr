@@ -93,7 +93,7 @@ export function QuickResiduoDialog({ open, onOpenChange, defaultName, defaultDes
             </div>
             <div>
               <Label className="text-xs">Código IBAMA</Label>
-              <Input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Ex.: 01 01 19" />
+              <Input value={codigo} onChange={(e) => setCodigo(e.target.value)} onBlur={() => setCodigo(formatCodigoIbama(codigo) || codigo)} placeholder="Ex.: 01 01 19" />
             </div>
           </div>
           <div>
