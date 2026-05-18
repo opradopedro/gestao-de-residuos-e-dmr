@@ -56,7 +56,7 @@ export function TipoResiduoEditDialog({
         </DialogHeader>
         <div className="grid gap-3">
           <div><Label className="text-xs">Nome</Label><Input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-          <div><Label className="text-xs">Código IBAMA</Label><Input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Ex.: 200138" /></div>
+          <div><Label className="text-xs">Código IBAMA</Label><Input value={codigo} onChange={(e) => setCodigo(e.target.value)} onBlur={() => setCodigo(formatCodigoIbama(codigo) || codigo)} placeholder="Ex.: 20 01 38" /></div>
           <div><Label className="text-xs">Tratamento padrão</Label><Input value={trat} onChange={(e) => setTrat(e.target.value)} placeholder="Ex.: Reciclagem" /></div>
         </div>
         <DialogFooter>
