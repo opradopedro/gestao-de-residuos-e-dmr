@@ -36,7 +36,7 @@ export function TipoResiduoEditDialog({
     mutationFn: () => upsertTipoResiduo({
       id: tipo?.id, nome: nome.trim(),
       tratamento_padrao: trat.trim() || "Reciclagem",
-      codigo: codigo.trim() || null,
+      codigo: normalizeCodigoIbama(codigo) || null,
     }),
     onSuccess: (t) => {
       qc.invalidateQueries({ queryKey: ["tipos_residuo"] });
