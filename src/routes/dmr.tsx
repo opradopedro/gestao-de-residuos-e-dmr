@@ -256,8 +256,10 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
   const { data: linhas = [] } = useQuery({ queryKey: ["dmr_linhas", uploadId], queryFn: () => getDmrLinhas(uploadId) });
   const { data: coletas = [] } = useQuery({ queryKey: ["coletas", unidadeId], queryFn: () => listColetasByUnidade(unidadeId) });
   const { data: tipos = [] } = useQuery({ queryKey: ["tipos_residuo"], queryFn: listTiposResiduo });
+  const { data: destinadoresCad = [] } = useQuery({ queryKey: ["destinadores"], queryFn: listDestinadores });
   const [detail, setDetail] = useState<Grupo | null>(null);
   const [resolveOpen, setResolveOpen] = useState(false);
+  const [resolveDestOpen, setResolveDestOpen] = useState(false);
   const [editTipo, setEditTipo] = useState<TipoResiduo | null>(null);
 
   // Resolve um texto livre da DMR para o nome canônico de um tipo cadastrado
