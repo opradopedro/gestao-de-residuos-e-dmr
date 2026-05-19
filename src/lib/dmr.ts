@@ -95,3 +95,14 @@ export async function renameDmrLinhasResiduo(uploadId: string, fromText: string,
     .eq("residuo", fromText);
   if (error) throw error;
 }
+
+/** Renomeia o texto do destinador nas linhas de um upload (usado quando o usuário
+ *  resolve um destinador não cadastrado, escolhendo um existente ou criando um novo). */
+export async function renameDmrLinhasDestinador(uploadId: string, fromText: string, toText: string) {
+  const { error } = await supabase
+    .from("dmr_linhas")
+    .update({ destinador: toText })
+    .eq("upload_id", uploadId)
+    .eq("destinador", fromText);
+  if (error) throw error;
+}
