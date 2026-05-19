@@ -285,8 +285,8 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
     return { canonical: raw, matched: false };
   }
 
-  const { grupos, pendentes } = useMemo(() => {
-    if (!upload) return { grupos: [] as Grupo[], pendentes: [] as { texto: string; ocorrencias: number }[] };
+  const { grupos, pendentes, pendentesDest } = useMemo(() => {
+    if (!upload) return { grupos: [] as Grupo[], pendentes: [] as { texto: string; ocorrencias: number }[], pendentesDest: [] as { texto: string; ocorrencias: number }[] };
     const coletasTri = coletas.filter((c) => {
       const q = quarterOf(c.data);
       return q.ano === upload.ano && q.trimestre === upload.trimestre;
@@ -312,6 +312,9 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
     const dmrLinhasMap = new Map<string, any[]>();
     const labelMap = new Map<string, string>();
     const pendCount = new Map<string, number>();
+    const pendDestCount = new Map<string, number>();
+
+    const destNomesCad = new Set(destinadoresCad.map((d) => norm(d.nome)));
 
     for (const l of linhas) {
       const r = resolveResiduoCanonical(l.residuo);
@@ -323,6 +326,10 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
       if (r.tipo && !tipoPorKey.get(k)) tipoPorKey.set(k, r.tipo);
       if (!r.matched && l.residuo) {
         pendCount.set(l.residuo, (pendCount.get(l.residuo) ?? 0) + 1);
+      }
+      const destTxt = (l.destinador ?? "").trim();
+      if (destTxt && !destNomesCad.has(norm(destTxt))) {
+        pendDestCount.set(destTxt, (pendDestCount.get(destTxt) ?? 0) + 1);
       }
     }
     for (const [k] of interno) {
@@ -351,9 +358,12 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
     const pendentes = Array.from(pendCount.entries())
       .map(([texto, ocorrencias]) => ({ texto, ocorrencias }))
       .sort((a, b) => b.ocorrencias - a.ocorrencias);
+    const pendentesDest = Array.from(pendDestCount.entries())
+      .map(([texto, ocorrencias]) => ({ texto, ocorrencias }))
+      .sort((a, b) => b.ocorrencias - a.ocorrencias);
 
-    return { grupos, pendentes };
-  }, [upload, linhas, coletas, tipos]);
+    return { grupos, pendentes, pendentesDest };
+  }, [upload, linhas, coletas, tipos, destinadoresCad]);
 
   if (!upload) return null;
 
