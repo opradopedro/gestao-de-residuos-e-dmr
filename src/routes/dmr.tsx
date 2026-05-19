@@ -469,6 +469,13 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
         pendentes={pendentes}
       />
 
+      <DmrResolveDestinadoresDialog
+        open={resolveDestOpen}
+        onOpenChange={setResolveDestOpen}
+        uploadId={uploadId}
+        pendentes={pendentesDest}
+      />
+
       <TipoResiduoEditDialog
         open={!!editTipo}
         onOpenChange={(o) => !o && setEditTipo(null)}
