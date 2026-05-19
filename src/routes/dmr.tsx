@@ -388,6 +388,25 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
         </Card>
       )}
 
+      {pendentesDest.length > 0 && (
+        <Card>
+          <CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-sm">
+              <div className="font-medium flex items-center gap-2">
+                <AlertTriangle className="size-4 text-warning-foreground" />
+                {pendentesDest.length} destinador(es) na DMR sem cadastro correspondente
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Substitua por um destinador cadastrado ou crie um novo.
+              </div>
+            </div>
+            <Button onClick={() => setResolveDestOpen(true)}>
+              <Wand2 className="size-4 mr-1" /> Resolver destinadores
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="p-0">
           <div className="p-4 border-b border-border">
