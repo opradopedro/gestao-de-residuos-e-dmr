@@ -20,6 +20,8 @@ import { quarterOf } from "@/lib/quarter";
 import { formatTon, formatDate } from "@/lib/format";
 import { TipoResiduoEditDialog } from "@/components/TipoResiduoEditDialog";
 import { DmrResolveResiduosDialog } from "@/components/DmrResolveResiduosDialog";
+import { DmrResolveDestinadoresDialog } from "@/components/DmrResolveDestinadoresDialog";
+import { listDestinadores } from "@/lib/data";
 
 export const Route = createFileRoute("/dmr")({
   head: () => ({ meta: [{ title: "DMR — Conferência" }] }),
@@ -254,8 +256,10 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
   const { data: linhas = [] } = useQuery({ queryKey: ["dmr_linhas", uploadId], queryFn: () => getDmrLinhas(uploadId) });
   const { data: coletas = [] } = useQuery({ queryKey: ["coletas", unidadeId], queryFn: () => listColetasByUnidade(unidadeId) });
   const { data: tipos = [] } = useQuery({ queryKey: ["tipos_residuo"], queryFn: listTiposResiduo });
+  const { data: destinadoresCad = [] } = useQuery({ queryKey: ["destinadores"], queryFn: listDestinadores });
   const [detail, setDetail] = useState<Grupo | null>(null);
   const [resolveOpen, setResolveOpen] = useState(false);
+  const [resolveDestOpen, setResolveDestOpen] = useState(false);
   const [editTipo, setEditTipo] = useState<TipoResiduo | null>(null);
 
   // Resolve um texto livre da DMR para o nome canônico de um tipo cadastrado
@@ -281,8 +285,8 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
     return { canonical: raw, matched: false };
   }
 
-  const { grupos, pendentes } = useMemo(() => {
-    if (!upload) return { grupos: [] as Grupo[], pendentes: [] as { texto: string; ocorrencias: number }[] };
+  const { grupos, pendentes, pendentesDest } = useMemo(() => {
+    if (!upload) return { grupos: [] as Grupo[], pendentes: [] as { texto: string; ocorrencias: number }[], pendentesDest: [] as { texto: string; ocorrencias: number }[] };
     const coletasTri = coletas.filter((c) => {
       const q = quarterOf(c.data);
       return q.ano === upload.ano && q.trimestre === upload.trimestre;
@@ -308,6 +312,9 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
     const dmrLinhasMap = new Map<string, any[]>();
     const labelMap = new Map<string, string>();
     const pendCount = new Map<string, number>();
+    const pendDestCount = new Map<string, number>();
+
+    const destNomesCad = new Set(destinadoresCad.map((d) => norm(d.nome)));
 
     for (const l of linhas) {
       const r = resolveResiduoCanonical(l.residuo);
@@ -319,6 +326,10 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
       if (r.tipo && !tipoPorKey.get(k)) tipoPorKey.set(k, r.tipo);
       if (!r.matched && l.residuo) {
         pendCount.set(l.residuo, (pendCount.get(l.residuo) ?? 0) + 1);
+      }
+      const destTxt = (l.destinador ?? "").trim();
+      if (destTxt && !destNomesCad.has(norm(destTxt))) {
+        pendDestCount.set(destTxt, (pendDestCount.get(destTxt) ?? 0) + 1);
       }
     }
     for (const [k] of interno) {
@@ -347,9 +358,12 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
     const pendentes = Array.from(pendCount.entries())
       .map(([texto, ocorrencias]) => ({ texto, ocorrencias }))
       .sort((a, b) => b.ocorrencias - a.ocorrencias);
+    const pendentesDest = Array.from(pendDestCount.entries())
+      .map(([texto, ocorrencias]) => ({ texto, ocorrencias }))
+      .sort((a, b) => b.ocorrencias - a.ocorrencias);
 
-    return { grupos, pendentes };
-  }, [upload, linhas, coletas, tipos]);
+    return { grupos, pendentes, pendentesDest };
+  }, [upload, linhas, coletas, tipos, destinadoresCad]);
 
   if (!upload) return null;
 
@@ -369,6 +383,25 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
             </div>
             <Button onClick={() => setResolveOpen(true)}>
               <Wand2 className="size-4 mr-1" /> Resolver pendentes
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {pendentesDest.length > 0 && (
+        <Card>
+          <CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-sm">
+              <div className="font-medium flex items-center gap-2">
+                <AlertTriangle className="size-4 text-warning-foreground" />
+                {pendentesDest.length} destinador(es) na DMR sem cadastro correspondente
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Substitua por um destinador cadastrado ou crie um novo.
+              </div>
+            </div>
+            <Button onClick={() => setResolveDestOpen(true)}>
+              <Wand2 className="size-4 mr-1" /> Resolver destinadores
             </Button>
           </CardContent>
         </Card>
@@ -434,6 +467,13 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
         onOpenChange={setResolveOpen}
         uploadId={uploadId}
         pendentes={pendentes}
+      />
+
+      <DmrResolveDestinadoresDialog
+        open={resolveDestOpen}
+        onOpenChange={setResolveDestOpen}
+        uploadId={uploadId}
+        pendentes={pendentesDest}
       />
 
       <TipoResiduoEditDialog
