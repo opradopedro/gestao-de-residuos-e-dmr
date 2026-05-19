@@ -20,6 +20,8 @@ import { quarterOf } from "@/lib/quarter";
 import { formatTon, formatDate } from "@/lib/format";
 import { TipoResiduoEditDialog } from "@/components/TipoResiduoEditDialog";
 import { DmrResolveResiduosDialog } from "@/components/DmrResolveResiduosDialog";
+import { DmrResolveDestinadoresDialog } from "@/components/DmrResolveDestinadoresDialog";
+import { listDestinadores } from "@/lib/data";
 
 export const Route = createFileRoute("/dmr")({
   head: () => ({ meta: [{ title: "DMR — Conferência" }] }),
