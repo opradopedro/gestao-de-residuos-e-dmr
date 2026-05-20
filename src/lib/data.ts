@@ -219,11 +219,14 @@ export async function createTransportador(input: { nome: string; cnpj?: string |
   }
   const { data, error } = await supabase.from("transportadores").insert({ nome: input.nome, cnpj: input.cnpj ?? null }).select().single();
   if (error) throw error;
+  await auditCadastro("cadastro_criado", `Transportador criado: "${input.nome}"`, { entidade: "transportador", depois: data });
   return data as any;
 }
 export async function deleteTransportador(id: string) {
+  const { data: prev } = await supabase.from("transportadores").select("*").eq("id", id).maybeSingle();
   const { error } = await supabase.from("transportadores").delete().eq("id", id);
   if (error) throw error;
+  if (prev) await auditCadastro("cadastro_excluido", `Transportador excluído: "${(prev as any).nome}"`, { entidade: "transportador", antes: prev });
 }
 
 // ===== Destinadores =====
@@ -239,11 +242,14 @@ export async function createDestinador(input: { nome: string; cnpj?: string | nu
   }
   const { data, error } = await supabase.from("destinadores").insert({ nome: input.nome, cnpj: input.cnpj ?? null }).select().single();
   if (error) throw error;
+  await auditCadastro("cadastro_criado", `Destinador criado: "${input.nome}"`, { entidade: "destinador", depois: data });
   return data as any;
 }
 export async function deleteDestinador(id: string) {
+  const { data: prev } = await supabase.from("destinadores").select("*").eq("id", id).maybeSingle();
   const { error } = await supabase.from("destinadores").delete().eq("id", id);
   if (error) throw error;
+  if (prev) await auditCadastro("cadastro_excluido", `Destinador excluído: "${(prev as any).nome}"`, { entidade: "destinador", antes: prev });
 }
 
 // ===== Vínculos destinador <-> resíduo =====
