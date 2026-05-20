@@ -725,8 +725,10 @@ export async function updateColetaMtr(id: string, mtr: string | null) {
 
 // ===== Atualizações de cadastros =====
 export async function updateUnidade(id: string, nome: string): Promise<Unidade> {
+  const { data: prev } = await supabase.from("unidades").select("*").eq("id", id).maybeSingle();
   const { data, error } = await supabase.from("unidades").update({ nome }).eq("id", id).select().single();
   if (error) throw error;
+  await auditCadastro("cadastro_editado", `Unidade editada: "${(prev as any)?.nome ?? nome}" → "${nome}"`, { entidade: "unidade", antes: prev, depois: data });
   return data as any;
 }
 export async function updateTransportador(id: string, input: { nome: string; cnpj?: string | null }): Promise<Transportador> {
@@ -734,9 +736,11 @@ export async function updateTransportador(id: string, input: { nome: string; cnp
     const dup = await findTransportadorByCnpj(input.cnpj);
     if (dup && dup.id !== id) { const e: any = new Error(`CNPJ já cadastrado para "${dup.nome}"`); e.code = "DUP_CNPJ"; e.existing = dup; throw e; }
   }
+  const { data: prev } = await supabase.from("transportadores").select("*").eq("id", id).maybeSingle();
   const { data, error } = await supabase.from("transportadores").update({ nome: input.nome, cnpj: input.cnpj ?? null }).eq("id", id).select().single();
   if (error) throw error;
   await supabase.from("coletas").update({ transportador: input.nome }).eq("transportador_id", id);
+  await auditCadastro("cadastro_editado", `Transportador editado: "${(prev as any)?.nome ?? input.nome}" → "${input.nome}"`, { entidade: "transportador", antes: prev, depois: data });
   return data as any;
 }
 export async function updateDestinador(id: string, input: { nome: string; cnpj?: string | null }): Promise<Destinador> {
@@ -744,9 +748,11 @@ export async function updateDestinador(id: string, input: { nome: string; cnpj?:
     const dup = await findDestinadorByCnpj(input.cnpj);
     if (dup && dup.id !== id) { const e: any = new Error(`CNPJ já cadastrado para "${dup.nome}"`); e.code = "DUP_CNPJ"; e.existing = dup; throw e; }
   }
+  const { data: prev } = await supabase.from("destinadores").select("*").eq("id", id).maybeSingle();
   const { data, error } = await supabase.from("destinadores").update({ nome: input.nome, cnpj: input.cnpj ?? null }).eq("id", id).select().single();
   if (error) throw error;
   await supabase.from("coletas").update({ destinador: input.nome }).eq("destinador_id", id);
+  await auditCadastro("cadastro_editado", `Destinador editado: "${(prev as any)?.nome ?? input.nome}" → "${input.nome}"`, { entidade: "destinador", antes: prev, depois: data });
   return data as any;
 }
 
