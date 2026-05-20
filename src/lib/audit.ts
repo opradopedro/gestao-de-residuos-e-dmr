@@ -13,6 +13,11 @@ export type AuditTipo =
   | "merge_unidade"
   | "merge_residuo"
   | "merge_tratamento"
+  | "cadastro_criado"
+  | "cadastro_editado"
+  | "cadastro_excluido"
+  | "vinculo_criado"
+  | "dmr_upload"
   | "rollback";
 
 export type AuditEntry = {
