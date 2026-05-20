@@ -65,6 +65,7 @@ export async function listUnidades(): Promise<Unidade[]> {
 export async function createUnidade(nome: string) {
   const { data, error } = await supabase.from("unidades").insert({ nome }).select().single();
   if (error) throw error;
+  await auditCadastro("cadastro_criado", `Unidade criada: "${nome}"`, { entidade: "unidade", depois: data });
   return data;
 }
 
@@ -93,8 +94,10 @@ export async function bulkInsertDestinadores(rows: { nome: string; cnpj?: string
 }
 
 export async function deleteUnidade(id: string) {
+  const { data: prev } = await supabase.from("unidades").select("*").eq("id", id).maybeSingle();
   const { error } = await supabase.from("unidades").delete().eq("id", id);
   if (error) throw error;
+  if (prev) await auditCadastro("cadastro_excluido", `Unidade excluída: "${(prev as any).nome}"`, { entidade: "unidade", antes: prev });
 }
 
 export async function listTiposResiduo(): Promise<TipoResiduo[]> {
