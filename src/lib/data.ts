@@ -1,5 +1,23 @@
 import { supabase } from "@/integrations/supabase/client";
 
+// Audit helper inline (evita ciclo de import com audit.ts)
+async function auditCadastro(
+  tipo: "cadastro_criado" | "cadastro_editado" | "cadastro_excluido",
+  descricao: string,
+  snapshot?: any,
+) {
+  try {
+    await (supabase as any).from("audit_log").insert({
+      unidade_id: null,
+      tipo,
+      descricao,
+      quantidade: 1,
+      snapshot: snapshot ?? null,
+      rollback_disponivel: false,
+    });
+  } catch (e) { console.warn("audit cadastro falhou", e); }
+}
+
 export type Unidade = { id: string; nome: string; criado_em: string };
 export type TipoResiduo = { id: string; nome: string; tratamento_padrao: string; codigo?: string | null };
 export type Tratamento = { id: string; nome: string; codigo: string | null };
@@ -47,6 +65,7 @@ export async function listUnidades(): Promise<Unidade[]> {
 export async function createUnidade(nome: string) {
   const { data, error } = await supabase.from("unidades").insert({ nome }).select().single();
   if (error) throw error;
+  await auditCadastro("cadastro_criado", `Unidade criada: "${nome}"`, { entidade: "unidade", depois: data });
   return data;
 }
 
@@ -75,8 +94,10 @@ export async function bulkInsertDestinadores(rows: { nome: string; cnpj?: string
 }
 
 export async function deleteUnidade(id: string) {
+  const { data: prev } = await supabase.from("unidades").select("*").eq("id", id).maybeSingle();
   const { error } = await supabase.from("unidades").delete().eq("id", id);
   if (error) throw error;
+  if (prev) await auditCadastro("cadastro_excluido", `Unidade excluída: "${(prev as any).nome}"`, { entidade: "unidade", antes: prev });
 }
 
 export async function listTiposResiduo(): Promise<TipoResiduo[]> {
@@ -89,23 +110,27 @@ export async function upsertTipoResiduo(input: { id?: string; nome: string; trat
   const payload = { nome: input.nome, tratamento_padrao: input.tratamento_padrao, codigo: input.codigo ?? null };
   if (input.id) {
     // cascade rename: propaga novo nome para itens de coleta vinculados por id
-    const { data: prev } = await supabase.from("tipos_residuo").select("nome").eq("id", input.id).maybeSingle();
+    const { data: prev } = await supabase.from("tipos_residuo").select("*").eq("id", input.id).maybeSingle();
     const { data, error } = await supabase.from("tipos_residuo").update(payload).eq("id", input.id).select().single();
     if (error) throw error;
     if (prev && (prev as any).nome !== input.nome) {
       await supabase.from("coleta_itens").update({ tipo_residuo_nome: input.nome }).eq("tipo_residuo_id", input.id);
     }
+    await auditCadastro("cadastro_editado", `Resíduo editado: "${(prev as any)?.nome ?? input.nome}" → "${input.nome}"`, { entidade: "residuo", antes: prev, depois: data });
     return data as any;
   } else {
     const { data, error } = await supabase.from("tipos_residuo").insert(payload).select().single();
     if (error) throw error;
+    await auditCadastro("cadastro_criado", `Resíduo criado: "${input.nome}"`, { entidade: "residuo", depois: data });
     return data as any;
   }
 }
 
 export async function deleteTipoResiduo(id: string) {
+  const { data: prev } = await supabase.from("tipos_residuo").select("*").eq("id", id).maybeSingle();
   const { error } = await supabase.from("tipos_residuo").delete().eq("id", id);
   if (error) throw error;
+  if (prev) await auditCadastro("cadastro_excluido", `Resíduo excluído: "${(prev as any).nome}"`, { entidade: "residuo", antes: prev });
 }
 
 export async function bulkInsertTiposResiduo(rows: { nome: string; codigo?: string | null; tratamento_padrao?: string | null }[]) {
@@ -130,7 +155,7 @@ export async function upsertTratamento(input: { id?: string; nome: string; codig
   const payload = { nome: input.nome, codigo: input.codigo ?? null };
   if (input.id) {
     // cascade rename: propaga em coleta_itens.tratamento, tipos_residuo.tratamento_padrao, destinador_residuos.tratamento
-    const { data: prev } = await supabase.from("tratamentos").select("nome").eq("id", input.id).maybeSingle();
+    const { data: prev } = await supabase.from("tratamentos").select("*").eq("id", input.id).maybeSingle();
     const { data, error } = await supabase.from("tratamentos").update(payload).eq("id", input.id).select().single();
     if (error) throw error;
     const oldNome = (prev as any)?.nome;
@@ -139,17 +164,21 @@ export async function upsertTratamento(input: { id?: string; nome: string; codig
       await supabase.from("tipos_residuo").update({ tratamento_padrao: input.nome }).eq("tratamento_padrao", oldNome);
       await supabase.from("destinador_residuos").update({ tratamento: input.nome }).eq("tratamento", oldNome);
     }
+    await auditCadastro("cadastro_editado", `Tratamento editado: "${oldNome ?? input.nome}" → "${input.nome}"`, { entidade: "tratamento", antes: prev, depois: data });
     return data as any;
   } else {
     const { data, error } = await supabase.from("tratamentos").insert(payload).select().single();
     if (error) throw error;
+    await auditCadastro("cadastro_criado", `Tratamento criado: "${input.nome}"`, { entidade: "tratamento", depois: data });
     return data as any;
   }
 }
 
 export async function deleteTratamento(id: string) {
+  const { data: prev } = await supabase.from("tratamentos").select("*").eq("id", id).maybeSingle();
   const { error } = await supabase.from("tratamentos").delete().eq("id", id);
   if (error) throw error;
+  if (prev) await auditCadastro("cadastro_excluido", `Tratamento excluído: "${(prev as any).nome}"`, { entidade: "tratamento", antes: prev });
 }
 
 export async function bulkInsertTratamentos(rows: { nome: string; codigo?: string | null }[]) {
@@ -190,11 +219,14 @@ export async function createTransportador(input: { nome: string; cnpj?: string |
   }
   const { data, error } = await supabase.from("transportadores").insert({ nome: input.nome, cnpj: input.cnpj ?? null }).select().single();
   if (error) throw error;
+  await auditCadastro("cadastro_criado", `Transportador criado: "${input.nome}"`, { entidade: "transportador", depois: data });
   return data as any;
 }
 export async function deleteTransportador(id: string) {
+  const { data: prev } = await supabase.from("transportadores").select("*").eq("id", id).maybeSingle();
   const { error } = await supabase.from("transportadores").delete().eq("id", id);
   if (error) throw error;
+  if (prev) await auditCadastro("cadastro_excluido", `Transportador excluído: "${(prev as any).nome}"`, { entidade: "transportador", antes: prev });
 }
 
 // ===== Destinadores =====
@@ -210,11 +242,14 @@ export async function createDestinador(input: { nome: string; cnpj?: string | nu
   }
   const { data, error } = await supabase.from("destinadores").insert({ nome: input.nome, cnpj: input.cnpj ?? null }).select().single();
   if (error) throw error;
+  await auditCadastro("cadastro_criado", `Destinador criado: "${input.nome}"`, { entidade: "destinador", depois: data });
   return data as any;
 }
 export async function deleteDestinador(id: string) {
+  const { data: prev } = await supabase.from("destinadores").select("*").eq("id", id).maybeSingle();
   const { error } = await supabase.from("destinadores").delete().eq("id", id);
   if (error) throw error;
+  if (prev) await auditCadastro("cadastro_excluido", `Destinador excluído: "${(prev as any).nome}"`, { entidade: "destinador", antes: prev });
 }
 
 // ===== Vínculos destinador <-> resíduo =====
@@ -690,8 +725,10 @@ export async function updateColetaMtr(id: string, mtr: string | null) {
 
 // ===== Atualizações de cadastros =====
 export async function updateUnidade(id: string, nome: string): Promise<Unidade> {
+  const { data: prev } = await supabase.from("unidades").select("*").eq("id", id).maybeSingle();
   const { data, error } = await supabase.from("unidades").update({ nome }).eq("id", id).select().single();
   if (error) throw error;
+  await auditCadastro("cadastro_editado", `Unidade editada: "${(prev as any)?.nome ?? nome}" → "${nome}"`, { entidade: "unidade", antes: prev, depois: data });
   return data as any;
 }
 export async function updateTransportador(id: string, input: { nome: string; cnpj?: string | null }): Promise<Transportador> {
@@ -699,9 +736,11 @@ export async function updateTransportador(id: string, input: { nome: string; cnp
     const dup = await findTransportadorByCnpj(input.cnpj);
     if (dup && dup.id !== id) { const e: any = new Error(`CNPJ já cadastrado para "${dup.nome}"`); e.code = "DUP_CNPJ"; e.existing = dup; throw e; }
   }
+  const { data: prev } = await supabase.from("transportadores").select("*").eq("id", id).maybeSingle();
   const { data, error } = await supabase.from("transportadores").update({ nome: input.nome, cnpj: input.cnpj ?? null }).eq("id", id).select().single();
   if (error) throw error;
   await supabase.from("coletas").update({ transportador: input.nome }).eq("transportador_id", id);
+  await auditCadastro("cadastro_editado", `Transportador editado: "${(prev as any)?.nome ?? input.nome}" → "${input.nome}"`, { entidade: "transportador", antes: prev, depois: data });
   return data as any;
 }
 export async function updateDestinador(id: string, input: { nome: string; cnpj?: string | null }): Promise<Destinador> {
@@ -709,9 +748,11 @@ export async function updateDestinador(id: string, input: { nome: string; cnpj?:
     const dup = await findDestinadorByCnpj(input.cnpj);
     if (dup && dup.id !== id) { const e: any = new Error(`CNPJ já cadastrado para "${dup.nome}"`); e.code = "DUP_CNPJ"; e.existing = dup; throw e; }
   }
+  const { data: prev } = await supabase.from("destinadores").select("*").eq("id", id).maybeSingle();
   const { data, error } = await supabase.from("destinadores").update({ nome: input.nome, cnpj: input.cnpj ?? null }).eq("id", id).select().single();
   if (error) throw error;
   await supabase.from("coletas").update({ destinador: input.nome }).eq("destinador_id", id);
+  await auditCadastro("cadastro_editado", `Destinador editado: "${(prev as any)?.nome ?? input.nome}" → "${input.nome}"`, { entidade: "destinador", antes: prev, depois: data });
   return data as any;
 }
 
