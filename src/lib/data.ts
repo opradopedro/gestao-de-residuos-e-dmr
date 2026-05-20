@@ -1,5 +1,23 @@
 import { supabase } from "@/integrations/supabase/client";
 
+// Audit helper inline (evita ciclo de import com audit.ts)
+async function auditCadastro(
+  tipo: "cadastro_criado" | "cadastro_editado" | "cadastro_excluido",
+  descricao: string,
+  snapshot?: any,
+) {
+  try {
+    await (supabase as any).from("audit_log").insert({
+      unidade_id: null,
+      tipo,
+      descricao,
+      quantidade: 1,
+      snapshot: snapshot ?? null,
+      rollback_disponivel: false,
+    });
+  } catch (e) { console.warn("audit cadastro falhou", e); }
+}
+
 export type Unidade = { id: string; nome: string; criado_em: string };
 export type TipoResiduo = { id: string; nome: string; tratamento_padrao: string; codigo?: string | null };
 export type Tratamento = { id: string; nome: string; codigo: string | null };
