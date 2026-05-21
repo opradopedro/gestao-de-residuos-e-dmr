@@ -194,6 +194,11 @@ export function HistoryDialog({
                               <Eye className="size-3 mr-1" /> Ver
                             </Button>
                           )}
+                          {(e.tipo === "importacao" || e.tipo === "exclusao_em_massa") && (
+                            <Button size="sm" variant="outline" onClick={() => setVerAfetados(e)}>
+                              <Eye className="size-3 mr-1" /> Ver registros
+                            </Button>
+                          )}
                           {canRollback(e) && (
                             <Button
                               size="sm"
