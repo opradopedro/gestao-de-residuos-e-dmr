@@ -62,6 +62,7 @@ function ColetasList() {
   const [importOpen, setImportOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [viewId, setViewId] = useState<string | null>(null);
+  const [dupOpen, setDupOpen] = useState(false);
 
   // persist
   useMemo(() => {
