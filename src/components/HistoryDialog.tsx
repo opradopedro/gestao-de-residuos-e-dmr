@@ -223,6 +223,7 @@ export function HistoryDialog({
       </Dialog>
 
       <SingleRecordDialog entry={verEntry} onClose={() => setVerEntry(null)} onRevert={(e) => { rollbackMut.mutate(e); setVerEntry(null); }} reverting={rollbackMut.isPending} />
+      <AffectedRecordsDialog entry={verAfetados} onClose={() => setVerAfetados(null)} />
     </>
   );
 }
