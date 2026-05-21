@@ -298,6 +298,53 @@ function ColetasList() {
       </Card>
 
       {unidade && <ColetaImportWizard open={importOpen} onOpenChange={setImportOpen} unidadeAtiva={unidade} />}
+
+      <Dialog open={dupOpen} onOpenChange={setDupOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Duplicatas detectadas</DialogTitle>
+            <DialogDescription>
+              Coletas com mesma data, destinador, transportador e itens (peso/tratamento). Inclui registros sem MTR e manuais.
+            </DialogDescription>
+          </DialogHeader>
+          {dupGroups.length === 0 ? (
+            <div className="p-6 text-center text-muted-foreground text-sm">Nenhuma duplicata encontrada.</div>
+          ) : (
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+              {dupGroups.map((g, i) => (
+                <div key={i} className="border rounded-md p-3">
+                  <div className="text-xs text-muted-foreground mb-2">
+                    Grupo {i + 1} · {g.length} coletas · {formatDate(g[0].data)} · {g[0].destinador || "—"}
+                  </div>
+                  <div className="divide-y">
+                    {g.map((c) => (
+                      <div key={c.id} className="flex items-center justify-between py-2 text-sm">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-mono text-xs">{c.mtr || (c.dmr_manual ? "manual" : "sem MTR")}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {(c.itens ?? []).map((it) => `${it.tipo_residuo_nome} (${formatKgPlain(Number(it.peso_kg))})`).join(" · ")}
+                          </div>
+                        </div>
+                        <div className="flex gap-1 ml-2 shrink-0">
+                          <Button size="sm" variant="ghost" onClick={() => { setDupOpen(false); setViewId(c.id); }}>
+                            <Eye className="size-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => {
+                            if (confirm(`Excluir coleta${c.mtr ? ` MTR ${c.mtr}` : ""}?`)) delMut.mutate(c.id);
+                          }}>
+                            <Trash2 className="size-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <BulkDeleteDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen} coletas={coletas} unidadeId={unidade} totalGeral={coletas.length} />
       <AdvancedFilterDialog open={advOpen} onOpenChange={setAdvOpen} filtro={filtroAvancado} onApply={setFiltroAvancado} />
       <SavedFiltersDialog open={savedOpen} onOpenChange={setSavedOpen} onPick={setFiltroAvancado} />
