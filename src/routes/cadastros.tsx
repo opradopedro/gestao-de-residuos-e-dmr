@@ -538,30 +538,45 @@ function MergeDialog({ open, onOpenChange, tipo, itens, preselectRemoverId }: {
             <div className="space-y-3">
               {conflitos.map((c, i) => {
                 const escolha = escolhas[i];
-                const card = (lado: "A" | "B", coleta: any, label: string) => (
-                  <div
-                    className={`flex-1 border rounded p-3 cursor-pointer transition-colors ${
-                      escolha === lado ? "border-primary bg-primary/5" : "hover:bg-muted/40"
-                    }`}
-                    onClick={() => setEscolhas((p) => ({ ...p, [i]: lado }))}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-semibold uppercase text-muted-foreground">{label}</span>
-                      <input type="radio" checked={escolha === lado} readOnly />
+                const headerFor = (coleta: any) => {
+                  const mtr = coleta.mtr ? `MTR ${coleta.mtr}` : "Sem MTR";
+                  const ent = tipo === "destinador" ? (coleta.destinador || "—")
+                    : tipo === "transportador" ? (coleta.transportador || "—")
+                    : (coleta.destinador || coleta.transportador || "—");
+                  return `${mtr} — ${ent}`;
+                };
+                const card = (lado: "A" | "B", coleta: any, label: string) => {
+                  const total = (coleta.itens ?? []).reduce((s: number, it: any) => s + Number(it.peso_kg ?? 0), 0);
+                  return (
+                    <div
+                      className={`flex-1 border rounded p-3 cursor-pointer transition-colors ${
+                        escolha === lado ? "border-primary bg-primary/5" : "hover:bg-muted/40"
+                      }`}
+                      onClick={() => setEscolhas((p) => ({ ...p, [i]: lado }))}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold uppercase text-muted-foreground">{label}</span>
+                        <input type="radio" checked={escolha === lado} readOnly />
+                      </div>
+                      <div className="text-sm font-medium truncate">{headerFor(coleta)}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Data: {coleta.data} · {(coleta.itens ?? []).length} item(s) · {total.toFixed(2)} kg
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Dest.: {coleta.destinador || "—"} · Transp.: {coleta.transportador || "—"}
+                      </div>
+                      <div className="text-xs mt-1">
+                        {(coleta.itens ?? []).map((it: any) => `${it.tipo_residuo_nome} (${it.peso_kg}kg)`).join(", ") || "—"}
+                      </div>
                     </div>
-                    <div className="text-sm font-medium">{coleta.data} · MTR: {coleta.mtr || "—"}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Destinador: {coleta.destinador || "—"} · Transportador: {coleta.transportador || "—"}
-                    </div>
-                    <div className="text-xs mt-1">
-                      {(coleta.itens ?? []).map((it: any) => `${it.tipo_residuo_nome} (${it.peso_kg}kg)`).join(", ") || "—"}
-                    </div>
-                  </div>
-                );
+                  );
+                };
                 return (
                   <div key={i} className="border rounded p-2 bg-background">
                     <div className="text-xs text-muted-foreground mb-2">
-                      {c.razao === "mtr" ? `MTR duplicado: ${c.original.mtr}` : "Mesma data, destinador, transportador e itens"}
+                      {c.razao === "mtr"
+                        ? `MTR duplicado: ${c.original.mtr}`
+                        : "Duplicata sem MTR (mesma data, destinador, transportador e itens)"}
                     </div>
                     <div className="flex gap-2">
                       {card("A", c.original, "A — Será modificada")}
