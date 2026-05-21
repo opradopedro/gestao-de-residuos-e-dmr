@@ -10,6 +10,7 @@ import {
   findMtrDuplicates,
   ALERTA_PESO_KG,
   deleteColeta,
+  coletaFingerprint,
   type ColetaComItens,
 } from "@/lib/data";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
@@ -25,8 +26,9 @@ import { ColetaViewDialog } from "@/components/ColetaViewDialog";
 import { aplicarFiltro, type FiltroAvancado } from "@/lib/coletas-filtros";
 import {
   Plus, AlertTriangle, FileWarning, Scale, ArrowUp, ArrowDown,
-  Upload, Trash2, Filter, Bookmark, Eye,
+  Upload, Trash2, Filter, Bookmark, Eye, Copy,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { formatDate, formatKgPlain } from "@/lib/format";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -60,6 +62,7 @@ function ColetasList() {
   const [importOpen, setImportOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [viewId, setViewId] = useState<string | null>(null);
+  const [dupOpen, setDupOpen] = useState(false);
 
   // persist
   useMemo(() => {
@@ -76,6 +79,26 @@ function ColetasList() {
   });
 
   const dups = useMemo(() => findMtrDuplicates(coletas), [coletas]);
+
+  // Grupos de duplicatas pelo fingerprint canônico (mesma data + destinador + transportador + itens).
+  const dupGroups = useMemo(() => {
+    const map = new Map<string, ColetaComItens[]>();
+    for (const c of coletas) {
+      const fp = coletaFingerprint({
+        data: c.data,
+        destinador: c.destinador,
+        transportador: c.transportador,
+        itens: (c.itens ?? []).map((it) => ({
+          tipo_residuo_nome: it.tipo_residuo_nome,
+          tratamento: it.tratamento,
+          peso_kg: Number(it.peso_kg) || 0,
+        })),
+      });
+      if (!map.has(fp)) map.set(fp, []);
+      map.get(fp)!.push(c);
+    }
+    return Array.from(map.values()).filter((g) => g.length > 1);
+  }, [coletas]);
 
   const delMut = useMutation({
     mutationFn: (id: string) => deleteColeta(id),
@@ -149,6 +172,12 @@ function ColetasList() {
         description={`${coletas.length} coletas no escopo · ${filtradas.length} visíveis após filtros${todasColetas ? " (todos os períodos)" : ` (período ${periodo.label})`}.`}
         actions={
           <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => setDupOpen(true)}>
+              <Copy className="size-4 mr-1" /> Detectar duplicatas
+              {dupGroups.length > 0 && (
+                <Badge variant="secondary" className="ml-2 text-[10px]">{dupGroups.length}</Badge>
+              )}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setBulkDeleteOpen(true)}>
               <Trash2 className="size-4 mr-1" /> Excluir em massa
             </Button>
@@ -269,6 +298,53 @@ function ColetasList() {
       </Card>
 
       {unidade && <ColetaImportWizard open={importOpen} onOpenChange={setImportOpen} unidadeAtiva={unidade} />}
+
+      <Dialog open={dupOpen} onOpenChange={setDupOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Duplicatas detectadas</DialogTitle>
+            <DialogDescription>
+              Coletas com mesma data, destinador, transportador e itens (peso/tratamento). Inclui registros sem MTR e manuais.
+            </DialogDescription>
+          </DialogHeader>
+          {dupGroups.length === 0 ? (
+            <div className="p-6 text-center text-muted-foreground text-sm">Nenhuma duplicata encontrada.</div>
+          ) : (
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+              {dupGroups.map((g, i) => (
+                <div key={i} className="border rounded-md p-3">
+                  <div className="text-xs text-muted-foreground mb-2">
+                    Grupo {i + 1} · {g.length} coletas · {formatDate(g[0].data)} · {g[0].destinador || "—"}
+                  </div>
+                  <div className="divide-y">
+                    {g.map((c) => (
+                      <div key={c.id} className="flex items-center justify-between py-2 text-sm">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-mono text-xs">{c.mtr || (c.dmr_manual ? "manual" : "sem MTR")}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {(c.itens ?? []).map((it) => `${it.tipo_residuo_nome} (${formatKgPlain(Number(it.peso_kg))})`).join(" · ")}
+                          </div>
+                        </div>
+                        <div className="flex gap-1 ml-2 shrink-0">
+                          <Button size="sm" variant="ghost" onClick={() => { setDupOpen(false); setViewId(c.id); }}>
+                            <Eye className="size-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => {
+                            if (confirm(`Excluir coleta${c.mtr ? ` MTR ${c.mtr}` : ""}?`)) delMut.mutate(c.id);
+                          }}>
+                            <Trash2 className="size-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <BulkDeleteDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen} coletas={coletas} unidadeId={unidade} totalGeral={coletas.length} />
       <AdvancedFilterDialog open={advOpen} onOpenChange={setAdvOpen} filtro={filtroAvancado} onApply={setFiltroAvancado} />
       <SavedFiltersDialog open={savedOpen} onOpenChange={setSavedOpen} onPick={setFiltroAvancado} />
