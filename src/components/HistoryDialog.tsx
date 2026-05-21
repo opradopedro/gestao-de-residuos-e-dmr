@@ -328,3 +328,122 @@ function SingleRecordDialog({
     </Dialog>
   );
 }
+
+function AffectedRecordsDialog({ entry, onClose }: { entry: AuditEntry | null; onClose: () => void }) {
+  const open = !!entry;
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["audit-afetados", entry?.id],
+    enabled: open,
+    queryFn: async () => {
+      if (!entry) return [];
+      // exclusao_em_massa: snapshot é array de coletas completas (já contém data/mtr/destinador/itens)
+      if (entry.tipo === "exclusao_em_massa") {
+        const snap: any[] = Array.isArray(entry.snapshot) ? entry.snapshot : [];
+        return snap.map((s) => ({
+          id: s.id as string,
+          data: s.data as string,
+          mtr: (s.mtr ?? "") as string,
+          destinador: (s.destinador ?? "") as string,
+          itens: s.itens ?? [],
+          existe: false, // foram excluídas; podem ter sido restauradas via rollback
+        }));
+      }
+      // importacao: snapshot tem { idsCriadas: [...] }; buscar do banco
+      if (entry.tipo === "importacao") {
+        const ids: string[] = entry.snapshot?.idsCriadas ?? [];
+        if (ids.length === 0) return [];
+        const { data: coletas } = await supabase
+          .from("coletas")
+          .select("id, data, mtr, destinador")
+          .in("id", ids);
+        const { data: itens } = await supabase
+          .from("coleta_itens")
+          .select("coleta_id, tipo_residuo_nome, tratamento, peso_kg")
+          .in("coleta_id", ids);
+        const itensByColeta = new Map<string, any[]>();
+        (itens ?? []).forEach((it: any) => {
+          if (!itensByColeta.has(it.coleta_id)) itensByColeta.set(it.coleta_id, []);
+          itensByColeta.get(it.coleta_id)!.push(it);
+        });
+        const presentes = new Set((coletas ?? []).map((c: any) => c.id));
+        return ids.map((id) => {
+          const c: any = (coletas ?? []).find((x: any) => x.id === id);
+          return {
+            id,
+            data: c?.data ?? "",
+            mtr: c?.mtr ?? "",
+            destinador: c?.destinador ?? "",
+            itens: itensByColeta.get(id) ?? [],
+            existe: presentes.has(id),
+          };
+        });
+      }
+      return [];
+    },
+  });
+
+  if (!entry) return null;
+  const totalGeral = rows.reduce(
+    (s, r) => s + (r.itens ?? []).reduce((a: number, it: any) => a + Number(it.peso_kg ?? 0), 0),
+    0,
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-[95vw] w-[900px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{entry.descricao}</DialogTitle>
+          <DialogDescription>
+            {rows.length} registro(s) afetado(s) · total {formatKgPlain(totalGeral)} ·{" "}
+            {new Date(entry.criado_em).toLocaleString("pt-BR")}
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="text-sm text-muted-foreground py-6 text-center">Carregando…</div>
+        ) : rows.length === 0 ? (
+          <div className="text-sm text-muted-foreground py-6 text-center">Nenhum registro no snapshot.</div>
+        ) : (
+          <div className="border rounded divide-y text-xs">
+            {rows.map((r) => {
+              const total = (r.itens ?? []).reduce((s: number, it: any) => s + Number(it.peso_kg ?? 0), 0);
+              return (
+                <div key={r.id} className="p-3 flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{r.data ? formatDate(r.data) : "—"}</span>
+                      <span className="font-mono text-muted-foreground">MTR {r.mtr || "—"}</span>
+                      <span className="truncate text-muted-foreground">· {r.destinador || "—"}</span>
+                      {entry.tipo === "exclusao_em_massa" && !entry.revertido && (
+                        <Badge variant="outline" className="text-[10px]">excluída</Badge>
+                      )}
+                      {entry.tipo === "importacao" && !r.existe && (
+                        <Badge variant="secondary" className="text-[10px]">não existe mais</Badge>
+                      )}
+                    </div>
+                    <div className="text-muted-foreground mt-0.5">
+                      {(r.itens ?? []).length} item(s) · total {formatKgPlain(total)}
+                    </div>
+                  </div>
+                  {r.existe && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        window.location.href = `/coletas/${r.id}`;
+                      }}
+                    >
+                      Abrir
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
