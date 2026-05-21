@@ -62,6 +62,7 @@ export function HistoryDialog({
   const qc = useQueryClient();
   const [filtroUnidade, setFiltroUnidade] = useState<string>("__all__");
   const [verEntry, setVerEntry] = useState<AuditEntry | null>(null);
+  const [verAfetados, setVerAfetados] = useState<AuditEntry | null>(null);
 
   const { data: unidades = [] } = useQuery({ queryKey: ["unidades"], queryFn: listUnidades, enabled: open });
   const { data: entries = [], isLoading } = useQuery({
