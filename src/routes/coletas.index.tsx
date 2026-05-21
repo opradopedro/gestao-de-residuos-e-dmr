@@ -10,6 +10,7 @@ import {
   findMtrDuplicates,
   ALERTA_PESO_KG,
   deleteColeta,
+  coletaFingerprint,
   type ColetaComItens,
 } from "@/lib/data";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
