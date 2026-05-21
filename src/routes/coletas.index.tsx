@@ -26,8 +26,9 @@ import { ColetaViewDialog } from "@/components/ColetaViewDialog";
 import { aplicarFiltro, type FiltroAvancado } from "@/lib/coletas-filtros";
 import {
   Plus, AlertTriangle, FileWarning, Scale, ArrowUp, ArrowDown,
-  Upload, Trash2, Filter, Bookmark, Eye,
+  Upload, Trash2, Filter, Bookmark, Eye, Copy,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { formatDate, formatKgPlain } from "@/lib/format";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
