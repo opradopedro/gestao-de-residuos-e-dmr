@@ -80,6 +80,26 @@ function ColetasList() {
 
   const dups = useMemo(() => findMtrDuplicates(coletas), [coletas]);
 
+  // Grupos de duplicatas pelo fingerprint canônico (mesma data + destinador + transportador + itens).
+  const dupGroups = useMemo(() => {
+    const map = new Map<string, ColetaComItens[]>();
+    for (const c of coletas) {
+      const fp = coletaFingerprint({
+        data: c.data,
+        destinador: c.destinador,
+        transportador: c.transportador,
+        itens: (c.itens ?? []).map((it) => ({
+          tipo_residuo_nome: it.tipo_residuo_nome,
+          tratamento: it.tratamento,
+          peso_kg: Number(it.peso_kg) || 0,
+        })),
+      });
+      if (!map.has(fp)) map.set(fp, []);
+      map.get(fp)!.push(c);
+    }
+    return Array.from(map.values()).filter((g) => g.length > 1);
+  }, [coletas]);
+
   const delMut = useMutation({
     mutationFn: (id: string) => deleteColeta(id),
     onSuccess: () => {
