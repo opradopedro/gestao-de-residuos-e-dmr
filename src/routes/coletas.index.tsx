@@ -172,6 +172,12 @@ function ColetasList() {
         description={`${coletas.length} coletas no escopo · ${filtradas.length} visíveis após filtros${todasColetas ? " (todos os períodos)" : ` (período ${periodo.label})`}.`}
         actions={
           <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => setDupOpen(true)}>
+              <Copy className="size-4 mr-1" /> Detectar duplicatas
+              {dupGroups.length > 0 && (
+                <Badge variant="secondary" className="ml-2 text-[10px]">{dupGroups.length}</Badge>
+              )}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setBulkDeleteOpen(true)}>
               <Trash2 className="size-4 mr-1" /> Excluir em massa
             </Button>
