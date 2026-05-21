@@ -13,7 +13,7 @@ import {
   type AuditEntry,
   logAction,
 } from "@/lib/audit";
-import { listUnidades, getColeta, deleteColeta, createColeta, rollbackMerge, type ColetaInput } from "@/lib/data";
+import { listUnidades, getColeta, deleteColeta, createColeta, rollbackMerge, listColetasByIds, type ColetaInput, type ColetaComItens } from "@/lib/data";
 import { formatDate, formatKgPlain } from "@/lib/format";
 import { toast } from "sonner";
 
