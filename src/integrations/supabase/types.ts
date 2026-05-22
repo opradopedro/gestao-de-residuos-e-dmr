@@ -109,7 +109,7 @@ export type Database = {
           peso_estimado: boolean
           transportador: string | null
           transportador_id: string | null
-          unidade_id: string
+          unidade_id: string | null
         }
         Insert: {
           atualizado_em?: string
@@ -124,7 +124,7 @@ export type Database = {
           peso_estimado?: boolean
           transportador?: string | null
           transportador_id?: string | null
-          unidade_id: string
+          unidade_id?: string | null
         }
         Update: {
           atualizado_em?: string
@@ -139,7 +139,7 @@ export type Database = {
           peso_estimado?: boolean
           transportador?: string | null
           transportador_id?: string | null
-          unidade_id?: string
+          unidade_id?: string | null
         }
         Relationships: [
           {

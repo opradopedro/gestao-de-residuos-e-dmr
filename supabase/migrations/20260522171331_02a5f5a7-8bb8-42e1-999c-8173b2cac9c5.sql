@@ -1,0 +1,1 @@
+ALTER TABLE public.coletas ALTER COLUMN unidade_id DROP NOT NULL;
