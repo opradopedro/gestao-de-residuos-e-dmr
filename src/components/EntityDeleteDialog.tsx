@@ -69,7 +69,7 @@ export function EntityDeleteDialog({
   });
 
   const opts = alternativos.filter((a) => a.id !== id);
-  const isUnidadeBlocked = tipo === "unidade" && transferTo === "__none__" && afetados > 0;
+  const isUnidadeBlocked = false;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
