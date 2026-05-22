@@ -47,7 +47,17 @@ export const Route = createFileRoute("/coletas/")({
 type SortKey = "data" | "destinador" | "transportador" | "mtr" | "peso" | "residuo" | "unidade";
 type SortDir = "asc" | "desc";
 
+const RISCO_LABEL: Record<string, string> = {
+  sem_peso: "Sem peso",
+  erro_preenchimento: "Erros de preenchimento",
+  sem_mtr_dmr: "Incluir na DMR",
+  sem_mtr_erro: "Sem MTR",
+  mtr_duplicado: "MTR duplicado",
+};
+
 function ColetasList() {
+  const navigate = (Route as any).useNavigate ? (Route as any).useNavigate() : null;
+  const search = Route.useSearch();
   const unidade = useUnidadeAtiva();
   const periodo = usePeriodoAtivo();
   const qc = useQueryClient();
