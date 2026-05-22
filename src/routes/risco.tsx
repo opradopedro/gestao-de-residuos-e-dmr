@@ -244,40 +244,31 @@ function RiscoPage() {
         </CardContent>
       </Card>
 
-      {fatores.length === 0 ? (
-        <Card className="border-success/30 bg-success/5">
-          <CardContent className="p-6 text-center">
-            <ShieldCheck className="size-10 text-success mx-auto mb-2" />
-            <div className="font-medium">Nenhum risco ou pendência identificada no período.</div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-3">
-          {fatores.map((f) => {
-            const tone = severidadeTone(f.severidade);
-            const Ico = f.icon;
-            return (
-              <Card key={f.id} className={`border ${tone}`}>
-                <CardContent className="p-4 flex items-center gap-4">
-                  <Ico className="size-6 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-foreground">
-                      {f.titulo}
-                      <span className="text-[10px] uppercase tracking-wider font-semibold ml-2">{SEV_LABEL[f.severidade]}</span>
-                    </div>
-                    <div className="text-sm text-muted-foreground">{f.descricao}</div>
+      <div className="grid gap-3">
+        {fatores.map((f) => {
+          const tone = severidadeTone(f.severidade);
+          const Ico = f.icon;
+          return (
+            <Card key={f.id} className={`border ${tone}`}>
+              <CardContent className="p-4 flex items-center gap-4">
+                <Ico className="size-6 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-foreground">
+                    {f.titulo}
+                    <span className="text-[10px] uppercase tracking-wider font-semibold ml-2">{SEV_LABEL[f.severidade]}</span>
                   </div>
-                  {f.onClick && (
-                    <Button size="sm" variant="outline" onClick={f.onClick}>
-                      Resolver <ArrowRight className="size-3.5 ml-1" />
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                  <div className="text-sm text-muted-foreground">{f.descricao}</div>
+                </div>
+                {f.onClick && (
+                  <Button size="sm" variant="outline" onClick={f.onClick}>
+                    Resolver <ArrowRight className="size-3.5 ml-1" />
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
