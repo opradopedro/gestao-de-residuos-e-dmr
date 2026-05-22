@@ -242,6 +242,17 @@ function ColetasList() {
         </div>
       </div>
 
+      {search.risco && RISCO_LABEL[search.risco] && (
+        <div className="mb-3 flex items-center gap-2 text-sm border border-primary/30 bg-primary/5 rounded px-3 py-2">
+          <span className="text-muted-foreground">Filtro de risco:</span>
+          <Badge variant="secondary">{RISCO_LABEL[search.risco]}</Badge>
+          <Button size="sm" variant="ghost" className="h-7 ml-auto" onClick={() => navigate({ to: "/coletas", search: {} as any })}>
+            Limpar
+          </Button>
+        </div>
+      )}
+
+
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
