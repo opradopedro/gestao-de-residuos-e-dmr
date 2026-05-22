@@ -223,7 +223,7 @@ function RiscoPage() {
           <div className="flex-1">
             <div className={`text-xs font-semibold uppercase tracking-wider ${tone.text}`}>{tone.label}</div>
             <div className="text-2xl font-semibold mt-1">
-              {fatores.length} fator{fatores.length === 1 ? "" : "es"} de risco identificado{fatores.length === 1 ? "" : "s"}
+              {fatoresAtivos.length} fator{fatoresAtivos.length === 1 ? "" : "es"} de risco identificado{fatoresAtivos.length === 1 ? "" : "s"}
             </div>
             <div className="text-sm text-muted-foreground mt-2">
               {totalColetasNoTri} coleta(s) registrada(s) totalizando {formatTon(totalKg)} no período.
