@@ -20,7 +20,7 @@ export const Route = createFileRoute("/risco")({
   component: RiscoPage,
 });
 
-type Severidade = "vermelho" | "laranja" | "amarelo";
+type Severidade = "vermelho" | "laranja" | "amarelo" | "verde";
 
 type Fator = {
   id: string;
@@ -32,14 +32,15 @@ type Fator = {
   onClick?: () => void;
 };
 
-const SEV_ORDER: Record<Severidade, number> = { vermelho: 0, laranja: 1, amarelo: 2 };
-const SEV_LABEL: Record<Severidade, string> = { vermelho: "crítico", laranja: "alto", amarelo: "atenção" };
+const SEV_ORDER: Record<Severidade, number> = { vermelho: 0, laranja: 1, amarelo: 2, verde: 3 };
+const SEV_LABEL: Record<Severidade, string> = { vermelho: "crítico", laranja: "alto", amarelo: "atenção", verde: "ok" };
 
 function severidadeTone(s: Severidade) {
   switch (s) {
     case "vermelho": return "border-destructive/40 bg-destructive/5 text-destructive";
     case "laranja": return "border-orange-400/50 bg-orange-500/5 text-orange-600 dark:text-orange-400";
     case "amarelo": return "border-warning/40 bg-warning/10 text-warning-foreground";
+    case "verde": return "border-success/40 bg-success/5 text-success";
   }
 }
 
