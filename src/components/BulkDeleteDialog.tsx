@@ -76,8 +76,11 @@ export function BulkDeleteDialog({
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-medium">Regras de filtro</div>
                   <Button size="sm" variant="outline" onClick={() => setFiltroOpen(true)}>
-                    <Filter className="size-3 mr-1" /> {filtro ? "Editar filtro" : "Configurar filtro"}
+                    <Filter className="size-3 mr-1" /> {filtro && filtro.regras.length > 0 ? `Editar filtro (${filtro.regras.length} regra${filtro.regras.length === 1 ? "" : "s"})` : "Configurar filtro"}
                   </Button>
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  Você pode adicionar várias regras combinadas com <strong>E</strong> (todas precisam ser verdadeiras) ou <strong>OU</strong> (qualquer uma) — clique em <em>"Adicionar regra"</em> dentro do painel.
                 </div>
                 {filtro && filtro.regras.length > 0 ? (
                   <ul className="text-xs space-y-1">
