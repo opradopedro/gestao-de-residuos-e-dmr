@@ -139,6 +139,15 @@ function ColetasList() {
     }
     // Filtro avançado
     arr = aplicarFiltro(arr, filtroAvancado, unidadeNomes);
+    // Filtro por risco (vindo do painel de Riscos)
+    if (search.risco) {
+      if (search.risco === "sem_peso") arr = arr.filter(isPendenciaSemPeso);
+      else if (search.risco === "erro_preenchimento") arr = arr.filter(isErroPreenchimento);
+      else if (search.risco === "sem_mtr_dmr") arr = arr.filter(isSemMtrOperacao);
+      else if (search.risco === "sem_mtr_erro") arr = arr.filter(isPendenciaSemMtr);
+      else if (search.risco === "mtr_duplicado") arr = arr.filter((c) => !!c.mtr && dups.has(c.mtr));
+    }
+
 
     const sorted = [...arr].sort((a, b) => {
       const dir = sortDir === "asc" ? 1 : -1;
