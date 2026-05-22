@@ -38,9 +38,12 @@ const FIELDS: { key: keyof DmrMapeamento; label: string }[] = [
 
 
 function DmrPage() {
-  const unidade = useUnidadeAtiva();
+  const unidadeAtiva = useUnidadeAtiva();
   const periodo = usePeriodoAtivo();
   const qc = useQueryClient();
+  const { data: unidades = [] } = useQuery({ queryKey: ["unidades"], queryFn: () => import("@/lib/data").then((m) => m.listUnidades()) });
+  const [unidadeAlvo, setUnidadeAlvo] = useState<string | null>(unidadeAtiva);
+  const unidade = unidadeAlvo ?? unidadeAtiva;
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [allRows, setAllRows] = useState<Record<string, any>[]>([]);
   const [linhaInicial, setLinhaInicial] = useState(1);
