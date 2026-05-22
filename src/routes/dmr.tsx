@@ -131,6 +131,18 @@ function DmrPage() {
         <CardContent className="p-6 space-y-4">
           <div className="flex flex-wrap gap-3 items-end">
             <div>
+              <Label className="text-xs">Unidade</Label>
+              <Select value={unidade ?? ""} onValueChange={(v) => setUnidadeAlvo(v)}>
+                <SelectTrigger className="w-56 mt-1"><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
+                <SelectContent>
+                  {unidades.map((u) => <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {unidade && unidadeAtiva && unidade !== unidadeAtiva && (
+                <div className="text-[11px] text-warning-foreground mt-1">⚠ Diferente da unidade ativa.</div>
+              )}
+            </div>
+            <div>
               <Label className="text-xs">Trimestre alvo</Label>
               <div className="flex gap-2 mt-1">
                 <Select value={String(periodo.trimestre)} onValueChange={(v) => setPeriodoAtivo({ ano: periodo.ano, trimestre: Number(v) as 1 | 2 | 3 | 4 })}>
