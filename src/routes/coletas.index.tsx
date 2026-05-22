@@ -168,7 +168,7 @@ function ColetasList() {
       return 0;
     });
     return sorted;
-  }, [coletas, busca, filtroAvancado, sortKey, sortDir, unidadeNomes, periodo.start, periodo.end]);
+  }, [coletas, busca, filtroAvancado, sortKey, sortDir, unidadeNomes, periodo.start, periodo.end, search.risco, dups, todasColetas]);
 
   function toggleSort(k: SortKey) {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
