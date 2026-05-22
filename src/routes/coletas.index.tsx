@@ -11,6 +11,10 @@ import {
   ALERTA_PESO_KG,
   deleteColeta,
   coletaFingerprint,
+  isErroPreenchimento,
+  isPendenciaSemMtr,
+  isSemMtrOperacao,
+  isPendenciaSemPeso,
   type ColetaComItens,
 } from "@/lib/data";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
