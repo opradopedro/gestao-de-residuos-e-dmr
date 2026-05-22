@@ -199,7 +199,7 @@ function RiscoPage() {
     [coletas, periodo],
   );
 
-  const nivelGeral: Severidade | "ok" = fatores[0]?.severidade ?? "ok";
+  const nivelGeral: Severidade | "ok" = fatoresAtivos[0]?.severidade ?? "ok";
   const tone = nivelGeral === "vermelho"
     ? { bg: "bg-destructive/10", border: "border-destructive/40", text: "text-destructive", icon: ShieldAlert, label: "Risco crítico" }
     : nivelGeral === "laranja"
