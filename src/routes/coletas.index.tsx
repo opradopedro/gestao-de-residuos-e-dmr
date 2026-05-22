@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo } from "@/hooks/use-periodo";
@@ -11,6 +11,10 @@ import {
   ALERTA_PESO_KG,
   deleteColeta,
   coletaFingerprint,
+  isErroPreenchimento,
+  isPendenciaSemMtr,
+  isSemMtrOperacao,
+  isPendenciaSemPeso,
   type ColetaComItens,
 } from "@/lib/data";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
@@ -43,7 +47,17 @@ export const Route = createFileRoute("/coletas/")({
 type SortKey = "data" | "destinador" | "transportador" | "mtr" | "peso" | "residuo" | "unidade";
 type SortDir = "asc" | "desc";
 
+const RISCO_LABEL: Record<string, string> = {
+  sem_peso: "Sem peso",
+  erro_preenchimento: "Erros de preenchimento",
+  sem_mtr_dmr: "Incluir na DMR",
+  sem_mtr_erro: "Sem MTR",
+  mtr_duplicado: "MTR duplicado",
+};
+
 function ColetasList() {
+  const navigate = useNavigate();
+  const search = Route.useSearch();
   const unidade = useUnidadeAtiva();
   const periodo = usePeriodoAtivo();
   const qc = useQueryClient();
@@ -125,6 +139,15 @@ function ColetasList() {
     }
     // Filtro avançado
     arr = aplicarFiltro(arr, filtroAvancado, unidadeNomes);
+    // Filtro por risco (vindo do painel de Riscos)
+    if (search.risco) {
+      if (search.risco === "sem_peso") arr = arr.filter(isPendenciaSemPeso);
+      else if (search.risco === "erro_preenchimento") arr = arr.filter(isErroPreenchimento);
+      else if (search.risco === "sem_mtr_dmr") arr = arr.filter(isSemMtrOperacao);
+      else if (search.risco === "sem_mtr_erro") arr = arr.filter(isPendenciaSemMtr);
+      else if (search.risco === "mtr_duplicado") arr = arr.filter((c) => !!c.mtr && dups.has(c.mtr));
+    }
+
 
     const sorted = [...arr].sort((a, b) => {
       const dir = sortDir === "asc" ? 1 : -1;
@@ -145,7 +168,7 @@ function ColetasList() {
       return 0;
     });
     return sorted;
-  }, [coletas, busca, filtroAvancado, sortKey, sortDir, unidadeNomes, periodo.start, periodo.end]);
+  }, [coletas, busca, filtroAvancado, sortKey, sortDir, unidadeNomes, periodo.start, periodo.end, search.risco, dups, todasColetas]);
 
   function toggleSort(k: SortKey) {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -218,6 +241,17 @@ function ColetasList() {
           <label htmlFor="todas-col" className="cursor-pointer">Ver todas as coletas (todos os períodos e unidades)</label>
         </div>
       </div>
+
+      {search.risco && RISCO_LABEL[search.risco] && (
+        <div className="mb-3 flex items-center gap-2 text-sm border border-primary/30 bg-primary/5 rounded px-3 py-2">
+          <span className="text-muted-foreground">Filtro de risco:</span>
+          <Badge variant="secondary">{RISCO_LABEL[search.risco]}</Badge>
+          <Button size="sm" variant="ghost" className="h-7 ml-auto" onClick={() => navigate({ to: "/coletas", search: {} as any })}>
+            Limpar
+          </Button>
+        </div>
+      )}
+
 
       <Card>
         <CardContent className="p-0">

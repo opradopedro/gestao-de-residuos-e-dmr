@@ -20,7 +20,7 @@ export const Route = createFileRoute("/risco")({
   component: RiscoPage,
 });
 
-type Severidade = "vermelho" | "laranja" | "amarelo";
+type Severidade = "vermelho" | "laranja" | "amarelo" | "verde";
 
 type Fator = {
   id: string;
@@ -32,14 +32,15 @@ type Fator = {
   onClick?: () => void;
 };
 
-const SEV_ORDER: Record<Severidade, number> = { vermelho: 0, laranja: 1, amarelo: 2 };
-const SEV_LABEL: Record<Severidade, string> = { vermelho: "crítico", laranja: "alto", amarelo: "atenção" };
+const SEV_ORDER: Record<Severidade, number> = { vermelho: 0, laranja: 1, amarelo: 2, verde: 3 };
+const SEV_LABEL: Record<Severidade, string> = { vermelho: "crítico", laranja: "alto", amarelo: "atenção", verde: "ok" };
 
 function severidadeTone(s: Severidade) {
   switch (s) {
     case "vermelho": return "border-destructive/40 bg-destructive/5 text-destructive";
     case "laranja": return "border-orange-400/50 bg-orange-500/5 text-orange-600 dark:text-orange-400";
     case "amarelo": return "border-warning/40 bg-warning/10 text-warning-foreground";
+    case "verde": return "border-success/40 bg-success/5 text-success";
   }
 }
 
@@ -91,65 +92,91 @@ function RiscoPage() {
     const list: Fator[] = [];
 
     // VERMELHO — Crítico (impacta diretamente DMR)
-    if (semPeso.length > 0) list.push({
+    list.push(semPeso.length > 0 ? {
       id: "sem_peso", severidade: "vermelho", icon: Scale,
       titulo: "Sem peso",
       descricao: `${semPeso.length} coleta(s) com peso zerado ou não informado — impacta diretamente a DMR.`,
       count: semPeso.length,
       onClick: () => navigate({ to: "/coletas", search: { risco: "sem_peso" } as any }),
+    } : {
+      id: "sem_peso", severidade: "verde", icon: Scale,
+      titulo: "Sem peso", descricao: "Todas as coletas têm peso informado.", count: 0,
     });
-    if (foraDmr > 0) list.push({
+    list.push(foraDmr > 0 ? {
       id: "fora_dmr", severidade: "vermelho", icon: FileSpreadsheet,
       titulo: "Volume fora da DMR",
       descricao: `${formatTon(foraDmr)} no sistema interno não aparecem na DMR oficial do trimestre.`,
       count: 1,
       onClick: () => navigate({ to: "/dmr" }),
+    } : {
+      id: "fora_dmr", severidade: "verde", icon: FileSpreadsheet,
+      titulo: "Volume fora da DMR",
+      descricao: upload ? "Volume interno bate com a DMR oficial." : "Sem DMR importada para comparar.",
+      count: 0,
     });
 
     // LARANJA — Alto impacto (pode impactar DMR)
-    if (errosPreench.length > 0) list.push({
+    list.push(errosPreench.length > 0 ? {
       id: "erro_preenchimento", severidade: "laranja", icon: AlertTriangle,
       titulo: "Erros de preenchimento",
       descricao: `${errosPreench.length} coleta(s) com campos essenciais vazios (data, destinador, transportador, resíduo ou tratamento).`,
       count: errosPreench.length,
       onClick: () => navigate({ to: "/coletas", search: { risco: "erro_preenchimento" } as any }),
+    } : {
+      id: "erro_preenchimento", severidade: "verde", icon: AlertTriangle,
+      titulo: "Erros de preenchimento", descricao: "Todos os campos essenciais preenchidos.", count: 0,
     });
-    if (semMtrOp.length > 0) list.push({
+    list.push(semMtrOp.length > 0 ? {
       id: "incluir_dmr", severidade: "laranja", icon: FileCheck,
       titulo: "Incluir na DMR",
       descricao: `${semMtrOp.length} coleta(s) marcadas para inclusão manual na DMR — confirme antes do envio.`,
       count: semMtrOp.length,
       onClick: () => navigate({ to: "/coletas", search: { risco: "sem_mtr_dmr" } as any }),
+    } : {
+      id: "incluir_dmr", severidade: "verde", icon: FileCheck,
+      titulo: "Incluir na DMR", descricao: "Nenhuma coleta pendente de inclusão manual.", count: 0,
     });
-    if (resSemIbama.length > 0) list.push({
+    list.push(resSemIbama.length > 0 ? {
       id: "ibama", severidade: "laranja", icon: Recycle,
       titulo: "Resíduo sem código IBAMA",
       descricao: `${resSemIbama.length} resíduo(s) cadastrado(s) sem código IBAMA — ficarão sem correspondência na DMR.`,
       count: resSemIbama.length,
-      onClick: () => navigate({ to: "/cadastros" }),
+      onClick: () => navigate({ to: "/cadastros", search: { risco: "ibama" } as any }),
+    } : {
+      id: "ibama", severidade: "verde", icon: Recycle,
+      titulo: "Resíduo sem código IBAMA", descricao: "Todos os resíduos têm código IBAMA.", count: 0,
     });
 
     // AMARELO — Atenção (não crítico)
-    if (semMtrErro.length > 0) list.push({
+    list.push(semMtrErro.length > 0 ? {
       id: "sem_mtr_erro", severidade: "amarelo", icon: FileWarning,
       titulo: "Sem MTR",
       descricao: `${semMtrErro.length} coleta(s) sem MTR informado e não marcadas como "Incluir na DMR".`,
       count: semMtrErro.length,
       onClick: () => navigate({ to: "/coletas", search: { risco: "sem_mtr_erro" } as any }),
+    } : {
+      id: "sem_mtr_erro", severidade: "verde", icon: FileWarning,
+      titulo: "Sem MTR", descricao: "Todas as coletas têm MTR ou estão marcadas para inclusão manual.", count: 0,
     });
-    if (dups.size > 0) list.push({
+    list.push(dups.size > 0 ? {
       id: "mtr_dup", severidade: "amarelo", icon: AlertTriangle,
       titulo: "MTR duplicado",
       descricao: `${dups.size} MTR(s) único(s) duplicado(s) em ${dupColetas.length} coleta(s).`,
       count: dups.size,
       onClick: () => navigate({ to: "/coletas", search: { risco: "mtr_duplicado" } as any }),
+    } : {
+      id: "mtr_dup", severidade: "verde", icon: AlertTriangle,
+      titulo: "MTR duplicado", descricao: "Nenhum MTR duplicado.", count: 0,
     });
-    if (destSemCnpj.length > 0) list.push({
+    list.push(destSemCnpj.length > 0 ? {
       id: "cnpj", severidade: "amarelo", icon: Building2,
       titulo: "Destinador sem CNPJ",
       descricao: `${destSemCnpj.length} destinador(es) cadastrado(s) sem CNPJ.`,
       count: destSemCnpj.length,
-      onClick: () => navigate({ to: "/cadastros" }),
+      onClick: () => navigate({ to: "/cadastros", search: { risco: "cnpj" } as any }),
+    } : {
+      id: "cnpj", severidade: "verde", icon: Building2,
+      titulo: "Destinador sem CNPJ", descricao: "Todos os destinadores têm CNPJ.", count: 0,
     });
 
     list.sort((a, b) => {
@@ -161,6 +188,8 @@ function RiscoPage() {
     return list;
   }, [coletas, periodo, upload, linhasDmr, destinadores, tiposResiduo, unidade, navigate]);
 
+  const fatoresAtivos = useMemo(() => fatores.filter((f) => f.severidade !== "verde"), [fatores]);
+
   const totalKg = useMemo(
     () => coletas.filter((c) => c.data >= periodo.start && c.data <= periodo.end).reduce((s, c) => s + totalPesoColeta(c), 0),
     [coletas, periodo],
@@ -170,7 +199,7 @@ function RiscoPage() {
     [coletas, periodo],
   );
 
-  const nivelGeral: Severidade | "ok" = fatores[0]?.severidade ?? "ok";
+  const nivelGeral: Severidade | "ok" = fatoresAtivos[0]?.severidade ?? "ok";
   const tone = nivelGeral === "vermelho"
     ? { bg: "bg-destructive/10", border: "border-destructive/40", text: "text-destructive", icon: ShieldAlert, label: "Risco crítico" }
     : nivelGeral === "laranja"
@@ -194,7 +223,7 @@ function RiscoPage() {
           <div className="flex-1">
             <div className={`text-xs font-semibold uppercase tracking-wider ${tone.text}`}>{tone.label}</div>
             <div className="text-2xl font-semibold mt-1">
-              {fatores.length} fator{fatores.length === 1 ? "" : "es"} de risco identificado{fatores.length === 1 ? "" : "s"}
+              {fatoresAtivos.length} fator{fatoresAtivos.length === 1 ? "" : "es"} de risco identificado{fatoresAtivos.length === 1 ? "" : "s"}
             </div>
             <div className="text-sm text-muted-foreground mt-2">
               {totalColetasNoTri} coleta(s) registrada(s) totalizando {formatTon(totalKg)} no período.
@@ -215,40 +244,31 @@ function RiscoPage() {
         </CardContent>
       </Card>
 
-      {fatores.length === 0 ? (
-        <Card className="border-success/30 bg-success/5">
-          <CardContent className="p-6 text-center">
-            <ShieldCheck className="size-10 text-success mx-auto mb-2" />
-            <div className="font-medium">Nenhum risco ou pendência identificada no período.</div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-3">
-          {fatores.map((f) => {
-            const tone = severidadeTone(f.severidade);
-            const Ico = f.icon;
-            return (
-              <Card key={f.id} className={`border ${tone}`}>
-                <CardContent className="p-4 flex items-center gap-4">
-                  <Ico className="size-6 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-foreground">
-                      {f.titulo}
-                      <span className="text-[10px] uppercase tracking-wider font-semibold ml-2">{SEV_LABEL[f.severidade]}</span>
-                    </div>
-                    <div className="text-sm text-muted-foreground">{f.descricao}</div>
+      <div className="grid gap-3">
+        {fatores.map((f) => {
+          const tone = severidadeTone(f.severidade);
+          const Ico = f.icon;
+          return (
+            <Card key={f.id} className={`border ${tone}`}>
+              <CardContent className="p-4 flex items-center gap-4">
+                <Ico className="size-6 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-foreground">
+                    {f.titulo}
+                    <span className="text-[10px] uppercase tracking-wider font-semibold ml-2">{SEV_LABEL[f.severidade]}</span>
                   </div>
-                  {f.onClick && (
-                    <Button size="sm" variant="outline" onClick={f.onClick}>
-                      Resolver <ArrowRight className="size-3.5 ml-1" />
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                  <div className="text-sm text-muted-foreground">{f.descricao}</div>
+                </div>
+                {f.onClick && (
+                  <Button size="sm" variant="outline" onClick={f.onClick}>
+                    Resolver <ArrowRight className="size-3.5 ml-1" />
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }

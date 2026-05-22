@@ -69,7 +69,7 @@ export function EntityDeleteDialog({
   });
 
   const opts = alternativos.filter((a) => a.id !== id);
-  const isUnidadeBlocked = tipo === "unidade" && transferTo === "__none__" && afetados > 0;
+  const isUnidadeBlocked = false;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -98,7 +98,6 @@ export function EntityDeleteDialog({
                   {afetados > 0
                     ? <><strong>{afetados}</strong> registro(s) vinculado(s) perderão a referência e aparecerão em Pendências.</>
                     : "Nenhum registro vinculado — exclusão segura."}
-                  {isUnidadeBlocked && <div className="mt-1 font-semibold">Para excluir uma unidade com coletas, é necessário transferi-las.</div>}
                 </div>
               )}
             </div>
