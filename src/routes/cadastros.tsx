@@ -28,16 +28,27 @@ import { EntityDeleteDialog } from "@/components/EntityDeleteDialog";
 import { formatCNPJ, isValidCNPJ, normalizeCNPJ } from "@/lib/cnpj";
 import { formatCodigoIbama } from "@/lib/ibama";
 
+type CadastrosSearch = { risco?: string };
 export const Route = createFileRoute("/cadastros")({
   head: () => ({ meta: [{ title: "Cadastros — DMR" }] }),
+  validateSearch: (s: Record<string, unknown>): CadastrosSearch => ({ risco: s.risco ? String(s.risco) : undefined }),
   component: Cadastros,
 });
 
 function Cadastros() {
+  const search = Route.useSearch();
+  const initialTab = search.risco === "ibama" ? "residuos" : search.risco === "cnpj" ? "destinadores" : "unidades";
   return (
     <div className="p-6 max-w-5xl">
       <PageHeader title="Cadastros" description="Gerencie unidades, resíduos, tratamentos, transportadores e destinadores." />
-      <Tabs defaultValue="unidades">
+      {search.risco && (
+        <div className="mb-3 text-sm border border-primary/30 bg-primary/5 rounded px-3 py-2">
+          {search.risco === "ibama"
+            ? "Mostrando aba de resíduos — corrija os resíduos sem código IBAMA."
+            : "Mostrando aba de destinadores — corrija os destinadores sem CNPJ."}
+        </div>
+      )}
+      <Tabs defaultValue={initialTab}>
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="unidades" className="hover:bg-accent/60 transition-colors">Unidades</TabsTrigger>
           <TabsTrigger value="residuos" className="hover:bg-accent/60 transition-colors">Tipos de resíduo</TabsTrigger>
