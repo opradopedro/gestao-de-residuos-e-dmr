@@ -56,7 +56,7 @@ const RISCO_LABEL: Record<string, string> = {
 };
 
 function ColetasList() {
-  const navigate = (Route as any).useNavigate ? (Route as any).useNavigate() : null;
+  const navigate = useNavigate();
   const search = Route.useSearch();
   const unidade = useUnidadeAtiva();
   const periodo = usePeriodoAtivo();
