@@ -770,10 +770,12 @@ export async function deleteEntidadeComTransferencia(
     if (tipo === "destinador") return { afetados: (await mergeDestinadores(transferToId, id)).coletasAtualizadas };
   }
   if (tipo === "unidade") {
-    const { count } = await supabase.from("coletas").select("id", { count: "exact", head: true }).eq("unidade_id", id);
-    if ((count ?? 0) > 0) throw new Error("Existem coletas nesta unidade. Selecione uma unidade de destino para transferir.");
+    // Sem transferência: desvincula coletas (ficam órfãs e aparecem em Pendências) e remove a unidade.
+    const { data: cs } = await supabase.from("coletas").select("id").eq("unidade_id", id);
+    const ids = (cs ?? []).map((r: any) => r.id);
+    if (ids.length > 0) await supabase.from("coletas").update({ unidade_id: null }).in("id", ids);
     await deleteUnidade(id);
-    return { afetados: 0 };
+    return { afetados: ids.length };
   }
   if (tipo === "residuo") {
     const { data: itens } = await supabase.from("coleta_itens").select("id").eq("tipo_residuo_id", id);
