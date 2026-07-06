@@ -627,6 +627,44 @@ function DetailContent({ detail, onEditTipo, revisao, onChangeStatus, onChangeOb
           </div>
         )}
 
+        <div className="rounded-md border p-3 space-y-3">
+          <div className="font-medium">Revisão</div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant={revStatus === "ok" ? "default" : "outline"}
+              className={revStatus === "ok" ? "bg-success text-success-foreground hover:bg-success/90" : ""}
+              onClick={() => onChangeStatus("ok")}
+            >
+              <CheckCircle2 className="size-4 mr-1" /> OK — adicionar peso total na DMR
+            </Button>
+            <Button
+              size="sm"
+              variant={revStatus === "pendente" ? "default" : "outline"}
+              className={revStatus === "pendente" ? "bg-warning text-warning-foreground hover:bg-warning/90" : ""}
+              onClick={() => onChangeStatus("pendente")}
+            >
+              <CircleAlert className="size-4 mr-1" /> Irregular / Pendente
+            </Button>
+          </div>
+          <div>
+            <Label className="text-xs">Observações</Label>
+            <Textarea
+              className="mt-1"
+              rows={3}
+              value={obs}
+              onChange={(e) => setObs(e.target.value)}
+              onBlur={() => {
+                const next = obs.trim() ? obs : null;
+                const prev = revisao?.observacoes ?? null;
+                if (next !== prev) onChangeObservacoes(next);
+              }}
+              placeholder="Ex.: aguardando baixa da CETESB para o MTR 260012509203"
+            />
+          </div>
+        </div>
+
+
         <div>
           <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
             <div className="font-medium">Coletas internas ({matches.length}/{detail.matches.length})</div>
