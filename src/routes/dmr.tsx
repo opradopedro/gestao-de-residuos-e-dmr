@@ -4,15 +4,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo, setPeriodoAtivo } from "@/hooks/use-periodo";
 import { listColetasByUnidade, totalPesoColeta, listTiposResiduo, type TipoResiduo } from "@/lib/data";
-import { listDmrUploads, getDmrLinhas, createDmrUpload, deleteDmrUpload, DmrMapeamento } from "@/lib/dmr";
+import { listDmrUploads, getDmrLinhas, createDmrUpload, deleteDmrUpload, DmrMapeamento, listDmrRevisoes, upsertDmrRevisao, type DmrRevisao, type DmrRevisaoStatus } from "@/lib/dmr";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Upload, Trash2, AlertTriangle, FileSpreadsheet, ChevronRight, Wand2, Pencil } from "lucide-react";
+import { Upload, Trash2, AlertTriangle, FileSpreadsheet, ChevronRight, Wand2, Pencil, CheckCircle2, CircleAlert, MessageSquare } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
@@ -267,15 +268,29 @@ type Grupo = {
 };
 
 function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId: string }) {
+  const qc = useQueryClient();
   const { data: upload } = useQuery({ queryKey: ["dmr_uploads", unidadeId], queryFn: () => listDmrUploads(unidadeId), select: (l) => l.find((u) => u.id === uploadId) });
   const { data: linhas = [] } = useQuery({ queryKey: ["dmr_linhas", uploadId], queryFn: () => getDmrLinhas(uploadId) });
   const { data: coletas = [] } = useQuery({ queryKey: ["coletas", unidadeId], queryFn: () => listColetasByUnidade(unidadeId) });
   const { data: tipos = [] } = useQuery({ queryKey: ["tipos_residuo"], queryFn: listTiposResiduo });
   const { data: destinadoresCad = [] } = useQuery({ queryKey: ["destinadores"], queryFn: listDestinadores });
+  const { data: revisoes = [] } = useQuery({ queryKey: ["dmr_revisoes", uploadId], queryFn: () => listDmrRevisoes(uploadId) });
+  const revisoesMap = useMemo(() => {
+    const m: Record<string, DmrRevisao> = {};
+    for (const r of revisoes) m[r.grupo_key] = r;
+    return m;
+  }, [revisoes]);
+  const mutRevisao = useMutation({
+    mutationFn: (input: { grupo_key: string; status?: DmrRevisaoStatus; observacoes?: string | null }) =>
+      upsertDmrRevisao({ upload_id: uploadId, ...input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["dmr_revisoes", uploadId] }),
+    onError: (e: any) => toast.error(e.message),
+  });
   const [detail, setDetail] = useState<Grupo | null>(null);
   const [resolveOpen, setResolveOpen] = useState(false);
   const [resolveDestOpen, setResolveDestOpen] = useState(false);
   const [editTipo, setEditTipo] = useState<TipoResiduo | null>(null);
+
 
   // Resolve um texto livre da DMR para o nome canônico de um tipo cadastrado
   // 1) tenta casar pelo prefixo de código IBAMA ("200138 - madeira…")
@@ -438,11 +453,12 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
                   <th className="text-right p-3">Interno</th>
                   <th className="text-right p-3">DMR</th>
                   <th className="text-right p-3">Divergência</th>
+                  <th className="text-center p-3">Revisão</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {grupos.length === 0 ? <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Sem dados.</td></tr> : grupos.map((g) => {
+                {grupos.length === 0 ? <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Sem dados.</td></tr> : grupos.map((g) => {
                   const pct = g.internoKg > 0 ? (g.diff / g.internoKg) * 100 : (g.dmrKg > 0 ? 100 : 0);
                   const abs = Math.abs(g.diff);
                   const grave = abs > 50 || Math.abs(pct) > 10;
@@ -450,6 +466,8 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
                   const status = grave ? { label: "Grave", cls: "bg-destructive/15 text-destructive border-destructive/30" }
                     : leve ? { label: "Leve", cls: "bg-warning/15 text-warning-foreground border-warning/40" }
                     : { label: "OK", cls: "bg-success/15 text-success border-success/30" };
+                  const rev = revisoesMap[g.key];
+                  const revStatus: DmrRevisaoStatus | null = rev?.status ?? null;
                   return (
                     <tr key={g.key} className="border-t border-border align-top hover:bg-muted/30 cursor-pointer" onClick={() => setDetail(g)}>
                       <td className="p-3"><span className={`text-[10px] font-semibold uppercase rounded-full px-2 py-1 border ${status.cls}`}>{status.label}</span></td>
@@ -460,6 +478,36 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
                       <td className={"p-3 text-right tabular-nums " + (grave ? "text-destructive font-medium" : leve ? "text-warning-foreground" : "")}>
                         {g.diff > 0 ? "+" : ""}{formatTon(g.diff)}
                         {(g.internoKg > 0 || g.dmrKg > 0) && <div className="text-xs text-muted-foreground">{pct > 0 ? "+" : ""}{pct.toFixed(1)}%</div>}
+                      </td>
+                      <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            size="sm"
+                            variant={revStatus === "ok" ? "default" : "outline"}
+                            className={revStatus === "ok" ? "h-7 px-2 bg-success text-success-foreground hover:bg-success/90" : "h-7 px-2"}
+                            onClick={() => mutRevisao.mutate({ grupo_key: g.key, status: "ok" })}
+                            title="Marcar como OK — só falta adicionar na DMR"
+                          >
+                            <CheckCircle2 className="size-3.5 mr-1" /> OK
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={revStatus === "pendente" ? "default" : "outline"}
+                            className={revStatus === "pendente" ? "h-7 px-2 bg-warning text-warning-foreground hover:bg-warning/90" : "h-7 px-2"}
+                            onClick={() => mutRevisao.mutate({ grupo_key: g.key, status: "pendente" })}
+                            title="Marcar como Irregular / Pendente"
+                          >
+                            <CircleAlert className="size-3.5 mr-1" /> Pendente
+                          </Button>
+                          {rev?.observacoes && (
+                            <MessageSquare className="size-3.5 text-muted-foreground ml-1" aria-label="Possui observações" />
+                          )}
+                        </div>
+                        {rev?.observacoes && (
+                          <div className="text-[11px] text-muted-foreground mt-1 line-clamp-1 max-w-[220px]" title={rev.observacoes}>
+                            {rev.observacoes}
+                          </div>
+                        )}
                       </td>
                       <td className="p-3 text-muted-foreground"><ChevronRight className="size-4" /></td>
                     </tr>
@@ -473,9 +521,18 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
 
       <Sheet open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <SheetContent className="sm:max-w-xl overflow-y-auto">
-          {detail && <DetailContent detail={detail} onEditTipo={() => detail.tipoResiduo && setEditTipo(detail.tipoResiduo)} />}
+          {detail && (
+            <DetailContent
+              detail={detail}
+              onEditTipo={() => detail.tipoResiduo && setEditTipo(detail.tipoResiduo)}
+              revisao={revisoesMap[detail.key] ?? null}
+              onChangeStatus={(status) => mutRevisao.mutate({ grupo_key: detail.key, status })}
+              onChangeObservacoes={(observacoes) => mutRevisao.mutate({ grupo_key: detail.key, observacoes })}
+            />
+          )}
         </SheetContent>
       </Sheet>
+
 
       <DmrResolveResiduosDialog
         open={resolveOpen}
@@ -503,9 +560,18 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
 type DetailSort = "data-desc" | "data-asc" | "peso-desc";
 type DetailFilter = "todas" | "estimado" | "sem-mtr";
 
-function DetailContent({ detail, onEditTipo }: { detail: Grupo; onEditTipo: () => void }) {
+function DetailContent({ detail, onEditTipo, revisao, onChangeStatus, onChangeObservacoes }: {
+  detail: Grupo;
+  onEditTipo: () => void;
+  revisao: DmrRevisao | null;
+  onChangeStatus: (status: DmrRevisaoStatus) => void;
+  onChangeObservacoes: (observacoes: string | null) => void;
+}) {
   const [sort, setSort] = useState<DetailSort>("data-desc");
   const [filter, setFilter] = useState<DetailFilter>("todas");
+  const [obs, setObs] = useState(revisao?.observacoes ?? "");
+  useMemo(() => { setObs(revisao?.observacoes ?? ""); }, [revisao?.id, revisao?.observacoes]);
+  const revStatus = revisao?.status ?? null;
 
   const matches = useMemo(() => {
     let arr = [...detail.matches];
@@ -560,6 +626,44 @@ function DetailContent({ detail, onEditTipo }: { detail: Grupo; onEditTipo: () =
             </ul>
           </div>
         )}
+
+        <div className="rounded-md border p-3 space-y-3">
+          <div className="font-medium">Revisão</div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant={revStatus === "ok" ? "default" : "outline"}
+              className={revStatus === "ok" ? "bg-success text-success-foreground hover:bg-success/90" : ""}
+              onClick={() => onChangeStatus("ok")}
+            >
+              <CheckCircle2 className="size-4 mr-1" /> OK — adicionar peso total na DMR
+            </Button>
+            <Button
+              size="sm"
+              variant={revStatus === "pendente" ? "default" : "outline"}
+              className={revStatus === "pendente" ? "bg-warning text-warning-foreground hover:bg-warning/90" : ""}
+              onClick={() => onChangeStatus("pendente")}
+            >
+              <CircleAlert className="size-4 mr-1" /> Irregular / Pendente
+            </Button>
+          </div>
+          <div>
+            <Label className="text-xs">Observações</Label>
+            <Textarea
+              className="mt-1"
+              rows={3}
+              value={obs}
+              onChange={(e) => setObs(e.target.value)}
+              onBlur={() => {
+                const next = obs.trim() ? obs : null;
+                const prev = revisao?.observacoes ?? null;
+                if (next !== prev) onChangeObservacoes(next);
+              }}
+              placeholder="Ex.: aguardando baixa da CETESB para o MTR 260012509203"
+            />
+          </div>
+        </div>
+
 
         <div>
           <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
