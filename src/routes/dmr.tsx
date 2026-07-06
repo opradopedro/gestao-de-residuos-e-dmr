@@ -460,11 +460,12 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
               <tbody>
                 {grupos.length === 0 ? <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Sem dados.</td></tr> : grupos.map((g) => {
                   const pct = g.internoKg > 0 ? (g.diff / g.internoKg) * 100 : (g.dmrKg > 0 ? 100 : 0);
-                  const abs = Math.abs(g.diff);
-                  const grave = abs > 50 || Math.abs(pct) > 10;
-                  const leve = !grave && abs > 1;
+                  // Regras: DMR > controle interno = Grave; |%| > 10 = Grave; |%| <= 10 e != 0 = Médio; sem diferença = OK.
+                  const grave = g.diff > 0 || Math.abs(pct) > 10;
+                  const medio = !grave && g.diff !== 0;
+                  const leve = medio;
                   const status = grave ? { label: "Grave", cls: "bg-destructive/15 text-destructive border-destructive/30" }
-                    : leve ? { label: "Leve", cls: "bg-warning/15 text-warning-foreground border-warning/40" }
+                    : medio ? { label: "Médio", cls: "bg-warning/15 text-warning-foreground border-warning/40" }
                     : { label: "OK", cls: "bg-success/15 text-success border-success/30" };
                   const rev = revisoesMap[g.key];
                   const revStatus: DmrRevisaoStatus | null = rev?.status ?? null;
