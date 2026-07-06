@@ -453,11 +453,12 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
                   <th className="text-right p-3">Interno</th>
                   <th className="text-right p-3">DMR</th>
                   <th className="text-right p-3">Divergência</th>
+                  <th className="text-center p-3">Revisão</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {grupos.length === 0 ? <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Sem dados.</td></tr> : grupos.map((g) => {
+                {grupos.length === 0 ? <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Sem dados.</td></tr> : grupos.map((g) => {
                   const pct = g.internoKg > 0 ? (g.diff / g.internoKg) * 100 : (g.dmrKg > 0 ? 100 : 0);
                   const abs = Math.abs(g.diff);
                   const grave = abs > 50 || Math.abs(pct) > 10;
@@ -465,6 +466,8 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
                   const status = grave ? { label: "Grave", cls: "bg-destructive/15 text-destructive border-destructive/30" }
                     : leve ? { label: "Leve", cls: "bg-warning/15 text-warning-foreground border-warning/40" }
                     : { label: "OK", cls: "bg-success/15 text-success border-success/30" };
+                  const rev = revisoesMap[g.key];
+                  const revStatus: DmrRevisaoStatus | null = rev?.status ?? null;
                   return (
                     <tr key={g.key} className="border-t border-border align-top hover:bg-muted/30 cursor-pointer" onClick={() => setDetail(g)}>
                       <td className="p-3"><span className={`text-[10px] font-semibold uppercase rounded-full px-2 py-1 border ${status.cls}`}>{status.label}</span></td>
@@ -475,6 +478,36 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
                       <td className={"p-3 text-right tabular-nums " + (grave ? "text-destructive font-medium" : leve ? "text-warning-foreground" : "")}>
                         {g.diff > 0 ? "+" : ""}{formatTon(g.diff)}
                         {(g.internoKg > 0 || g.dmrKg > 0) && <div className="text-xs text-muted-foreground">{pct > 0 ? "+" : ""}{pct.toFixed(1)}%</div>}
+                      </td>
+                      <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            size="sm"
+                            variant={revStatus === "ok" ? "default" : "outline"}
+                            className={revStatus === "ok" ? "h-7 px-2 bg-success text-success-foreground hover:bg-success/90" : "h-7 px-2"}
+                            onClick={() => mutRevisao.mutate({ grupo_key: g.key, status: "ok" })}
+                            title="Marcar como OK — só falta adicionar na DMR"
+                          >
+                            <CheckCircle2 className="size-3.5 mr-1" /> OK
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={revStatus === "pendente" ? "default" : "outline"}
+                            className={revStatus === "pendente" ? "h-7 px-2 bg-warning text-warning-foreground hover:bg-warning/90" : "h-7 px-2"}
+                            onClick={() => mutRevisao.mutate({ grupo_key: g.key, status: "pendente" })}
+                            title="Marcar como Irregular / Pendente"
+                          >
+                            <CircleAlert className="size-3.5 mr-1" /> Pendente
+                          </Button>
+                          {rev?.observacoes && (
+                            <MessageSquare className="size-3.5 text-muted-foreground ml-1" aria-label="Possui observações" />
+                          )}
+                        </div>
+                        {rev?.observacoes && (
+                          <div className="text-[11px] text-muted-foreground mt-1 line-clamp-1 max-w-[220px]" title={rev.observacoes}>
+                            {rev.observacoes}
+                          </div>
+                        )}
                       </td>
                       <td className="p-3 text-muted-foreground"><ChevronRight className="size-4" /></td>
                     </tr>
@@ -488,9 +521,18 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
 
       <Sheet open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <SheetContent className="sm:max-w-xl overflow-y-auto">
-          {detail && <DetailContent detail={detail} onEditTipo={() => detail.tipoResiduo && setEditTipo(detail.tipoResiduo)} />}
+          {detail && (
+            <DetailContent
+              detail={detail}
+              onEditTipo={() => detail.tipoResiduo && setEditTipo(detail.tipoResiduo)}
+              revisao={revisoesMap[detail.key] ?? null}
+              onChangeStatus={(status) => mutRevisao.mutate({ grupo_key: detail.key, status })}
+              onChangeObservacoes={(observacoes) => mutRevisao.mutate({ grupo_key: detail.key, observacoes })}
+            />
+          )}
         </SheetContent>
       </Sheet>
+
 
       <DmrResolveResiduosDialog
         open={resolveOpen}
