@@ -106,3 +106,36 @@ export async function renameDmrLinhasDestinador(uploadId: string, fromText: stri
     .eq("destinador", fromText);
   if (error) throw error;
 }
+
+export type DmrRevisaoStatus = "ok" | "pendente";
+export type DmrRevisao = {
+  id: string;
+  upload_id: string;
+  grupo_key: string;
+  status: DmrRevisaoStatus;
+  observacoes: string | null;
+};
+
+export async function listDmrRevisoes(upload_id: string): Promise<DmrRevisao[]> {
+  const { data, error } = await (supabase as any)
+    .from("dmr_revisoes")
+    .select("*")
+    .eq("upload_id", upload_id);
+  if (error) throw error;
+  return (data ?? []) as DmrRevisao[];
+}
+
+export async function upsertDmrRevisao(input: {
+  upload_id: string;
+  grupo_key: string;
+  status?: DmrRevisaoStatus;
+  observacoes?: string | null;
+}) {
+  const payload: any = { upload_id: input.upload_id, grupo_key: input.grupo_key };
+  if (input.status !== undefined) payload.status = input.status;
+  if (input.observacoes !== undefined) payload.observacoes = input.observacoes;
+  const { error } = await (supabase as any)
+    .from("dmr_revisoes")
+    .upsert(payload, { onConflict: "upload_id,grupo_key" });
+  if (error) throw error;
+}
