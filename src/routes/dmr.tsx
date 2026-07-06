@@ -268,15 +268,29 @@ type Grupo = {
 };
 
 function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId: string }) {
+  const qc = useQueryClient();
   const { data: upload } = useQuery({ queryKey: ["dmr_uploads", unidadeId], queryFn: () => listDmrUploads(unidadeId), select: (l) => l.find((u) => u.id === uploadId) });
   const { data: linhas = [] } = useQuery({ queryKey: ["dmr_linhas", uploadId], queryFn: () => getDmrLinhas(uploadId) });
   const { data: coletas = [] } = useQuery({ queryKey: ["coletas", unidadeId], queryFn: () => listColetasByUnidade(unidadeId) });
   const { data: tipos = [] } = useQuery({ queryKey: ["tipos_residuo"], queryFn: listTiposResiduo });
   const { data: destinadoresCad = [] } = useQuery({ queryKey: ["destinadores"], queryFn: listDestinadores });
+  const { data: revisoes = [] } = useQuery({ queryKey: ["dmr_revisoes", uploadId], queryFn: () => listDmrRevisoes(uploadId) });
+  const revisoesMap = useMemo(() => {
+    const m: Record<string, DmrRevisao> = {};
+    for (const r of revisoes) m[r.grupo_key] = r;
+    return m;
+  }, [revisoes]);
+  const mutRevisao = useMutation({
+    mutationFn: (input: { grupo_key: string; status?: DmrRevisaoStatus; observacoes?: string | null }) =>
+      upsertDmrRevisao({ upload_id: uploadId, ...input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["dmr_revisoes", uploadId] }),
+    onError: (e: any) => toast.error(e.message),
+  });
   const [detail, setDetail] = useState<Grupo | null>(null);
   const [resolveOpen, setResolveOpen] = useState(false);
   const [resolveDestOpen, setResolveDestOpen] = useState(false);
   const [editTipo, setEditTipo] = useState<TipoResiduo | null>(null);
+
 
   // Resolve um texto livre da DMR para o nome canônico de um tipo cadastrado
   // 1) tenta casar pelo prefixo de código IBAMA ("200138 - madeira…")
