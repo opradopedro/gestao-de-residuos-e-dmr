@@ -560,9 +560,18 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
 type DetailSort = "data-desc" | "data-asc" | "peso-desc";
 type DetailFilter = "todas" | "estimado" | "sem-mtr";
 
-function DetailContent({ detail, onEditTipo }: { detail: Grupo; onEditTipo: () => void }) {
+function DetailContent({ detail, onEditTipo, revisao, onChangeStatus, onChangeObservacoes }: {
+  detail: Grupo;
+  onEditTipo: () => void;
+  revisao: DmrRevisao | null;
+  onChangeStatus: (status: DmrRevisaoStatus) => void;
+  onChangeObservacoes: (observacoes: string | null) => void;
+}) {
   const [sort, setSort] = useState<DetailSort>("data-desc");
   const [filter, setFilter] = useState<DetailFilter>("todas");
+  const [obs, setObs] = useState(revisao?.observacoes ?? "");
+  useMemo(() => { setObs(revisao?.observacoes ?? ""); }, [revisao?.id, revisao?.observacoes]);
+  const revStatus = revisao?.status ?? null;
 
   const matches = useMemo(() => {
     let arr = [...detail.matches];
