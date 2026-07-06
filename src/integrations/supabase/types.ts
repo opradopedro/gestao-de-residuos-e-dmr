@@ -266,6 +266,44 @@ export type Database = {
           },
         ]
       }
+      dmr_revisoes: {
+        Row: {
+          atualizado_em: string
+          criado_em: string
+          grupo_key: string
+          id: string
+          observacoes: string | null
+          status: string
+          upload_id: string
+        }
+        Insert: {
+          atualizado_em?: string
+          criado_em?: string
+          grupo_key: string
+          id?: string
+          observacoes?: string | null
+          status?: string
+          upload_id: string
+        }
+        Update: {
+          atualizado_em?: string
+          criado_em?: string
+          grupo_key?: string
+          id?: string
+          observacoes?: string | null
+          status?: string
+          upload_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dmr_revisoes_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "dmr_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dmr_uploads: {
         Row: {
           ano: number
