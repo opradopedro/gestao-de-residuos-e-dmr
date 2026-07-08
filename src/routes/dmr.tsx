@@ -456,9 +456,19 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
 
       <Card>
         <CardContent className="p-0">
-          <div className="p-4 border-b border-border">
-            <h3 className="font-medium">Conferência: {upload.arquivo_nome}</h3>
-            <div className="text-xs text-muted-foreground">{upload.ano} · {upload.trimestre}º trimestre — clique numa linha para investigar</div>
+          <div className="p-4 border-b border-border flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="font-medium">Conferência: {upload.arquivo_nome}</h3>
+              <div className="text-xs text-muted-foreground">{upload.ano} · {upload.trimestre}º trimestre — clique numa linha para investigar</div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setEditResiduosOpen(true)} disabled={todosResiduos.length === 0} title="Alterar relação de resíduos já mapeados (preserva observações)">
+                <Pencil className="size-3.5 mr-1" /> Alterar resíduos
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setEditDestOpen(true)} disabled={todosDestinadores.length === 0} title="Alterar relação de destinadores já mapeados (preserva observações)">
+                <Pencil className="size-3.5 mr-1" /> Alterar destinadores
+              </Button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
