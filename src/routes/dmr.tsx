@@ -591,12 +591,12 @@ function DetailContent({ detail, onEditTipo, revisao, onChangeStatus, onChangeOb
 
   const matches = useMemo(() => {
     let arr = [...detail.matches];
-    if (filter === "estimado") arr = arr.filter((c) => c.peso_estimado);
-    else if (filter === "sem-mtr") arr = arr.filter((c) => !c.mtr);
+    if (filter === "estimado") arr = arr.filter((m) => m.coleta.peso_estimado);
+    else if (filter === "sem-mtr") arr = arr.filter((m) => !m.coleta.mtr);
     arr.sort((a, b) => {
-      if (sort === "data-asc") return String(a.data).localeCompare(String(b.data));
-      if (sort === "peso-desc") return totalPesoColeta(b) - totalPesoColeta(a);
-      return String(b.data).localeCompare(String(a.data));
+      if (sort === "data-asc") return String(a.coleta.data).localeCompare(String(b.coleta.data));
+      if (sort === "peso-desc") return b.pesoItemKg - a.pesoItemKg;
+      return String(b.coleta.data).localeCompare(String(a.coleta.data));
     });
     return arr;
   }, [detail, sort, filter]);
