@@ -290,6 +290,8 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
   const [detail, setDetail] = useState<Grupo | null>(null);
   const [resolveOpen, setResolveOpen] = useState(false);
   const [resolveDestOpen, setResolveDestOpen] = useState(false);
+  const [editResiduosOpen, setEditResiduosOpen] = useState(false);
+  const [editDestOpen, setEditDestOpen] = useState(false);
   const [editTipo, setEditTipo] = useState<TipoResiduo | null>(null);
 
 
