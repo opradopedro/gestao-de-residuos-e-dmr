@@ -72,7 +72,7 @@ export function DmrResolveResiduosDialog({
       <Dialog open={open} onOpenChange={(o) => { if (!o) onOpenChange(false); }}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Resolver resíduo da DMR ({idx + 1}/{total})</DialogTitle>
+            <DialogTitle>{titulo ?? "Resolver resíduo da DMR"} ({idx + 1}/{total})</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 text-sm">
             <div className="rounded-md border bg-muted/30 p-3">
