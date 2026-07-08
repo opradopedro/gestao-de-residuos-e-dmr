@@ -22,6 +22,7 @@ import { formatTon, formatDate } from "@/lib/format";
 import { TipoResiduoEditDialog } from "@/components/TipoResiduoEditDialog";
 import { DmrResolveResiduosDialog } from "@/components/DmrResolveResiduosDialog";
 import { DmrResolveDestinadoresDialog } from "@/components/DmrResolveDestinadoresDialog";
+import { DmrAlterarEquivalenciasDialog } from "@/components/DmrAlterarEquivalenciasDialog";
 import { listDestinadores } from "@/lib/data";
 
 export const Route = createFileRoute("/dmr")({
@@ -290,8 +291,7 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
   const [detail, setDetail] = useState<Grupo | null>(null);
   const [resolveOpen, setResolveOpen] = useState(false);
   const [resolveDestOpen, setResolveDestOpen] = useState(false);
-  const [editResiduosOpen, setEditResiduosOpen] = useState(false);
-  const [editDestOpen, setEditDestOpen] = useState(false);
+  const [alterarOpen, setAlterarOpen] = useState(false);
   const [editTipo, setEditTipo] = useState<TipoResiduo | null>(null);
 
 
@@ -462,11 +462,8 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
               <div className="text-xs text-muted-foreground">{upload.ano} · {upload.trimestre}º trimestre — clique numa linha para investigar</div>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setEditResiduosOpen(true)} disabled={todosResiduos.length === 0} title="Alterar relação de resíduos já mapeados (preserva observações)">
-                <Pencil className="size-3.5 mr-1" /> Alterar resíduos
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setEditDestOpen(true)} disabled={todosDestinadores.length === 0} title="Alterar relação de destinadores já mapeados (preserva observações)">
-                <Pencil className="size-3.5 mr-1" /> Alterar destinadores
+              <Button size="sm" variant="outline" onClick={() => setAlterarOpen(true)} disabled={todosResiduos.length === 0 && todosDestinadores.length === 0} title="Alterar equivalências de resíduos ou destinadores já mapeados (preserva observações)">
+                <Pencil className="size-3.5 mr-1" /> Alterar equivalências
               </Button>
             </div>
           </div>
@@ -576,21 +573,14 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
         pendentes={pendentesDest}
       />
 
-      <DmrResolveResiduosDialog
-        open={editResiduosOpen}
-        onOpenChange={setEditResiduosOpen}
+      <DmrAlterarEquivalenciasDialog
+        open={alterarOpen}
+        onOpenChange={setAlterarOpen}
         uploadId={uploadId}
-        pendentes={todosResiduos}
-        titulo="Alterar relação de resíduos"
+        residuos={todosResiduos}
+        destinadores={todosDestinadores}
       />
 
-      <DmrResolveDestinadoresDialog
-        open={editDestOpen}
-        onOpenChange={setEditDestOpen}
-        uploadId={uploadId}
-        pendentes={todosDestinadores}
-        titulo="Alterar relação de destinadores"
-      />
 
       <TipoResiduoEditDialog
         open={!!editTipo}
