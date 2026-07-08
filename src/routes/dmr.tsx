@@ -22,6 +22,7 @@ import { formatTon, formatDate } from "@/lib/format";
 import { TipoResiduoEditDialog } from "@/components/TipoResiduoEditDialog";
 import { DmrResolveResiduosDialog } from "@/components/DmrResolveResiduosDialog";
 import { DmrResolveDestinadoresDialog } from "@/components/DmrResolveDestinadoresDialog";
+import { DmrAlterarEquivalenciasDialog } from "@/components/DmrAlterarEquivalenciasDialog";
 import { listDestinadores } from "@/lib/data";
 
 export const Route = createFileRoute("/dmr")({
