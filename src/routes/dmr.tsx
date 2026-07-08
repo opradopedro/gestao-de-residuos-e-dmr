@@ -253,6 +253,7 @@ function DmrPage() {
   );
 }
 
+type ColetaMatch = { coleta: any; pesoItemKg: number };
 type Grupo = {
   key: string;
   residuo: string;
@@ -260,9 +261,9 @@ type Grupo = {
   internoKg: number;
   dmrKg: number;
   diff: number;
-  matches: any[];
-  causasSemMtr: any[];
-  causasEstimado: any[];
+  matches: ColetaMatch[];
+  causasSemMtr: ColetaMatch[];
+  causasEstimado: ColetaMatch[];
   dmrLinhas: any[];
   tipoResiduo?: TipoResiduo;
 };
