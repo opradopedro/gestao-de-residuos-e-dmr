@@ -12,12 +12,13 @@ import { toast } from "sonner";
 type Pendente = { texto: string; ocorrencias: number };
 
 export function DmrResolveResiduosDialog({
-  open, onOpenChange, uploadId, pendentes,
+  open, onOpenChange, uploadId, pendentes, titulo,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   uploadId: string;
   pendentes: Pendente[];
+  titulo?: string;
 }) {
   const qc = useQueryClient();
   const { data: tipos = [] } = useQuery({ queryKey: ["tipos_residuo"], queryFn: listTiposResiduo });
@@ -71,7 +72,7 @@ export function DmrResolveResiduosDialog({
       <Dialog open={open} onOpenChange={(o) => { if (!o) onOpenChange(false); }}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Resolver resíduo da DMR ({idx + 1}/{total})</DialogTitle>
+            <DialogTitle>{titulo ?? "Resolver resíduo da DMR"} ({idx + 1}/{total})</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 text-sm">
             <div className="rounded-md border bg-muted/30 p-3">

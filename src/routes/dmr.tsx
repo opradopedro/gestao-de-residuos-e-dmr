@@ -253,6 +253,7 @@ function DmrPage() {
   );
 }
 
+type ColetaMatch = { coleta: any; pesoItemKg: number };
 type Grupo = {
   key: string;
   residuo: string;
@@ -260,9 +261,9 @@ type Grupo = {
   internoKg: number;
   dmrKg: number;
   diff: number;
-  matches: any[];
-  causasSemMtr: any[];
-  causasEstimado: any[];
+  matches: ColetaMatch[];
+  causasSemMtr: ColetaMatch[];
+  causasEstimado: ColetaMatch[];
   dmrLinhas: any[];
   tipoResiduo?: TipoResiduo;
 };
@@ -289,6 +290,8 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
   const [detail, setDetail] = useState<Grupo | null>(null);
   const [resolveOpen, setResolveOpen] = useState(false);
   const [resolveDestOpen, setResolveDestOpen] = useState(false);
+  const [editResiduosOpen, setEditResiduosOpen] = useState(false);
+  const [editDestOpen, setEditDestOpen] = useState(false);
   const [editTipo, setEditTipo] = useState<TipoResiduo | null>(null);
 
 
@@ -315,8 +318,9 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
     return { canonical: raw, matched: false };
   }
 
-  const { grupos, pendentes, pendentesDest } = useMemo(() => {
-    if (!upload) return { grupos: [] as Grupo[], pendentes: [] as { texto: string; ocorrencias: number }[], pendentesDest: [] as { texto: string; ocorrencias: number }[] };
+  const { grupos, pendentes, pendentesDest, todosResiduos, todosDestinadores } = useMemo(() => {
+    const empty = { grupos: [] as Grupo[], pendentes: [] as { texto: string; ocorrencias: number }[], pendentesDest: [] as { texto: string; ocorrencias: number }[], todosResiduos: [] as { texto: string; ocorrencias: number }[], todosDestinadores: [] as { texto: string; ocorrencias: number }[] };
+    if (!upload) return empty;
     const coletasTri = coletas.filter((c) => {
       const q = quarterOf(c.data);
       return q.ano === upload.ano && q.trimestre === upload.trimestre;
@@ -324,7 +328,7 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
 
     const norm = (s?: string | null) => (s ?? "").trim().toLowerCase();
     const interno = new Map<string, number>();
-    const internoColetas = new Map<string, any[]>();
+    const internoItens = new Map<string, Map<string, ColetaMatch>>();
     const tipoPorKey = new Map<string, TipoResiduo | undefined>();
 
     for (const c of coletasTri) {
@@ -332,9 +336,13 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
       for (const it of c.itens ?? []) {
         const r = resolveResiduoCanonical(it.tipo_residuo_nome);
         const k = `${norm(r.canonical)}||${dest}`;
-        interno.set(k, (interno.get(k) ?? 0) + Number(it.peso_kg));
-        if (!internoColetas.has(k)) internoColetas.set(k, []);
-        if (!internoColetas.get(k)!.includes(c)) internoColetas.get(k)!.push(c);
+        const pesoIt = Number(it.peso_kg);
+        interno.set(k, (interno.get(k) ?? 0) + pesoIt);
+        if (!internoItens.has(k)) internoItens.set(k, new Map());
+        const bucket = internoItens.get(k)!;
+        const prev = bucket.get(c.id);
+        if (prev) prev.pesoItemKg += pesoIt;
+        else bucket.set(c.id, { coleta: c, pesoItemKg: pesoIt });
         if (r.tipo) tipoPorKey.set(k, r.tipo);
       }
     }
@@ -343,6 +351,8 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
     const labelMap = new Map<string, string>();
     const pendCount = new Map<string, number>();
     const pendDestCount = new Map<string, number>();
+    const allResCount = new Map<string, number>();
+    const allDestCount = new Map<string, number>();
 
     const destNomesCad = new Set(destinadoresCad.map((d) => norm(d.nome)));
 
@@ -354,12 +364,16 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
       dmrLinhasMap.get(k)!.push(l);
       labelMap.set(k, r.canonical);
       if (r.tipo && !tipoPorKey.get(k)) tipoPorKey.set(k, r.tipo);
-      if (!r.matched && l.residuo) {
-        pendCount.set(l.residuo, (pendCount.get(l.residuo) ?? 0) + 1);
+      if (l.residuo) {
+        allResCount.set(l.residuo, (allResCount.get(l.residuo) ?? 0) + 1);
+        if (!r.matched) pendCount.set(l.residuo, (pendCount.get(l.residuo) ?? 0) + 1);
       }
       const destTxt = (l.destinador ?? "").trim();
-      if (destTxt && !destNomesCad.has(norm(destTxt))) {
-        pendDestCount.set(destTxt, (pendDestCount.get(destTxt) ?? 0) + 1);
+      if (destTxt) {
+        allDestCount.set(destTxt, (allDestCount.get(destTxt) ?? 0) + 1);
+        if (!destNomesCad.has(norm(destTxt))) {
+          pendDestCount.set(destTxt, (pendDestCount.get(destTxt) ?? 0) + 1);
+        }
       }
     }
     for (const [k] of interno) {
@@ -372,27 +386,30 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
       const internoKg = interno.get(k) ?? 0;
       const dmrKg = dmr.get(k) ?? 0;
       const diff = dmrKg - internoKg;
-      const matches = internoColetas.get(k) ?? [];
+      const matches: ColetaMatch[] = Array.from((internoItens.get(k) ?? new Map<string, ColetaMatch>()).values());
       return {
         key: k,
         residuo: labelMap.get(k) ?? k.split("||")[0],
         destinador,
         internoKg, dmrKg, diff, matches,
-        causasSemMtr: matches.filter((c) => !c.mtr),
-        causasEstimado: matches.filter((c) => c.peso_estimado),
+        causasSemMtr: matches.filter((m) => !m.coleta.mtr),
+        causasEstimado: matches.filter((m) => m.coleta.peso_estimado),
         dmrLinhas: dmrLinhasMap.get(k) ?? [],
         tipoResiduo: tipoPorKey.get(k),
       };
     }).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
 
-    const pendentes = Array.from(pendCount.entries())
-      .map(([texto, ocorrencias]) => ({ texto, ocorrencias }))
-      .sort((a, b) => b.ocorrencias - a.ocorrencias);
-    const pendentesDest = Array.from(pendDestCount.entries())
+    const toList = (m: Map<string, number>) => Array.from(m.entries())
       .map(([texto, ocorrencias]) => ({ texto, ocorrencias }))
       .sort((a, b) => b.ocorrencias - a.ocorrencias);
 
-    return { grupos, pendentes, pendentesDest };
+    return {
+      grupos,
+      pendentes: toList(pendCount),
+      pendentesDest: toList(pendDestCount),
+      todosResiduos: toList(allResCount),
+      todosDestinadores: toList(allDestCount),
+    };
   }, [upload, linhas, coletas, tipos, destinadoresCad]);
 
   if (!upload) return null;
@@ -439,9 +456,19 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
 
       <Card>
         <CardContent className="p-0">
-          <div className="p-4 border-b border-border">
-            <h3 className="font-medium">Conferência: {upload.arquivo_nome}</h3>
-            <div className="text-xs text-muted-foreground">{upload.ano} · {upload.trimestre}º trimestre — clique numa linha para investigar</div>
+          <div className="p-4 border-b border-border flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="font-medium">Conferência: {upload.arquivo_nome}</h3>
+              <div className="text-xs text-muted-foreground">{upload.ano} · {upload.trimestre}º trimestre — clique numa linha para investigar</div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setEditResiduosOpen(true)} disabled={todosResiduos.length === 0} title="Alterar relação de resíduos já mapeados (preserva observações)">
+                <Pencil className="size-3.5 mr-1" /> Alterar resíduos
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setEditDestOpen(true)} disabled={todosDestinadores.length === 0} title="Alterar relação de destinadores já mapeados (preserva observações)">
+                <Pencil className="size-3.5 mr-1" /> Alterar destinadores
+              </Button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -549,6 +576,22 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
         pendentes={pendentesDest}
       />
 
+      <DmrResolveResiduosDialog
+        open={editResiduosOpen}
+        onOpenChange={setEditResiduosOpen}
+        uploadId={uploadId}
+        pendentes={todosResiduos}
+        titulo="Alterar relação de resíduos"
+      />
+
+      <DmrResolveDestinadoresDialog
+        open={editDestOpen}
+        onOpenChange={setEditDestOpen}
+        uploadId={uploadId}
+        pendentes={todosDestinadores}
+        titulo="Alterar relação de destinadores"
+      />
+
       <TipoResiduoEditDialog
         open={!!editTipo}
         onOpenChange={(o) => !o && setEditTipo(null)}
@@ -576,12 +619,12 @@ function DetailContent({ detail, onEditTipo, revisao, onChangeStatus, onChangeOb
 
   const matches = useMemo(() => {
     let arr = [...detail.matches];
-    if (filter === "estimado") arr = arr.filter((c) => c.peso_estimado);
-    else if (filter === "sem-mtr") arr = arr.filter((c) => !c.mtr);
+    if (filter === "estimado") arr = arr.filter((m) => m.coleta.peso_estimado);
+    else if (filter === "sem-mtr") arr = arr.filter((m) => !m.coleta.mtr);
     arr.sort((a, b) => {
-      if (sort === "data-asc") return String(a.data).localeCompare(String(b.data));
-      if (sort === "peso-desc") return totalPesoColeta(b) - totalPesoColeta(a);
-      return String(b.data).localeCompare(String(a.data));
+      if (sort === "data-asc") return String(a.coleta.data).localeCompare(String(b.coleta.data));
+      if (sort === "peso-desc") return b.pesoItemKg - a.pesoItemKg;
+      return String(b.coleta.data).localeCompare(String(a.coleta.data));
     });
     return arr;
   }, [detail, sort, filter]);
@@ -690,13 +733,18 @@ function DetailContent({ detail, onEditTipo, revisao, onChangeStatus, onChangeOb
           </div>
           {matches.length === 0 ? <div className="text-muted-foreground text-xs">Nenhuma coleta para o filtro atual.</div> : (
             <div className="space-y-2">
-              {matches.map((c) => (
-                <div key={c.id} className="border rounded-md p-2 flex items-center justify-between">
+              {matches.map((m) => (
+                <div key={m.coleta.id} className="border rounded-md p-2 flex items-center justify-between">
                   <div>
-                    <div className="text-xs">{formatDate(c.data)} · MTR {c.mtr || <span className="text-destructive">—</span>}</div>
-                    <div className="text-xs text-muted-foreground">{formatTon(totalPesoColeta(c))} {c.peso_estimado && <span className="text-warning-foreground">(estimado)</span>}</div>
+                    <div className="text-xs">{formatDate(m.coleta.data)} · MTR {m.coleta.mtr || <span className="text-destructive">—</span>}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatTon(m.pesoItemKg)} {m.coleta.peso_estimado && <span className="text-warning-foreground">(estimado)</span>}
+                      {m.pesoItemKg !== totalPesoColeta(m.coleta) && (
+                        <span className="ml-1 text-muted-foreground/70">· coleta total: {formatTon(totalPesoColeta(m.coleta))}</span>
+                      )}
+                    </div>
                   </div>
-                  <Button asChild size="sm" variant="ghost"><Link to="/coletas/$id" params={{ id: c.id }}>Editar</Link></Button>
+                  <Button asChild size="sm" variant="ghost"><Link to="/coletas/$id" params={{ id: m.coleta.id }}>Editar</Link></Button>
                 </div>
               ))}
             </div>

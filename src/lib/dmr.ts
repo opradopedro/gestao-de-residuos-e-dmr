@@ -85,6 +85,26 @@ export async function deleteDmrUpload(id: string) {
   if (error) throw error;
 }
 
+/** Migra grupo_key das revisões após renomear resíduo/destinador, para preservar observações. */
+async function migrateRevisoesGrupoKey(uploadId: string, kind: "residuo" | "destinador", fromText: string, toText: string) {
+  const { data: revs, error } = await (supabase as any).from("dmr_revisoes").select("id, grupo_key").eq("upload_id", uploadId);
+  if (error) throw error;
+  const nFrom = fromText.trim().toLowerCase();
+  const nTo = toText.trim().toLowerCase();
+  for (const r of (revs ?? []) as { id: string; grupo_key: string }[]) {
+    const [res, dest] = r.grupo_key.split("||");
+    let newKey: string | null = null;
+    if (kind === "residuo" && res === nFrom) newKey = `${nTo}||${dest}`;
+    if (kind === "destinador" && dest === nFrom) newKey = `${res}||${nTo}`;
+    if (!newKey || newKey === r.grupo_key) continue;
+    const { error: upErr } = await (supabase as any).from("dmr_revisoes").update({ grupo_key: newKey }).eq("id", r.id);
+    if (upErr) {
+      // Provável colisão com chave já existente — descartamos a antiga.
+      await (supabase as any).from("dmr_revisoes").delete().eq("id", r.id);
+    }
+  }
+}
+
 /** Renomeia o texto do resíduo nas linhas de um upload (usado quando o usuário
  *  resolve um resíduo não cadastrado, escolhendo um existente ou criando um novo). */
 export async function renameDmrLinhasResiduo(uploadId: string, fromText: string, toText: string) {
@@ -94,6 +114,7 @@ export async function renameDmrLinhasResiduo(uploadId: string, fromText: string,
     .eq("upload_id", uploadId)
     .eq("residuo", fromText);
   if (error) throw error;
+  await migrateRevisoesGrupoKey(uploadId, "residuo", fromText, toText);
 }
 
 /** Renomeia o texto do destinador nas linhas de um upload (usado quando o usuário
@@ -105,6 +126,7 @@ export async function renameDmrLinhasDestinador(uploadId: string, fromText: stri
     .eq("upload_id", uploadId)
     .eq("destinador", fromText);
   if (error) throw error;
+  await migrateRevisoesGrupoKey(uploadId, "destinador", fromText, toText);
 }
 
 export type DmrRevisaoStatus = "ok" | "pendente";
