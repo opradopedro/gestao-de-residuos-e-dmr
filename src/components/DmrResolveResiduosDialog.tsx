@@ -12,12 +12,13 @@ import { toast } from "sonner";
 type Pendente = { texto: string; ocorrencias: number };
 
 export function DmrResolveResiduosDialog({
-  open, onOpenChange, uploadId, pendentes,
+  open, onOpenChange, uploadId, pendentes, titulo,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   uploadId: string;
   pendentes: Pendente[];
+  titulo?: string;
 }) {
   const qc = useQueryClient();
   const { data: tipos = [] } = useQuery({ queryKey: ["tipos_residuo"], queryFn: listTiposResiduo });
