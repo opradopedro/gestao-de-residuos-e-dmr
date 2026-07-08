@@ -462,11 +462,8 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
               <div className="text-xs text-muted-foreground">{upload.ano} · {upload.trimestre}º trimestre — clique numa linha para investigar</div>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setEditResiduosOpen(true)} disabled={todosResiduos.length === 0} title="Alterar relação de resíduos já mapeados (preserva observações)">
-                <Pencil className="size-3.5 mr-1" /> Alterar resíduos
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setEditDestOpen(true)} disabled={todosDestinadores.length === 0} title="Alterar relação de destinadores já mapeados (preserva observações)">
-                <Pencil className="size-3.5 mr-1" /> Alterar destinadores
+              <Button size="sm" variant="outline" onClick={() => setAlterarOpen(true)} disabled={todosResiduos.length === 0 && todosDestinadores.length === 0} title="Alterar equivalências de resíduos ou destinadores já mapeados (preserva observações)">
+                <Pencil className="size-3.5 mr-1" /> Alterar equivalências
               </Button>
             </div>
           </div>
