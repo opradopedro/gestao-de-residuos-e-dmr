@@ -705,13 +705,18 @@ function DetailContent({ detail, onEditTipo, revisao, onChangeStatus, onChangeOb
           </div>
           {matches.length === 0 ? <div className="text-muted-foreground text-xs">Nenhuma coleta para o filtro atual.</div> : (
             <div className="space-y-2">
-              {matches.map((c) => (
-                <div key={c.id} className="border rounded-md p-2 flex items-center justify-between">
+              {matches.map((m) => (
+                <div key={m.coleta.id} className="border rounded-md p-2 flex items-center justify-between">
                   <div>
-                    <div className="text-xs">{formatDate(c.data)} · MTR {c.mtr || <span className="text-destructive">—</span>}</div>
-                    <div className="text-xs text-muted-foreground">{formatTon(totalPesoColeta(c))} {c.peso_estimado && <span className="text-warning-foreground">(estimado)</span>}</div>
+                    <div className="text-xs">{formatDate(m.coleta.data)} · MTR {m.coleta.mtr || <span className="text-destructive">—</span>}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatTon(m.pesoItemKg)} {m.coleta.peso_estimado && <span className="text-warning-foreground">(estimado)</span>}
+                      {m.pesoItemKg !== totalPesoColeta(m.coleta) && (
+                        <span className="ml-1 text-muted-foreground/70">· coleta total: {formatTon(totalPesoColeta(m.coleta))}</span>
+                      )}
+                    </div>
                   </div>
-                  <Button asChild size="sm" variant="ghost"><Link to="/coletas/$id" params={{ id: c.id }}>Editar</Link></Button>
+                  <Button asChild size="sm" variant="ghost"><Link to="/coletas/$id" params={{ id: m.coleta.id }}>Editar</Link></Button>
                 </div>
               ))}
             </div>
