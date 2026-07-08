@@ -573,21 +573,14 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
         pendentes={pendentesDest}
       />
 
-      <DmrResolveResiduosDialog
-        open={editResiduosOpen}
-        onOpenChange={setEditResiduosOpen}
+      <DmrAlterarEquivalenciasDialog
+        open={alterarOpen}
+        onOpenChange={setAlterarOpen}
         uploadId={uploadId}
-        pendentes={todosResiduos}
-        titulo="Alterar relação de resíduos"
+        residuos={todosResiduos}
+        destinadores={todosDestinadores}
       />
 
-      <DmrResolveDestinadoresDialog
-        open={editDestOpen}
-        onOpenChange={setEditDestOpen}
-        uploadId={uploadId}
-        pendentes={todosDestinadores}
-        titulo="Alterar relação de destinadores"
-      />
 
       <TipoResiduoEditDialog
         open={!!editTipo}
