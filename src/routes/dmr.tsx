@@ -316,8 +316,9 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
     return { canonical: raw, matched: false };
   }
 
-  const { grupos, pendentes, pendentesDest } = useMemo(() => {
-    if (!upload) return { grupos: [] as Grupo[], pendentes: [] as { texto: string; ocorrencias: number }[], pendentesDest: [] as { texto: string; ocorrencias: number }[] };
+  const { grupos, pendentes, pendentesDest, todosResiduos, todosDestinadores } = useMemo(() => {
+    const empty = { grupos: [] as Grupo[], pendentes: [] as { texto: string; ocorrencias: number }[], pendentesDest: [] as { texto: string; ocorrencias: number }[], todosResiduos: [] as { texto: string; ocorrencias: number }[], todosDestinadores: [] as { texto: string; ocorrencias: number }[] };
+    if (!upload) return empty;
     const coletasTri = coletas.filter((c) => {
       const q = quarterOf(c.data);
       return q.ano === upload.ano && q.trimestre === upload.trimestre;
@@ -325,7 +326,7 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
 
     const norm = (s?: string | null) => (s ?? "").trim().toLowerCase();
     const interno = new Map<string, number>();
-    const internoColetas = new Map<string, any[]>();
+    const internoItens = new Map<string, Map<string, ColetaMatch>>();
     const tipoPorKey = new Map<string, TipoResiduo | undefined>();
 
     for (const c of coletasTri) {
@@ -333,9 +334,13 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
       for (const it of c.itens ?? []) {
         const r = resolveResiduoCanonical(it.tipo_residuo_nome);
         const k = `${norm(r.canonical)}||${dest}`;
-        interno.set(k, (interno.get(k) ?? 0) + Number(it.peso_kg));
-        if (!internoColetas.has(k)) internoColetas.set(k, []);
-        if (!internoColetas.get(k)!.includes(c)) internoColetas.get(k)!.push(c);
+        const pesoIt = Number(it.peso_kg);
+        interno.set(k, (interno.get(k) ?? 0) + pesoIt);
+        if (!internoItens.has(k)) internoItens.set(k, new Map());
+        const bucket = internoItens.get(k)!;
+        const prev = bucket.get(c.id);
+        if (prev) prev.pesoItemKg += pesoIt;
+        else bucket.set(c.id, { coleta: c, pesoItemKg: pesoIt });
         if (r.tipo) tipoPorKey.set(k, r.tipo);
       }
     }
@@ -344,6 +349,8 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
     const labelMap = new Map<string, string>();
     const pendCount = new Map<string, number>();
     const pendDestCount = new Map<string, number>();
+    const allResCount = new Map<string, number>();
+    const allDestCount = new Map<string, number>();
 
     const destNomesCad = new Set(destinadoresCad.map((d) => norm(d.nome)));
 
@@ -355,12 +362,16 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
       dmrLinhasMap.get(k)!.push(l);
       labelMap.set(k, r.canonical);
       if (r.tipo && !tipoPorKey.get(k)) tipoPorKey.set(k, r.tipo);
-      if (!r.matched && l.residuo) {
-        pendCount.set(l.residuo, (pendCount.get(l.residuo) ?? 0) + 1);
+      if (l.residuo) {
+        allResCount.set(l.residuo, (allResCount.get(l.residuo) ?? 0) + 1);
+        if (!r.matched) pendCount.set(l.residuo, (pendCount.get(l.residuo) ?? 0) + 1);
       }
       const destTxt = (l.destinador ?? "").trim();
-      if (destTxt && !destNomesCad.has(norm(destTxt))) {
-        pendDestCount.set(destTxt, (pendDestCount.get(destTxt) ?? 0) + 1);
+      if (destTxt) {
+        allDestCount.set(destTxt, (allDestCount.get(destTxt) ?? 0) + 1);
+        if (!destNomesCad.has(norm(destTxt))) {
+          pendDestCount.set(destTxt, (pendDestCount.get(destTxt) ?? 0) + 1);
+        }
       }
     }
     for (const [k] of interno) {
@@ -373,27 +384,30 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
       const internoKg = interno.get(k) ?? 0;
       const dmrKg = dmr.get(k) ?? 0;
       const diff = dmrKg - internoKg;
-      const matches = internoColetas.get(k) ?? [];
+      const matches: ColetaMatch[] = Array.from((internoItens.get(k) ?? new Map<string, ColetaMatch>()).values());
       return {
         key: k,
         residuo: labelMap.get(k) ?? k.split("||")[0],
         destinador,
         internoKg, dmrKg, diff, matches,
-        causasSemMtr: matches.filter((c) => !c.mtr),
-        causasEstimado: matches.filter((c) => c.peso_estimado),
+        causasSemMtr: matches.filter((m) => !m.coleta.mtr),
+        causasEstimado: matches.filter((m) => m.coleta.peso_estimado),
         dmrLinhas: dmrLinhasMap.get(k) ?? [],
         tipoResiduo: tipoPorKey.get(k),
       };
     }).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
 
-    const pendentes = Array.from(pendCount.entries())
-      .map(([texto, ocorrencias]) => ({ texto, ocorrencias }))
-      .sort((a, b) => b.ocorrencias - a.ocorrencias);
-    const pendentesDest = Array.from(pendDestCount.entries())
+    const toList = (m: Map<string, number>) => Array.from(m.entries())
       .map(([texto, ocorrencias]) => ({ texto, ocorrencias }))
       .sort((a, b) => b.ocorrencias - a.ocorrencias);
 
-    return { grupos, pendentes, pendentesDest };
+    return {
+      grupos,
+      pendentes: toList(pendCount),
+      pendentesDest: toList(pendDestCount),
+      todosResiduos: toList(allResCount),
+      todosDestinadores: toList(allDestCount),
+    };
   }, [upload, linhas, coletas, tipos, destinadoresCad]);
 
   if (!upload) return null;
