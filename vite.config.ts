@@ -6,4 +6,16 @@
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-export default defineConfig();
+// Build estático (SPA) para o GitHub Pages. Ativado só com GITHUB_PAGES=true,
+// então o build normal do Lovable continua igual.
+const pages = process.env.GITHUB_PAGES === "true";
+
+export default defineConfig(
+  pages
+    ? {
+        nitro: false,
+        tanstackStart: { spa: { enabled: true } },
+        vite: { base: process.env.PAGES_BASE ?? "/" },
+      }
+    : {},
+);
