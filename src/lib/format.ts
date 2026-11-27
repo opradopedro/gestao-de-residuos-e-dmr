@@ -22,6 +22,9 @@ export function formatDate(iso: string): string {
 // Converte um valor de planilha (que representa TONELADAS) em número.
 // Aceita: número JS (xlsx já parseou), string com vírgula decimal (BR) ou ponto (EN).
 // NÃO remove pontos cegamente (bug anterior multiplicava 2.7 por 10).
+/** Diferenças menores que isso (kg) são arredondamento da DMR, que vem em toneladas. */
+export const TOLERANCIA_DMR_KG = 1;
+
 export function parseTonelada(v: any): number {
   if (v == null || v === "") return 0;
   if (typeof v === "number") return isFinite(v) ? v : 0;

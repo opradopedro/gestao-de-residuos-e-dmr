@@ -4,7 +4,7 @@ import { useUnidadeAtiva } from "@/hooks/use-unidade";
 import { usePeriodoAtivo } from "@/hooks/use-periodo";
 import { listColetasByUnidade, totalPesoColeta } from "@/lib/data";
 import { listDmrUploads, getDmrLinhas } from "@/lib/dmr";
-import { formatTon, formatKg } from "@/lib/format";
+import { formatTon, formatKg, TOLERANCIA_DMR_KG } from "@/lib/format";
 import { NoUnidade, PageHeader } from "@/components/NoUnidade";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,7 @@ function Dashboard() {
     if (upload) {
       const totalDmr = linhasDmr.reduce((s, l) => s + Number(l.peso_kg ?? 0), 0);
       foraDmr = Math.max(0, peso - totalDmr);
+      if (foraDmr < TOLERANCIA_DMR_KG) foraDmr = 0;
     }
 
     const porResiduo = new Map<string, number>();
@@ -166,7 +167,7 @@ function QuickAction({ to, icon: Icon, label, tone }: { to: string; icon: any; l
 
 function ChartCard({ title, data, color }: { title: string; data: { nome: string; kg: number }[]; color: string }) {
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader><CardTitle className="text-base">{title}</CardTitle></CardHeader>
       <CardContent>
         {data.length === 0 ? (

@@ -14,7 +14,13 @@ export default defineConfig(
   pages
     ? {
         nitro: false,
-        tanstackStart: { spa: { enabled: true } },
+        tanstackStart: {
+          spa: { enabled: true },
+          // Gera o HTML de cada rota já com a rota certa. Sem isso, toda rota abria com
+          // o HTML do Dashboard e o menu ficava com dois itens destacados.
+          prerender: { enabled: true, crawlLinks: false },
+          pages: ["/coletas", "/coletas/nova", "/risco", "/pendencias", "/consolidacao", "/dmr", "/cadastros"].map((path) => ({ path })),
+        },
         vite: { base: process.env.PAGES_BASE ?? "/" },
       }
     : {},

@@ -1,3 +1,4 @@
+import { fetchAllPages } from "@/lib/data";
 import { supabase } from "@/integrations/supabase/client";
 
 export type DmrUpload = {
@@ -75,9 +76,9 @@ export async function listDmrUploads(unidade_id: string): Promise<DmrUpload[]> {
 }
 
 export async function getDmrLinhas(upload_id: string): Promise<DmrLinha[]> {
-  const { data, error } = await supabase.from("dmr_linhas").select("*").eq("upload_id", upload_id).limit(5000);
-  if (error) throw error;
-  return (data ?? []) as any;
+  return fetchAllPages<DmrLinha>((from, to) =>
+    supabase.from("dmr_linhas").select("*").eq("upload_id", upload_id).order("id").range(from, to) as any,
+  );
 }
 
 export async function deleteDmrUpload(id: string) {

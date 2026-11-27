@@ -408,7 +408,7 @@ function TransportadorDialog({ mode, transportador, onClose, todos = [] }: { mod
               <Button variant="outline" type="button" onClick={() => setMergeOpen(true)}><Merge className="size-4 mr-1" /> Unificar com…</Button>
             )}
             <Button variant="outline" onClick={onClose}>Cancelar</Button>
-            <Button disabled={!nome.trim() || mut.isPending} onClick={() => mut.mutate()}>Salvar</Button>
+            <Button disabled={!nome.trim() || mut.isPending || (!!cnpj && !isValidCNPJ(cnpj))} onClick={() => mut.mutate()}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -802,7 +802,7 @@ function DestinadorFullDialog({ mode, destinador, onClose, todos = [] }: { mode:
               <Button variant="outline" type="button" onClick={() => setMergeOpen(true)}><Merge className="size-4 mr-1" /> Unificar com…</Button>
             )}
             <Button variant="outline" onClick={onClose}>Cancelar</Button>
-            <Button disabled={!nome.trim() || mut.isPending || !ready} onClick={() => mut.mutate()}>
+            <Button disabled={!nome.trim() || mut.isPending || !ready || (!!cnpj && !isValidCNPJ(cnpj))} onClick={() => mut.mutate()}>
               {mut.isPending ? "Salvando..." : "Salvar"}
             </Button>
           </DialogFooter>
