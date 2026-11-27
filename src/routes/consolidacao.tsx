@@ -18,7 +18,14 @@ import { ColetaForm } from "@/components/ColetaForm";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/consolidacao")({
-  head: () => ({ meta: [{ title: "Consolidação trimestral — DMR" }] }),
+  head: () => ({ meta: [
+    { title: "Consolidação trimestral — DMR" },
+    { name: "description", content: "Pesos trimestrais consolidados por resíduo e destinador para a DMR." },
+    { property: "og:title", content: "Consolidação trimestral — DMR" },
+    { property: "og:description", content: "Pesos trimestrais consolidados por resíduo e destinador para a DMR." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: Consolidacao,
 });
 

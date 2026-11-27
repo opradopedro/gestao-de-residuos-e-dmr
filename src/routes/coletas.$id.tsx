@@ -9,7 +9,14 @@ import { Trash2, ArrowLeft, Pencil, Eye } from "lucide-react";
 import { useState } from "react";
 
 export const Route = createFileRoute("/coletas/$id")({
-  head: () => ({ meta: [{ title: "Coleta — DMR" }] }),
+  head: () => ({ meta: [
+    { title: "Coleta — DMR" },
+    { name: "description", content: "Detalhes da coleta, resíduos, pesos, transportador e destinador." },
+    { property: "og:title", content: "Coleta — DMR" },
+    { property: "og:description", content: "Detalhes da coleta, resíduos, pesos, transportador e destinador." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: EditarColeta,
 });
 

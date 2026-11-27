@@ -39,7 +39,14 @@ import { toast } from "sonner";
 
 type ColetasSearch = { risco?: string };
 export const Route = createFileRoute("/coletas/")({
-  head: () => ({ meta: [{ title: "Coletas — DMR" }] }),
+  head: () => ({ meta: [
+    { title: "Coletas — DMR" },
+    { name: "description", content: "Consulta de coletas, pesos e manifestos de transporte de resíduos." },
+    { property: "og:title", content: "Coletas — DMR" },
+    { property: "og:description", content: "Consulta de coletas, pesos e manifestos de transporte de resíduos." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   validateSearch: (s: Record<string, unknown>): ColetasSearch => ({ risco: s.risco ? String(s.risco) : undefined }),
   component: ColetasList,
 });

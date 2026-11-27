@@ -30,7 +30,14 @@ import { formatCodigoIbama } from "@/lib/ibama";
 
 type CadastrosSearch = { risco?: string };
 export const Route = createFileRoute("/cadastros")({
-  head: () => ({ meta: [{ title: "Cadastros — DMR" }] }),
+  head: () => ({ meta: [
+    { title: "Cadastros — DMR" },
+    { name: "description", content: "Cadastros de unidades, resíduos, tratamentos, transportadores e destinadores." },
+    { property: "og:title", content: "Cadastros — DMR" },
+    { property: "og:description", content: "Cadastros de unidades, resíduos, tratamentos, transportadores e destinadores." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   validateSearch: (s: Record<string, unknown>): CadastrosSearch => ({ risco: s.risco ? String(s.risco) : undefined }),
   component: Cadastros,
 });

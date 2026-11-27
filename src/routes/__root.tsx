@@ -2,6 +2,7 @@ import { Outlet, createRootRouteWithContext, HeadContent, Scripts, Link } from "
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { AppShell } from "@/components/AppShell";
+import { useEffect } from "react";
 
 import appCss from "../styles.css?url";
 
@@ -37,8 +38,6 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { name: "twitter:title", content: "App TCC Resíduos" },
       { property: "og:description", content: "Sistema multiunidade para gestão, validação e reconciliação de DMR. EM TESTE" },
       { name: "twitter:description", content: "Sistema multiunidade para gestão, validação e reconciliação de DMR. EM TESTE" },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9764e54d-7bb3-44d0-81d5-6f2f02aeb5da/id-preview-560b3fbd--70db2a74-2843-4b69-88cf-11ce5d2c06b6.lovable.app-1777395168413.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9764e54d-7bb3-44d0-81d5-6f2f02aeb5da/id-preview-560b3fbd--70db2a74-2843-4b69-88cf-11ce5d2c06b6.lovable.app-1777395168413.png" },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
@@ -65,6 +64,29 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useEffect(() => {
+    // Remove company-specific browser state once per browser/tab after the data reset.
+    // Do not touch sign-in storage or unrelated application settings.
+    const resetKey = "dmr.data-reset-2026-11-27";
+    let removed = false;
+    try {
+      if (!localStorage.getItem(resetKey)) {
+        for (const key of ["dmr.unidade_ativa", "dmr.periodo", "import-job-state-v1"]) {
+          removed = localStorage.getItem(key) !== null || removed;
+          localStorage.removeItem(key);
+        }
+        localStorage.setItem(resetKey, "done");
+      }
+      if (!sessionStorage.getItem(resetKey)) {
+        removed = sessionStorage.getItem("coletas-list-state") !== null || removed;
+        sessionStorage.removeItem("coletas-list-state");
+        sessionStorage.setItem(resetKey, "done");
+      }
+      if (removed) window.location.reload();
+    } catch {
+      // Storage may be blocked by the browser; server data has already been reset.
+    }
+  }, []);
   return (
     <QueryClientProvider client={queryClient}>
       <AppShell>

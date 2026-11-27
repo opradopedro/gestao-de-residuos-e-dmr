@@ -26,7 +26,14 @@ import { DmrAlterarEquivalenciasDialog } from "@/components/DmrAlterarEquivalenc
 import { listDestinadores } from "@/lib/data";
 
 export const Route = createFileRoute("/dmr")({
-  head: () => ({ meta: [{ title: "DMR — Conferência" }] }),
+  head: () => ({ meta: [
+    { title: "DMR — Conferência" },
+    { name: "description", content: "Conferência dos pesos declarados na DMR com as coletas internas e suas revisões." },
+    { property: "og:title", content: "DMR — Conferência" },
+    { property: "og:description", content: "Conferência dos pesos declarados na DMR com as coletas internas e suas revisões." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: DmrPage,
 });
 
@@ -693,7 +700,7 @@ function DetailContent({ detail, onEditTipo, revisao, onChangeStatus, onChangeOb
                 const prev = revisao?.observacoes ?? null;
                 if (next !== prev) onChangeObservacoes(next);
               }}
-              placeholder="Ex.: aguardando baixa da CETESB para o MTR 260012509203"
+              placeholder="Ex.: aguardando baixa da CETESB para completar o peso na DMR"
             />
           </div>
         </div>

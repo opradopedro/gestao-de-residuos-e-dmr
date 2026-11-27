@@ -7,7 +7,14 @@ import { createColeta, ColetaInput } from "@/lib/data";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/coletas/nova")({
-  head: () => ({ meta: [{ title: "Nova coleta — DMR" }] }),
+  head: () => ({ meta: [
+    { title: "Nova coleta — DMR" },
+    { name: "description", content: "Registro de uma nova coleta de resíduos para conferência da DMR." },
+    { property: "og:title", content: "Nova coleta — DMR" },
+    { property: "og:description", content: "Registro de uma nova coleta de resíduos para conferência da DMR." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: NovaColeta,
 });
 

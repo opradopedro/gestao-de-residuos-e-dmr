@@ -13,7 +13,14 @@ import { useMemo } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 export const Route = createFileRoute("/")({
-  head: () => ({ meta: [{ title: "Dashboard — DMR" }] }),
+  head: () => ({ meta: [
+    { title: "Dashboard — DMR" },
+    { name: "description", content: "Visão geral das coletas, resíduos e conferências de DMR por unidade." },
+    { property: "og:title", content: "Dashboard — DMR" },
+    { property: "og:description", content: "Visão geral das coletas, resíduos e conferências de DMR por unidade." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: Dashboard,
 });
 

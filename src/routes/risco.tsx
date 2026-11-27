@@ -16,7 +16,14 @@ import { useMemo } from "react";
 import { formatTon, formatKg } from "@/lib/format";
 
 export const Route = createFileRoute("/risco")({
-  head: () => ({ meta: [{ title: "Riscos & Pendências — DMR" }] }),
+  head: () => ({ meta: [
+    { title: "Riscos & Pendências — DMR" },
+    { name: "description", content: "Avaliação de riscos e pendências que afetam a declaração de resíduos." },
+    { property: "og:title", content: "Riscos & Pendências — DMR" },
+    { property: "og:description", content: "Avaliação de riscos e pendências que afetam a declaração de resíduos." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: RiscoPage,
 });
 
