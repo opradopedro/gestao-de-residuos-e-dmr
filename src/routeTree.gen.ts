@@ -9,34 +9,19 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as RiscoRouteImport } from './routes/risco'
-import { Route as PendenciasRouteImport } from './routes/pendencias'
-import { Route as DmrRouteImport } from './routes/dmr'
-import { Route as ConsolidacaoRouteImport } from './routes/consolidacao'
-import { Route as CadastrosRouteImport } from './routes/cadastros'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CadastrosRouteImport } from './routes/cadastros'
+import { Route as ConsolidacaoRouteImport } from './routes/consolidacao'
+import { Route as DmrRouteImport } from './routes/dmr'
+import { Route as PendenciasRouteImport } from './routes/pendencias'
+import { Route as RiscoRouteImport } from './routes/risco'
 import { Route as ColetasIndexRouteImport } from './routes/coletas.index'
-import { Route as ColetasNovaRouteImport } from './routes/coletas.nova'
 import { Route as ColetasIdRouteImport } from './routes/coletas.$id'
+import { Route as ColetasNovaRouteImport } from './routes/coletas.nova'
 
-const RiscoRoute = RiscoRouteImport.update({
-  id: '/risco',
-  path: '/risco',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PendenciasRoute = PendenciasRouteImport.update({
-  id: '/pendencias',
-  path: '/pendencias',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DmrRoute = DmrRouteImport.update({
-  id: '/dmr',
-  path: '/dmr',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ConsolidacaoRoute = ConsolidacaoRouteImport.update({
-  id: '/consolidacao',
-  path: '/consolidacao',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CadastrosRoute = CadastrosRouteImport.update({
@@ -44,9 +29,24 @@ const CadastrosRoute = CadastrosRouteImport.update({
   path: '/cadastros',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const ConsolidacaoRoute = ConsolidacaoRouteImport.update({
+  id: '/consolidacao',
+  path: '/consolidacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DmrRoute = DmrRouteImport.update({
+  id: '/dmr',
+  path: '/dmr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PendenciasRoute = PendenciasRouteImport.update({
+  id: '/pendencias',
+  path: '/pendencias',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RiscoRoute = RiscoRouteImport.update({
+  id: '/risco',
+  path: '/risco',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ColetasIndexRoute = ColetasIndexRouteImport.update({
@@ -54,14 +54,14 @@ const ColetasIndexRoute = ColetasIndexRouteImport.update({
   path: '/coletas/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ColetasNovaRoute = ColetasNovaRouteImport.update({
-  id: '/coletas/nova',
-  path: '/coletas/nova',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ColetasIdRoute = ColetasIdRouteImport.update({
   id: '/coletas/$id',
   path: '/coletas/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ColetasNovaRoute = ColetasNovaRouteImport.update({
+  id: '/coletas/nova',
+  path: '/coletas/nova',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -149,32 +149,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/risco': {
-      id: '/risco'
-      path: '/risco'
-      fullPath: '/risco'
-      preLoaderRoute: typeof RiscoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pendencias': {
-      id: '/pendencias'
-      path: '/pendencias'
-      fullPath: '/pendencias'
-      preLoaderRoute: typeof PendenciasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dmr': {
-      id: '/dmr'
-      path: '/dmr'
-      fullPath: '/dmr'
-      preLoaderRoute: typeof DmrRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/consolidacao': {
-      id: '/consolidacao'
-      path: '/consolidacao'
-      fullPath: '/consolidacao'
-      preLoaderRoute: typeof ConsolidacaoRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cadastros': {
@@ -184,11 +163,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CadastrosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/consolidacao': {
+      id: '/consolidacao'
+      path: '/consolidacao'
+      fullPath: '/consolidacao'
+      preLoaderRoute: typeof ConsolidacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dmr': {
+      id: '/dmr'
+      path: '/dmr'
+      fullPath: '/dmr'
+      preLoaderRoute: typeof DmrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pendencias': {
+      id: '/pendencias'
+      path: '/pendencias'
+      fullPath: '/pendencias'
+      preLoaderRoute: typeof PendenciasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/risco': {
+      id: '/risco'
+      path: '/risco'
+      fullPath: '/risco'
+      preLoaderRoute: typeof RiscoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/coletas/': {
@@ -198,18 +198,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ColetasIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/coletas/nova': {
-      id: '/coletas/nova'
-      path: '/coletas/nova'
-      fullPath: '/coletas/nova'
-      preLoaderRoute: typeof ColetasNovaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/coletas/$id': {
       id: '/coletas/$id'
       path: '/coletas/$id'
       fullPath: '/coletas/$id'
       preLoaderRoute: typeof ColetasIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coletas/nova': {
+      id: '/coletas/nova'
+      path: '/coletas/nova'
+      fullPath: '/coletas/nova'
+      preLoaderRoute: typeof ColetasNovaRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
