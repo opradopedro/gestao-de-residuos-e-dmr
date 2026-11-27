@@ -24,6 +24,7 @@ jobs:
       - name: Build (static SPA)
         env:
           GITHUB_PAGES: "true"
+          VITE_DEMO_MODE: "true"
           PAGES_BASE: /${{ github.event.repository.name }}/
         run: bun run build
       - name: Prepare SPA fallback
