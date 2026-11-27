@@ -1,4 +1,4 @@
-import { parseTonelada } from "@/lib/format";
+import { parseTonelada, TOLERANCIA_DMR_KG } from "@/lib/format";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUnidadeAtiva } from "@/hooks/use-unidade";
@@ -492,8 +492,10 @@ function ConferenciaPanel({ uploadId, unidadeId }: { uploadId: string; unidadeId
                 {grupos.length === 0 ? <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Sem dados.</td></tr> : grupos.map((g) => {
                   const pct = g.internoKg > 0 ? (g.diff / g.internoKg) * 100 : (g.dmrKg > 0 ? 100 : 0);
                   // Regras: DMR > controle interno = Grave; |%| > 10 = Grave; |%| <= 10 e != 0 = Médio; sem diferença = OK.
-                  const grave = g.diff > 0 || Math.abs(pct) > 10;
-                  const medio = !grave && g.diff !== 0;
+                  // Diferenças abaixo de TOLERANCIA_DMR_KG são arredondamento (a DMR vem em toneladas) e contam como OK.
+                  const semDiferenca = Math.abs(g.diff) < TOLERANCIA_DMR_KG;
+                  const grave = !semDiferenca && (g.diff > 0 || Math.abs(pct) > 10);
+                  const medio = !grave && !semDiferenca;
                   const leve = medio;
                   const status = grave ? { label: "Grave", cls: "bg-destructive/15 text-destructive border-destructive/30" }
                     : medio ? { label: "Médio", cls: "bg-warning/15 text-warning-foreground border-warning/40" }

@@ -1,3 +1,4 @@
+import { parseTonelada } from "@/lib/format";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -134,6 +135,8 @@ export function ColetaImportWizard({
       return d.toISOString().slice(0, 10);
     }
     const s = String(v).trim();
+    // ISO (AAAA-MM-DD) primeiro: senão o padrão DD/MM/AA casa dentro de "2026-11-03" e vira 2003-11-26.
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
     const m = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
     if (m) {
       const [, d, mo, y] = m;
@@ -159,8 +162,8 @@ export function ColetaImportWizard({
       const dataStr = colMap.data ? parseDateCell(get(colMap.data)) : "";
       const mtr = colMap.mtr ? String(get(colMap.mtr) ?? "").trim() : "";
       const residuo = colMap.residuo ? String(get(colMap.residuo) ?? "").trim() : "";
-      const pesoRaw = colMap.peso ? String(get(colMap.peso) ?? "0").replace(/\./g, "").replace(",", ".") : "0";
-      const peso = Number(pesoRaw) || 0;
+      // Mesmo parser da DMR: aceita número da planilha, "1.234,56" (BR) e "210.5". Remover todos os pontos multiplicava 210.5 por 10.
+      const peso = colMap.peso ? parseTonelada(get(colMap.peso)) : 0;
       const tratamento = colMap.tratamento ? String(get(colMap.tratamento) ?? "").trim() : "";
       const destinador = colMap.destinador ? String(get(colMap.destinador) ?? "").trim() : "";
       const transportador = colMap.transportador ? String(get(colMap.transportador) ?? "").trim() : "";

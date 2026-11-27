@@ -13,7 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ShieldAlert, ShieldCheck, ShieldQuestion, ArrowRight, AlertTriangle, FileWarning, Scale, FileSpreadsheet, FileCheck, Info, Building2, Recycle } from "lucide-react";
 import { useMemo } from "react";
-import { formatTon, formatKg } from "@/lib/format";
+import { formatTon, formatKg, TOLERANCIA_DMR_KG } from "@/lib/format";
 
 export const Route = createFileRoute("/risco")({
   head: () => ({ meta: [
@@ -91,6 +91,7 @@ function RiscoPage() {
     if (upload) {
       const totalDmrKg = linhasDmr.reduce((s, l) => s + Number(l.peso_kg ?? 0), 0);
       foraDmr = Math.max(0, totalKg - totalDmrKg);
+      if (foraDmr < TOLERANCIA_DMR_KG) foraDmr = 0;
     }
 
     const destSemCnpj = destinadores.filter((d) => !d.cnpj || !d.cnpj.trim());

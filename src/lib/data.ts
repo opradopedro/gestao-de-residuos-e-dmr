@@ -452,9 +452,24 @@ export async function bulkDeleteColetas(ids: string[], unidade_id: string | null
 }
 
 // ===== Anos com dados =====
+/** Busca todas as páginas de uma consulta. O Supabase limita cada resposta a 1000 linhas. */
+export async function fetchAllPages<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>,
+  pageSize = 1000,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await page(from, from + pageSize - 1);
+    if (error) throw error;
+    out.push(...(data ?? []));
+    if (!data || data.length < pageSize) return out;
+  }
+}
+
 export async function listAnosComColetas(): Promise<number[]> {
-  const { data, error } = await supabase.from("coletas").select("data").order("data", { ascending: false }).limit(5000);
-  if (error) throw error;
+  const data = await fetchAllPages<{ data: string }>((from, to) =>
+    supabase.from("coletas").select("data").order("data", { ascending: false }).order("id").range(from, to) as any,
+  );
   const anos = new Set<number>();
   for (const r of data ?? []) {
     const y = (r as any).data?.slice(0, 4);
@@ -698,24 +713,26 @@ export async function getColeta(id: string): Promise<ColetaComItens | null> {
 }
 
 export async function listColetasByUnidade(unidade_id: string): Promise<ColetaComItens[]> {
-  const { data, error } = await supabase
-    .from("coletas")
-    .select("*, itens:coleta_itens(*)")
-    .eq("unidade_id", unidade_id)
-    .order("data", { ascending: false })
-    .limit(1000);
-  if (error) throw error;
-  return (data ?? []) as any;
+  return fetchAllPages<ColetaComItens>((from, to) =>
+    supabase
+      .from("coletas")
+      .select("*, itens:coleta_itens(*)")
+      .eq("unidade_id", unidade_id)
+      .order("data", { ascending: false })
+      .order("id")
+      .range(from, to) as any,
+  );
 }
 
 export async function listAllColetas(): Promise<ColetaComItens[]> {
-  const { data, error } = await supabase
-    .from("coletas")
-    .select("*, itens:coleta_itens(*)")
-    .order("data", { ascending: false })
-    .limit(1000);
-  if (error) throw error;
-  return (data ?? []) as any;
+  return fetchAllPages<ColetaComItens>((from, to) =>
+    supabase
+      .from("coletas")
+      .select("*, itens:coleta_itens(*)")
+      .order("data", { ascending: false })
+      .order("id")
+      .range(from, to) as any,
+  );
 }
 
 export async function updateColetaMtr(id: string, mtr: string | null) {
