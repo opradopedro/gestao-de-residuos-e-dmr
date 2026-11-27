@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ImportStatusBanner } from "@/components/ImportStatusBanner";
 import { HistoryDialog } from "@/components/HistoryDialog";
+import { DEMO_MODE } from "@/lib/demo-mode";
 
 type NavItem = { to: string; label: string; icon: any; exact?: boolean; badge?: "risco" };
 const NAV: NavItem[] = [
@@ -194,6 +195,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
       </aside>
       <main className="flex-1 min-w-0">
+        {DEMO_MODE && (
+          <div className="border-b border-warning/40 bg-warning/15 px-4 py-2 text-sm text-warning-foreground">
+            <b>Demonstração somente leitura.</b> Navegue e abra o que quiser, mas nada é salvo. Os dados são fictícios.
+          </div>
+        )}
         {/* Mobile header */}
         <div className="md:hidden border-b border-border p-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
